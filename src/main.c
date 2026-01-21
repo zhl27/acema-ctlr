@@ -1,5 +1,9 @@
 int main() {
-// write your code here
+    GestorDeVuelo gestor;
 
+    gestor.setEstado(prevuelo);
 
+    while (1) {
+        gestor.ejecutarCiclo();
+    }
 }
