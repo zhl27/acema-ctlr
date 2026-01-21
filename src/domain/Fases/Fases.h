@@ -13,7 +13,7 @@ public:
 
 class Prevuelo : public Fase {
 public:
-    void actuar(GestorDeVuelo& ctx) override {
+    void actuar(GestorDeFases& ctx) override {
         ctx.logSD();
         ctx.enviarTelemetria();
 
