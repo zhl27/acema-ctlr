@@ -1,0 +1,282 @@
+@startuml
+title Computadora de Vuelo - Modelo del Dominio
+
+'========================
+' Contexto
+'========================
+class GestorDeFases {
+    -estadoActual : Fase*
+    --
+    +GestorDeFases(estadoInicial : Fase&)
+    +cambiarEstado(nuevoEstado : Fase&)
+    +ejecutarCiclo()
+    --
+    +motorEncendido : bool
+    +frenoActivo : bool
+    +velocidadVertical : float
+    +altura : float
+    +contactoSuelo : bool
+    --
+    +registrarEvento(e : const char*)
+    +enviarTelemetria(e : const char*)
+}
+
+class Cohete {
+    -{static} instancia : Cohete*
+    -eventos: List<Eventos>
+    --
+    -Cohete()
+    --
+    +{static} obtenerInstancia() : Cohete&
+    --
+    -motorEncendido : bool
+    -frenoActivo : bool
+    -velocidadVertical : float
+    -altura : float
+    -contactoSuelo : bool
+    --
+    +agregarEvento(e : const char*)
+    +enviarTelemetria(e : const char*)
+}
+
+
+class Accionador {
+  - comandos: List<Comando>
+  - accionar(): void
+  - registrarEvento(TipoDeEvento): void
+  + sucedeEvento(TipoDeEvento): void
+}
+
+
+
+
+'========================
+' PID
+'========================
+
+class ControladorPID {
+
+}
+
+
+'========================
+' Fases
+'========================
+interface Fase {
+    +actuar(ctx : GestorDeFases)
+    -cumpleCondicionParaCambiarDeFase(ctx: GestorDeFases)
+    +nombre() : const char*
+}
+note left of Fase
+`actuar(...)` usa a
+`cumpleCondicionParaCambiarDeFase(...)`
+end note
+
+class Prevuelo implements Fase {
+    +actuar(ctx : GestorDeFases)
+    +nombre() : const char*
+}
+
+class Impulso implements Fase {
+    +actuar(ctx : GestorDeFases)
+    +nombre() : const char*
+}
+
+class Balistica implements Fase {
+    +actuar(ctx : GestorDeFases)
+    +nombre() : const char*
+}
+
+class FrenadoAerodinamico implements Fase {
+    +actuar(ctx : GestorDeFases)
+    +nombre() : const char*
+}
+
+class Apogeo implements Fase {
+    +actuar(ctx : GestorDeFases)
+    +nombre() : const char*
+}
+
+class AperturaDrogue implements Fase {
+    +actuar(ctx : GestorDeFases)
+    +nombre() : const char*
+}
+
+class DescensoRapido implements Fase {
+    +actuar(ctx : GestorDeFases)
+    +nombre() : const char*
+}
+
+class AperturaParacaidasPrincipal implements Fase  {
+    +actuar(ctx : GestorDeFases)
+    +nombre() : const char*
+}
+
+class DescensoLento implements Fase {
+    +actuar(ctx : GestorDeFases)
+    +nombre() : const char*
+}
+
+class Aterrizaje implements Fase {
+    +actuar(ctx : GestorDeFases)
+    +nombre() : const char*
+}
+
+
+'========================
+' Comandos
+'========================
+
+interface Comando {
+  +accionar(): void
+}
+
+class AbrirParacaidasPpal implements Comando {
+  - paracaidasPpal: ParacaidasPrincipal
+  +accionar(): void
+}
+class AbrirDrogue implements Comando {
+  - drogue: Drogue
+  +accionar(): void
+}
+class AbrirFrenoAerodinamica implements Comando {
+  - freno: FrenoAerodinamico
+  +accionar(): void
+}
+class CerrarFrenoAerodinamica implements Comando {
+  - freno: FrenoAerodinamico
+  +accionar(): void
+}
+class ActivarAlarma implements Comando {
+  - alarma: Alarma
+  +accionar(): void
+}
+class DesactivarAlarma implements Comando {
+  - alarma: Alarma
+  +accionar(): void
+}
+
+
+
+'========================
+' Actuadores
+'========================
+
+class EmisorDeTelemetria {
+    +emitir(datos: void*)
+}
+
+' Servo Vcc
+class FrenoAerodinamico {
+    +abrir()
+    +cerrar()
+
+}
+
+class Drogue {
+    +abrir()
+}
+
+class ParacaidasPrincipal {
+    +abrir()
+}
+
+' Buzz
+class Alarma {
+    +activar()
+    +desactivar()
+}
+
+'========================
+' Sensores
+'========================
+' receptor se asigna a través de DI
+
+' BMP180 y BMP280
+class SensorDePresion {
+    - receptor: ReceptorDePresion
+    --
+    + recibirDato(dato: void*)
+}
+
+' MPU 6050
+class Acelerometro {
+    - receptor: ReceptorDeAceleracion
+    --
+    + recibirDato(dato: void*)
+}
+
+class GPS {
+    - receptor: ReceptorDeCoordenadas
+    --
+    + recibirDato(dato: void*)
+}
+
+'========================
+' Receptores
+'========================
+' accionador se asigna a través de DI
+
+
+class ReceptorDePresion {
+  - accionador: Accionador
+  + evaluar(dato: double): void
+}
+
+class ReceptorDeCoordenadas {
+  - accionador: Accionador
+  + evaluar(coors: Coordenadas): void
+}
+class Coordenadas {
+  - latitud: double
+  - longitud: double
+}
+
+class ReceptorDeAceleracion {
+  - accionador: Accionador
+  + evaluar(dato: double): void
+}
+
+note bottom of ReceptorDeCoordenadas
+Cada receptor va a recibir en tiempo real los datos de los sensores.
+
+Cada receptor va a evaluar si sucede un evento.
+
+Si sucede un evento, se utiliza el accionador configurado para
+realizar con los actuadores correspondientes las acciones necesarias.
+
+El GestorDeFases va a estar en medio para evitar acciones inválidas --> medida de seguridad
+end note
+
+
+'========================
+' Relaciones
+'========================
+
+GestorDeFases --> Fase
+GestorDeFases ..> Cohete
+
+SensorDePresion --> ReceptorDePresion
+Acelerometro --> ReceptorDeAceleracion
+GPS --> ReceptorDeCoordenadas
+
+
+ReceptorDeCoordenadas ..> Coordenadas
+GPS ..> Coordenadas
+ReceptorDeCoordenadas --> Accionador
+ReceptorDeAceleracion --> Accionador
+ReceptorDePresion --> Accionador
+
+Accionador -->"*" Comando
+
+
+DesactivarAlarma --> Alarma
+ActivarAlarma --> Alarma
+AbrirDrogue --> Drogue
+AbrirParacaidasPpal --> ParacaidasPrincipal
+AbrirFrenoAerodinamica --> FrenoAerodinamico
+CerrarFrenoAerodinamica --> FrenoAerodinamico
+
+
+
+@enduml

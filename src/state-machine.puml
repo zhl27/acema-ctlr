@@ -1,0 +1,26 @@
+@startuml
+title Máquina de Estados - Cohete
+
+[*] --> Prevuelo
+
+Prevuelo --> FaseImpulso : Lanzamiento detectado
+
+FaseImpulso --> FaseBalistica : Motor apagado
+
+FaseBalistica --> FaseFrenoAerodinamico : Condición de frenado
+
+FaseFrenoAerodinamico --> Apogeo : Velocidad vertical = 0
+
+Apogeo --> AperturaDrogue : Desplegar drogue
+
+AperturaDrogue --> DescensoRapido : Drogue estable
+
+DescensoRapido --> AperturaParacaidasPrincipal : Altura <= 250m
+
+AperturaParacaidasPrincipal --> DescensoLento : Paracaídas principal desplegado
+
+DescensoLento --> Aterrizaje : Velocidad ≈ 0 y contacto suelo
+
+Aterrizaje --> [*]
+
+@enduml
