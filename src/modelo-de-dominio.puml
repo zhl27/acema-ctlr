@@ -35,8 +35,8 @@ class Cohete {
     -altura : float
     -contactoSuelo : bool
     --
-    +agregarEvento(e : const char*)
-    +enviarTelemetria(e : const char*)
+    +agregarEvento(e: const char*)
+    +enviarTelemetria(e: const char*)
 }
 
 

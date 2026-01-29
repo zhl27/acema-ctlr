@@ -9,6 +9,26 @@
 class Estado; // forward declaration --> para que class GestorDeFases pueda conocerlo
 
 class GestorDeFases {
+    // Private constructor to enforce singleton
+    GestorDeFases()
+        : estadoActual(nullptr),
+          altitud(0.0f),
+          velocidad(0.0f),
+          aceleracion(0.0f),
+          frenoAerodinamicoAbierto(false),
+          drogueAbierto(false),
+          paracaidasPrincipalAbierto(false) {}
+
+    ~GestorDeFases() = default;
+
+    // Non-copyable, non-movable
+    GestorDeFases(const GestorDeFases&) = delete;
+    GestorDeFases& operator=(const GestorDeFases&) = delete;
+    GestorDeFases(GestorDeFases&&) = delete;
+    GestorDeFases& operator=(GestorDeFases&&) = delete;
+
+    Estado* estadoActual;
+
 public:
     // Meyers singleton accessor
     static GestorDeFases& getInstance() {
@@ -41,27 +61,6 @@ public:
 
     void logSD();
     void enviarTelemetria();
-
-private:
-    // Private constructor to enforce singleton
-    GestorDeFases()
-        : estadoActual(nullptr),
-          altitud(0.0f),
-          velocidad(0.0f),
-          aceleracion(0.0f),
-          frenoAerodinamicoAbierto(false),
-          drogueAbierto(false),
-          paracaidasPrincipalAbierto(false) {}
-
-    ~GestorDeFases() = default;
-
-    // Non-copyable, non-movable
-    GestorDeFases(const GestorDeFases&) = delete;
-    GestorDeFases& operator=(const GestorDeFases&) = delete;
-    GestorDeFases(GestorDeFases&&) = delete;
-    GestorDeFases& operator=(GestorDeFases&&) = delete;
-
-    Estado* estadoActual;
 };
 
 

@@ -18,6 +18,3 @@ static AperturaParacaidasPrincipal aperturaParacaidasPrincipal;
 static DescensoLento descensoLento;
 static Aterrizaje aterrizaje;
 
-void GestorDeFases::ejecutarCiclo() {
-    this.estadoActual->actuar(*this);
-}
