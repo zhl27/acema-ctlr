@@ -1,18 +1,10 @@
 #include <Arduino.h>
-#include "../lib/Domain/GestorDeFases/GestorDeFases.h"
 
 void setup() {
-    GestorDeFases gestor;
-
-    gestor.setEstado(prevuelo);
-
-    while (1) {
-        gestor.ejecutarCiclo();
-    }
-
+    Serial.begin (115200);
+    Serial.println("Hello World");
 }
 
-void loop() {
-
+void loop() { // este task loop lo dedicamos a leer datos de entrada
 
 }
