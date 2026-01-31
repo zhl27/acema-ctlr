@@ -2,16 +2,18 @@
 // Created by lucaz on 30/1/2026.
 //
 
-#ifndef LOGGINPORT_H
-#define LOGGINPORT_H
+#ifndef LOGGINGPORT_H
+#define LOGGINGPORT_H
 
 
 
-class LogginPort {
+// SD Card
+class LoggingPort {
 public:
-
+    LoggingPort();
+    void save(void* data);
 };
 
 
 
-#endif //LOGGINPORT_H
+#endif //LOGGINGPORT_H

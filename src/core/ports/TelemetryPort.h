@@ -6,10 +6,12 @@
 #define TELEMETRYPORT_H
 
 
-
+// LoRa
 class TelemetryPort {
 public:
-
+    TelemetryPort();
+    void send();
+    void receive();
 };
 
 
