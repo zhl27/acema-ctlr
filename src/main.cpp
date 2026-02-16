@@ -3,6 +3,7 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BMP085.h>   // BMP180
 #include <Adafruit_BMP280.h>
+#include <TinyGPS++.h>
 #include <Wire.h>
 
 #include <../lib/SerialPrint/SerialPrint.h>
@@ -10,11 +11,14 @@
 Adafruit_MPU6050 mpu;
 Adafruit_BMP085 bmp180;
 Adafruit_BMP280 bmp280;
-
+TinyGPSPlus gps;
+HardwareSerial SerialGPS(2); // Pines 16 (RX) y 17 (TX)
 
 
 void setup() {
   Serial.begin(921600);
+  SerialGPS.begin(9600, SERIAL_8N1, 16, 17);
+
 
   Wire.begin(21, 22);
   Wire.setClock(400000); // I2C a 400kHz (Fast Mode)
@@ -67,6 +71,14 @@ void loop() {
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
 
+  while (SerialGPS.available() > 0) {
+    gps.encode(SerialGPS.read());
+  }
+
+  SerialPrint::plot("num_satelites", static_cast<float>(gps.satellites.value()));
+  SerialPrint::plot("s_lat", static_cast<float>(gps.location.lat()));
+  SerialPrint::plot("s_long", static_cast<float>(gps.location.lng()));
+
   // // Calculate altitude assuming 'standard' barometric
   // // pressure of 1013.25 millibar = 101325 Pascal
   // Serial.print(bmp180.readAltitude()); // meters
@@ -76,7 +88,6 @@ void loop() {
   // // vary with weather and such. If it is 1015 millibars
   // // that is equal to 101500 Pascals.
   // Serial.print(bmp180.readAltitude(102000));
-
 
    // Accelerometer
   SerialPrint::plot("ax", a.acceleration.x);
