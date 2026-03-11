@@ -3,7 +3,7 @@
 
 
 void setup() {
-  Serial.begin(921600);
+  Serial.begin(115200);
 
   while (!Serial)
     delay(10); // will pause mcu until serial console opens
@@ -11,4 +11,5 @@ void setup() {
 
 void loop() {
   SerialPrint::plot("dummy", 10);
+  delay(10);
 }
