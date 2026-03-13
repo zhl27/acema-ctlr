@@ -10,6 +10,8 @@ void setup() {
 }
 
 void loop() {
-  SerialPrint::plot("dummy", 10);
+  SerialPrint::plot("rand0", static_cast<float>(esp_random()));
+  SerialPrint::plot("rand1", static_cast<float>(esp_random()));
+  SerialPrint::plot("rand2", static_cast<float>(esp_random()));
   delay(10);
 }
