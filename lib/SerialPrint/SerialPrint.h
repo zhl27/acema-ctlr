@@ -9,55 +9,33 @@
 
 #define BUFFER_SIZE 150
 
+// cuidado con que los mensajes contengan los caracteres "$" y ";"
 #define PROTOCOL_SEPARATOR '$'
 #define DATA_SEPARATOR ';'
 #define KEYVALUE_SEPARATOR '='
 #define FLOAT_PRECISION 3
 
+
+// TODO: enviar todos los datos juntos al finalizar un loop (actually un solo loop sigue siendo ineficiente), no inmediatamente, así ahorramos ancho de banda
+
+// TODO: mejorar código para evitar ineficiencia conversión float a string
+
+char* concat(int num, ...);
+
 class SerialPrint {
+    static bool safe_print(const char *format, ...);
+    static bool timestamped_safe_print(const char* format, ...);
 public:
     // Datos que queremos graficar
     // template <typename T> static void plot(const char key[], T value, ) { // no recomendable en embedded
-    static void plot(const char key[], const float value) {
-        char buffer[BUFFER_SIZE];
-        snprintf(buffer, sizeof(buffer),
-           "PLOT%c%s%c%.*f",
-           PROTOCOL_SEPARATOR,
-           key,
-           KEYVALUE_SEPARATOR,
-           FLOAT_PRECISION,
-           value
-           // DATA_SEPARATOR
-           );
+    static void plot(const char key[], float value);
 
-        Serial.println(buffer);
-    }
     // Mensajes triviales. Ej.: "¡Enviado exitosamente!"
-    static void msg(const char* message) {
-        char buffer[BUFFER_SIZE];
-        snprintf(buffer, sizeof(buffer),
-           "MSG%c%s",
-           PROTOCOL_SEPARATOR,
-           message
-           // DATA_SEPARATOR
-           );
+    static void msg(const char* message);
 
-        Serial.println(buffer);
-    }
     // Mensajes de error
-    static void err(const char* error_msg) {
-        char buffer[BUFFER_SIZE];
-        snprintf(buffer, sizeof(buffer),
-           "ERR%c%s",
-           PROTOCOL_SEPARATOR,
-           error_msg
-           // DATA_SEPARATOR
-           );
-
-        Serial.println(buffer);
-    }
+    static void err(const char* error_msg);
 };
-
 
 
 #endif //SERIALPRINT_H
