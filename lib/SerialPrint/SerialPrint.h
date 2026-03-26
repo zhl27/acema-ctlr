@@ -20,11 +20,11 @@
 
 // TODO: mejorar código para evitar ineficiencia conversión float a string
 
-
-static bool safePrint(const char* format, ...);
+char* concat(int num, ...);
 
 class SerialPrint {
-    static bool safePrint(const char* format, ...);
+    static bool safe_print(const char *format, ...);
+    static bool timestamped_safe_print(const char* format, ...);
 public:
     // Datos que queremos graficar
     // template <typename T> static void plot(const char key[], T value, ) { // no recomendable en embedded
@@ -36,7 +36,6 @@ public:
     // Mensajes de error
     static void err(const char* error_msg);
 };
-
 
 
 #endif //SERIALPRINT_H
