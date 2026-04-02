@@ -75,9 +75,9 @@ void loop() {
     gps.encode(SerialGPS.read());
   }
 
-  SerialPrint::plot("num_satelites", static_cast<float>(gps.satellites.value()));
-  SerialPrint::plot("s_lat", static_cast<float>(gps.location.lat()));
-  SerialPrint::plot("s_long", static_cast<float>(gps.location.lng()));
+  // SerialPrint::plot("num_satelites", static_cast<float>(gps.satellites.value()));
+  // SerialPrint::plot("s_lat", static_cast<float>(gps.location.lat()));
+  // SerialPrint::plot("s_long", static_cast<float>(gps.location.lng()));
 
   // // Calculate altitude assuming 'standard' barometric
   // // pressure of 1013.25 millibar = 101325 Pascal
