@@ -1,112 +1,65 @@
-#include <Arduino.h>
-#include <Adafruit_MPU6050.h>
-#include <Adafruit_Sensor.h>
-#include <Adafruit_BMP085.h>   // BMP180
-#include <Adafruit_BMP280.h>
-#include <TinyGPS++.h>
-#include <Wire.h>
+#include <HX711_ADC.h>
+#include <SerialPrint.h>
 
-#include <../lib/SerialPrint/SerialPrint.h>
+const int boton_emergencia = 3;
+const int boton_ignicion = 4;
+const int boton_onoff = 5;
+const int buzz = 2;
 
-Adafruit_MPU6050 mpu;
-Adafruit_BMP085 bmp180;
-Adafruit_BMP280 bmp280;
-TinyGPSPlus gps;
-HardwareSerial SerialGPS(2); // Pines 16 (RX) y 17 (TX)
-
+const int dt = 6;
+const int sck = 7;
+float factor_calibracion = 102.82;
+HX711_ADC balanza(dt, sck);
 
 void setup() {
-  Serial.begin(921600);
-  SerialGPS.begin(9600, SERIAL_8N1, 16, 17);
+  Serial.begin(115200);
 
+  pinMode(boton_emergencia,INPUT);
+  pinMode(boton_ignicion, INPUT);
+  pinMode(boton_onoff, INPUT);
+  pinMode(buzz, OUTPUT);
 
-  Wire.begin(21, 22);
-  Wire.setClock(400000); // I2C a 400kHz (Fast Mode)
-
-  while (!Serial)
-    delay(10); // will pause mcu until serial console opens
-
-  if (!mpu.begin()) {
-    SerialPrint::err("Failed to find MPU6050 chip.");
-    while (1) delay(10);
+  SerialPrint::msg("iniciando balanza...");
+  balanza.begin();
+  delay(500);
+  balanza.start(2000);
+  // Verificar si la lectura está saturada (típico de cables de celda sueltos)
+  if (abs(balanza.getData()) > 100000) {
+    SerialPrint::err("[ERR C02]");
+  } else {
+    delay(500);
+    balanza.setCalFactor(-factor_calibracion);
+    delay(500);
+    balanza.tare();
   }
-  else {
-    SerialPrint::msg("MPU6050 Found!");
-    // Configurar MPU para máxima velocidad de respuesta
-    mpu.setFilterBandwidth(MPU6050_BAND_260_HZ);
-  }
-
-  if (!bmp180.begin()) {
-    SerialPrint::err("Could not find a valid BMP180 sensor, check wiring!");
-    while (1) delay(10);
-  }
-  else {
-    SerialPrint::msg("BMP180 Found!");
-  }
-
-  if (!bmp280.begin(0x76)) {
-    SerialPrint::err("Could not find a valid BMP180 sensor, check wiring!");
-    // If you don't have a BMP180 connected, you should comment out the BMP180 lines in loop()
-    while (1) delay(10);
-  }
-  else {
-    SerialPrint::msg("BMP180 Found!");
-    // Config BMP280
-    bmp280.setSampling(
-        Adafruit_BMP280::MODE_NORMAL,
-        Adafruit_BMP280::SAMPLING_X2,
-        Adafruit_BMP280::SAMPLING_X16,
-        Adafruit_BMP280::FILTER_X16,
-        Adafruit_BMP280::STANDBY_MS_250
-    );
-  }
-
-  delay(100);
+  SerialPrint::msg("balanza lista");
 }
 
-
-
 void loop() {
+  bool estado_boton_emergencia = digitalRead(boton_emergencia);
+  bool estado_boton_ignicion = digitalRead(boton_ignicion);
+  bool estado_boton_onoff = digitalRead(boton_onoff);
 
-  sensors_event_t a, g, temp;
-  mpu.getEvent(&a, &g, &temp);
-
-  while (SerialGPS.available() > 0) {
-    gps.encode(SerialGPS.read());
+  if(estado_boton_ignicion == HIGH) {
+    digitalWrite(buzz, HIGH);
+  } else{
+    digitalWrite(buzz, LOW);
   }
 
-  // SerialPrint::plot("num_satelites", static_cast<float>(gps.satellites.value()));
-  // SerialPrint::plot("s_lat", static_cast<float>(gps.location.lat()));
-  // SerialPrint::plot("s_long", static_cast<float>(gps.location.lng()));
+  bool nuevo_dato = balanza.update();
+  // if (nuevo_dato) { peso = balanza.getData();}
+  Serial.print("PLOT$peso=");
+  Serial.print(balanza.getData());
 
-  // // Calculate altitude assuming 'standard' barometric
-  // // pressure of 1013.25 millibar = 101325 Pascal
-  // Serial.print(bmp180.readAltitude()); // meters
-  // Serial.print(bmp180.readSealevelPressure()); // Pa
-  // // you can get a more precise measurement of altitude
-  // // if you know the current sea level pressure which will
-  // // vary with weather and such. If it is 1015 millibars
-  // // that is equal to 101500 Pascals.
-  // Serial.print(bmp180.readAltitude(102000));
+  Serial.print(";btn_ign=");
+  Serial.print(estado_boton_ignicion);
 
-   // Accelerometer
-  SerialPrint::plot("ax", a.acceleration.x);
-  SerialPrint::plot("ay", a.acceleration.y);
-  SerialPrint::plot("az", a.acceleration.z);
+  Serial.print(";btn_emg=");
+  Serial.print(estado_boton_emergencia);
 
-  // Gyroscope
-  SerialPrint::plot("gx", g.gyro.x);
-  SerialPrint::plot("gy", g.gyro.y);
-  SerialPrint::plot("gz", g.gyro.z);
+  Serial.print(";btn_onoff=");
+  Serial.print(estado_boton_onoff);
 
-  // Temperature (MPU)
-  SerialPrint::plot("mt", temp.temperature);
-
-  // BMP180 Data
-  SerialPrint::plot("bt", bmp180.readTemperature());
-  SerialPrint::plot("bp", bmp180.readSealevelPressure());
-  SerialPrint::plot("ba", bmp180.readAltitude(102000));
-
-
-  delay(10);
+  Serial.print(";t_time=");
+  Serial.println(millis());
 }

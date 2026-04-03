@@ -8,11 +8,10 @@
 // tener en cuenta los riesgos de usar variadic functions --> no afecta a nuestro caso de uso
 bool SerialPrint::safe_print(const char *format, ...) {
     char buffer[BUFFER_SIZE];
-    const int64_t t_time = esp_timer_get_time();
+    const int64_t t_time = micros();
     int res = 0;
     va_list args;
     va_start(args, format);
-    char* str[20]; // 2 ^ 63 = 9223372036854775808 --> tiene 19 dígitos decimales --> en string son 19 chars --> 20 chars en total máximo (contando null terminator)
     res += vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
     res += snprintf(buffer, sizeof(buffer), "%s%ct_time%c%lld", buffer, DATA_SEPARATOR, KEYVALUE_SEPARATOR, t_time);
