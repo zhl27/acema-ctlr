@@ -61,22 +61,6 @@ void SerialPrint::err(const char* error_msg) {
     );
 }
 
-
-// bool SerialPrint::timestamped_safe_print(const char *format, ...) {
-//
-//     va_list args;
-//     va_start(args, format);
-//     safe_print(format+"%c%lld",
-//                args,
-//                DATA_SEPARATOR,
-//                esp_timer_get_time()
-//     );
-//     va_end(args);
-//
-//     return true;
-// }
-
-
 /*
  * Versión con buffer dinámico --> genera mem frag, considerar
 * static void safePrint(const char* format, ...) {
