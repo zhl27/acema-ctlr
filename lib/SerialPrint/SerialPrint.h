@@ -24,7 +24,6 @@ char* concat(int num, ...);
 
 class SerialPrint {
     static bool safe_print(const char *format, ...);
-    static bool timestamped_safe_print(const char* format, ...);
 public:
     // Datos que queremos graficar
     // template <typename T> static void plot(const char key[], T value, ) { // no recomendable en embedded
