@@ -14,10 +14,10 @@ HX711_ADC balanza(dt, sck);
 void setup() {
   Serial.begin(115200);
 
-  pinMode(boton_emergencia,INPUT);
-  pinMode(boton_ignicion, INPUT);
-  pinMode(boton_onoff, INPUT);
-  pinMode(buzz, OUTPUT);
+  // pinMode(boton_emergencia,INPUT);
+  // pinMode(boton_ignicion, INPUT);
+  // pinMode(boton_onoff, INPUT);
+  // pinMode(buzz, OUTPUT);
 
   SerialPrint::msg("iniciando balanza...");
   balanza.begin();
@@ -36,30 +36,31 @@ void setup() {
 }
 
 void loop() {
-  bool estado_boton_emergencia = digitalRead(boton_emergencia);
-  bool estado_boton_ignicion = digitalRead(boton_ignicion);
-  bool estado_boton_onoff = digitalRead(boton_onoff);
+  // bool estado_boton_emergencia = digitalRead(boton_emergencia);
+  // bool estado_boton_ignicion = digitalRead(boton_ignicion);
+  // bool estado_boton_onoff = digitalRead(boton_onoff);
 
-  if(estado_boton_ignicion == HIGH) {
-    digitalWrite(buzz, HIGH);
-  } else{
-    digitalWrite(buzz, LOW);
-  }
+  // if(estado_boton_ignicion == HIGH) {
+  //   digitalWrite(buzz, HIGH);
+  // } else{
+  //   digitalWrite(buzz, LOW);
+  // }
 
   bool nuevo_dato = balanza.update();
   // if (nuevo_dato) { peso = balanza.getData();}
-  Serial.print("PLOT$peso=");
-  Serial.print(balanza.getData());
+  SerialPrint::plot("peso", static_cast<int>(balanza.getData()));
+  // Serial.print("PLOT$peso=");
+  // Serial.print(balanza.getData());
 
-  Serial.print(";btn_ign=");
-  Serial.print(estado_boton_ignicion);
+  // Serial.print(";btn_ign=");
+  // Serial.print(estado_boton_ignicion);
+  //
+  // Serial.print(";btn_emg=");
+  // Serial.print(estado_boton_emergencia);
+  //
+  // Serial.print(";btn_onoff=");
+  // Serial.print(estado_boton_onoff);
 
-  Serial.print(";btn_emg=");
-  Serial.print(estado_boton_emergencia);
-
-  Serial.print(";btn_onoff=");
-  Serial.print(estado_boton_onoff);
-
-  Serial.print(";t_time=");
-  Serial.println(millis());
+  // Serial.print(";t_time=");
+  // Serial.println(millis());
 }

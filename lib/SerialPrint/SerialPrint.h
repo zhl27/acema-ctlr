@@ -7,7 +7,7 @@
 
 #include <Arduino.h>
 
-#define BUFFER_SIZE 150
+#define BUFFER_SIZE 200
 
 // cuidado con que los mensajes contengan los caracteres "$" y ";"
 #define PROTOCOL_SEPARATOR '$'
@@ -29,6 +29,7 @@ public:
     // Datos que queremos graficar
     // template <typename T> static void plot(const char key[], T value, ) { // no recomendable en embedded
     static void plot(const char key[], float value);
+    static void plot(const char key[], int value);
 
     // Mensajes triviales. Ej.: "¡Enviado exitosamente!"
     static void msg(const char* message);
