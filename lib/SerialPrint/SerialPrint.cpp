@@ -4,18 +4,21 @@
 
 #include "SerialPrint.h"
 
+constexpr int pow10(int x) {
+    return (x == 0) ? 1 : 10 * pow10(x - 1);
+}
 
-// tener en cuenta los riesgos de usar variadic functions --> no afecta a nuestro caso de uso
+// TODO: tener en cuenta los riesgos de usar variadic functions --> no afecta a nuestro caso de uso
 bool SerialPrint::safe_print(const char *format, ...) {
     char buffer[BUFFER_SIZE];
-    const int64_t t_time = esp_timer_get_time();
+    const unsigned long t_time = millis();
     int res = 0;
     va_list args;
     va_start(args, format);
     char* str[20]; // 2 ^ 63 = 9223372036854775808 --> tiene 19 dígitos decimales --> en string son 19 chars --> 20 chars en total máximo (contando null terminator)
     res += vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
-    res += snprintf(buffer, sizeof(buffer), "%s%ct_time%c%lld", buffer, DATA_SEPARATOR, KEYVALUE_SEPARATOR, t_time);
+    res += snprintf(buffer, sizeof(buffer), "%s%ct_time%c%lu", buffer, DATA_SEPARATOR, KEYVALUE_SEPARATOR, t_time);
 
     if (res < 0) {
         Serial.println("ERR$format_error");
@@ -32,13 +35,23 @@ bool SerialPrint::safe_print(const char *format, ...) {
 }
 
 
-void SerialPrint::plot(const char key[], const float value) {
+// void SerialPrint::plot(const char key[], const float value) { // TODO: impl defectuosa
+//     const int scaled = static_cast<int>(value * pow10(FLOAT_PRECISION));
+//     safe_print(
+//         "PLOT%c%s%c%d",
+//         PROTOCOL_SEPARATOR,
+//         key,
+//         KEYVALUE_SEPARATOR,
+//         FLOAT_PRECISION,
+//         scaled
+//     );
+// }
+void SerialPrint::plot(const char key[], const int value) {
     safe_print(
-        "PLOT%c%s%c%.*f",
+        "PLOT%c%s%c%d",
         PROTOCOL_SEPARATOR,
         key,
         KEYVALUE_SEPARATOR,
-        FLOAT_PRECISION,
         value
     );
 }

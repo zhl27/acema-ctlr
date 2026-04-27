@@ -27,7 +27,7 @@ class SerialPrint {
 public:
     // Datos que queremos graficar
     // template <typename T> static void plot(const char key[], T value, ) { // no recomendable en embedded
-    static void plot(const char key[], float value);
+    static void plot(const char key[], int value);
 
     // Mensajes triviales. Ej.: "¡Enviado exitosamente!"
     static void msg(const char* message);
