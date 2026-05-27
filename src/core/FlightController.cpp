@@ -6,10 +6,5 @@
 
 
 void FlightController::update() {
-    if (serial.available()) {
-        char c = serial.read();
-
-        if (c == '1') led.on();
-        if (c == '0') led.off();
-    }
+    return;
 }

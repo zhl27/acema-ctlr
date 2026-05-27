@@ -5,22 +5,27 @@
 #ifndef SDCARDLOGGER_H
 #define SDCARDLOGGER_H
 #include <Printable.h>
-#include <>
+#include <Arduino.h>
+#include <SD.h>
 
 class SdCardLogger {
-    File file;
+    File _file;
 
 public:
     bool init(const char* filename) {
-        file = SD.open(filename, FILE_APPEND);
-        return file;
+        _file = SD.open(filename, FILE_APPEND);
+        if (!_file) {
+            return false;
+        }
+
+        return true;
     }
 
     int log(const Printable& obj) {
-        if (!file) return -1; // error
-        obj.printTo(file);
-        file.println(); // Es como printear "\n"
-        file.flush();
+        if (!_file) return -1; // error
+        obj.printTo(_file);
+        _file.println(); // Es como printear "\n"
+        _file.flush();
     }
 };
 

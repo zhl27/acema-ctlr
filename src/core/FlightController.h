@@ -7,7 +7,6 @@
 
 #include <fases.h>
 
-#include "fases.h"
 #include "ports/LcdPort.h"
 #include "ports/LoggingPort.h"
 #include "ports/TelemetryPort.h"
@@ -31,9 +30,7 @@ public:
           geoPositioning_(geoPositioning) {
     };
 
-    void update() {
-        // hacer cosas con los ports
-    }
+    void update();
 };
 
 /*

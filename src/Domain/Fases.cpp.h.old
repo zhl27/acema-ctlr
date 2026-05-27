@@ -5,7 +5,7 @@
 #ifndef FASES_H
 #define FASES_H
 
-#include "GestorDeFases.h"
+#include "GestorDeFases.cpp.h"
 
 class Prevuelo;
 class FaseImpulso;
