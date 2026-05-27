@@ -1,12 +1,16 @@
 #include <Arduino.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
+#include <TinyGPS++.h>
 #include <Wire.h>
 
 Adafruit_MPU6050 mpu;
+TinyGPSPlus gps;
+HardwareSerial SerialGPS(2); // Pines 16 (RX) y 17 (TX)
 
 void setup() {
   Serial.begin(115200);
+  SerialGPS.begin(9600, SERIAL_8N1, 16, 17);
   while (!Serial)
     delay(10); // will pause Zero, Leonardo, etc until serial console opens
 
@@ -34,6 +38,15 @@ void setup() {
 }
 
 void loop() {
+
+  while (SerialGPS.available() > 0) {
+    gps.encode(SerialGPS.read());
+  }
+
+  SerialPrint::plot("num_satelites", static_cast<float>(gps.satellites.value()));
+  SerialPrint::plot("s_lat", static_cast<float>(gps.location.lat()));
+  SerialPrint::plot("s_long", static_cast<float>(gps.location.lng()));
+
 
   if(mpu.getMotionInterruptStatus()) {
     /* Get new sensor events with the readings */
