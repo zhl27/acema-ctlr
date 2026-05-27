@@ -31,11 +31,8 @@ public:
           geoPositioning_(geoPositioning) {
     };
 
-    void update() {
-        // hacer cosas con los ports
-    }
+    void update();
 };
-
 /*
 
 
