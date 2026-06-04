@@ -3,6 +3,7 @@
 
 
 #include "globals.h"
+
 #include <actuadores/SerialPrint.h> // Tu librería personalizada
 #include "actuadores/mBuzzer.h"
 
@@ -10,7 +11,6 @@
 #include "sensores/mGPS.h"
 #include "sensores/mMPU6050.h"
 
-const int BUZZER_PIN = 25;
 
 mMPU6050 mpu;
 mBMP280 bmp;
@@ -25,27 +25,25 @@ void setup() {
     // short startup beep
     buzzer.beep(500);
 
-    Wire.begin(21, 22);
+    Wire.begin(WIRE_SDA, WIRE_SCL);
     gps.init();
 
     SerialPrint::msg("Adafruit MPU6050 & BMP280 test!");
 
-    if (!mpu.init(0x69)) {
+    if (!mpu.init(MPU_ADDR)) {
         SerialPrint::err("Failed to find MPU6050 chip");
         while (true) { delay(10); }
     }
     SerialPrint::msg("MPU6050 Found!");
 
-    if (!bmp.init(0x77, BMP280_CHIPID)) {
+    if (!bmp.init(BMP280_ADDR, BMP280_CHIPID)) {
         SerialPrint::err("Failed to find BMP280 chip");
         while (true) { delay(10); }
     }
     SerialPrint::msg("BMP280 Found!");
 
     // two short beeps to indicate sensors found
-    buzzer.beep(100);
-    delay(50);
-    buzzer.beep(100);
+    buzzer.playSuccess();
 
     delay(100);
 }
