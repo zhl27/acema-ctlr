@@ -1,6 +1,11 @@
 #include <Arduino.h>
 #include <Wire.h>
-#include <SerialPrint.h> // Tu librería personalizada
+
+
+#include "globals.h"
+#include <actuadores/SerialPrint.h> // Tu librería personalizada
+#include "actuadores/mBuzzer.h"
+
 #include "sensores/mBMP280.h"
 #include "sensores/mGPS.h"
 #include "sensores/mMPU6050.h"
@@ -10,44 +15,37 @@ const int BUZZER_PIN = 25;
 mMPU6050 mpu;
 mBMP280 bmp;
 mGPS gps;
+mBuzzer buzzer(BUZZER_PIN);
 
 void setup() {
-    Serial.begin(115200);
+    SerialPrint::init(SERIAL_BAUDRATE);
 
-    pinMode(BUZZER_PIN, OUTPUT);
-    digitalWrite(BUZZER_PIN, HIGH);
-    delay(500);
-    digitalWrite(BUZZER_PIN, LOW);
+    // initialize buzzer using mBuzzer implementation
+    buzzer.init();
+    // short startup beep
+    buzzer.beep(500);
 
     Wire.begin(21, 22);
     gps.init();
 
-    while (!Serial)
-        delay(10);
-
-    Serial.println("Adafruit MPU6050 & BMP280 test!");
+    SerialPrint::msg("Adafruit MPU6050 & BMP280 test!");
 
     if (!mpu.init(0x69)) {
-        Serial.println("Failed to find MPU6050 chip");
-        while (1) { delay(10); }
+        SerialPrint::err("Failed to find MPU6050 chip");
+        while (true) { delay(10); }
     }
-    Serial.println("MPU6050 Found!");
+    SerialPrint::msg("MPU6050 Found!");
 
     if (!bmp.init(0x77, BMP280_CHIPID)) {
-        Serial.println("Failed to find BMP280 chip");
-        while (1) { delay(10); }
+        SerialPrint::err("Failed to find BMP280 chip");
+        while (true) { delay(10); }
     }
-    Serial.println("BMP280 Found!");
+    SerialPrint::msg("BMP280 Found!");
 
-    Serial.println("");
-
-    digitalWrite(BUZZER_PIN, HIGH);
-    delay(100);
-    digitalWrite(BUZZER_PIN, LOW);
+    // two short beeps to indicate sensors found
+    buzzer.beep(100);
     delay(50);
-    digitalWrite(BUZZER_PIN, HIGH);
-    delay(100);
-    digitalWrite(BUZZER_PIN, LOW);
+    buzzer.beep(100);
 
     delay(100);
 }

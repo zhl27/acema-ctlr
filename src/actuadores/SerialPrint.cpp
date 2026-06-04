@@ -8,6 +8,11 @@ constexpr int pow10(int x) {
     return (x == 0) ? 1 : 10 * pow10(x - 1);
 }
 
+void SerialPrint::init(int baudrate) {
+    Serial.begin(baudrate);
+}
+
+
 // TODO: tener en cuenta los riesgos de usar variadic functions --> no afecta a nuestro caso de uso
 bool SerialPrint::safe_print(const char *format, ...) {
     char buffer[BUFFER_SIZE];

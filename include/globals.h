@@ -6,6 +6,7 @@
 #define ACEMA_CTLR_GLOBALS_H
 
 #define UMBRAL_LANZAMIENTO 100 // TODO: falta implementar valor real
+#define SERIAL_BAUDRATE 115200
 #define configSUPPORT_STATIC_ALLOCATION 1
 
 typedef enum PROTOCOLO {

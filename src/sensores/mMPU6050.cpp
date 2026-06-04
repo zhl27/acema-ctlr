@@ -4,7 +4,7 @@
 
 #include "mMPU6050.h"
 
-#include "SerialPrint.h"
+#include "actuadores/SerialPrint.h"
 
 
 mMPU6050::mMPU6050()

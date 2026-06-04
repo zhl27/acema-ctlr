@@ -4,7 +4,7 @@
 
 #include "mGPS.h"
 
-#include "SerialPrint.h"
+#include "actuadores/SerialPrint.h"
 
 
 mGPS::mGPS(int uartNum, int rx, int tx, uint32_t baud)
@@ -30,7 +30,7 @@ void mGPS::update() {
             // This will print every few seconds until a lock is found
             static unsigned long lastMessage = 0;
             if (millis() - lastMessage > 2000) {
-                Serial.println("Buscando satélites...");
+                SerialPrint::msg("Buscando satélites...");
                 lastMessage = millis();
             }
         }
