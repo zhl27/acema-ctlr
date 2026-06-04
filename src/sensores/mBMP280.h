@@ -35,7 +35,7 @@ public:
      * @param chipid Sensor chip ID (default BMP280_CHIPID)
      * @return true if initialized successfully, false otherwise.
      */
-    bool begin(uint8_t addr = 0x77, uint8_t chipid = BMP280_CHIPID);
+    bool init(uint8_t addr = 0x77, uint8_t chipid = BMP280_CHIPID);
 
     /**
      * @brief Performs readings, executes threshold change checks, and sends telemetries.

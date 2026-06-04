@@ -11,8 +11,8 @@ mMPU6050::mMPU6050()
     : accelX(0.0f), accelY(0.0f), accelZ(0.0f),
       gyroX(0.0f), gyroY(0.0f), gyroZ(0.0f), temp(0.0f) {}
 
-bool mMPU6050::begin(uint8_t addr) {
-    if (!mpu.begin(addr)) {
+bool mMPU6050::init(uint8_t addr) {
+    if (!mpu.begin(addr)) { // una guarda para salir de la función
         return false;
     }
 

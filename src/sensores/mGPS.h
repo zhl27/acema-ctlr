@@ -37,7 +37,7 @@ public:
     /**
      * @brief Initializes Serial connection.
      */
-    void begin();
+    void init();
 
     /**
      * @brief Reads incoming serial data, feeds the GPS decoder, and publishes updates when new data is available.

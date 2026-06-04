@@ -10,7 +10,7 @@
 mBMP280::mBMP280()
     : last_temp(0.0f), last_pres(0.0f), last_alt(0.0f) {}
 
-bool mBMP280::begin(uint8_t addr, uint8_t chipid) {
+bool mBMP280::init(uint8_t addr, uint8_t chipid) {
     if (!bmp.begin(addr, chipid)) {
         return false;
     }

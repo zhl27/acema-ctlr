@@ -36,7 +36,7 @@ public:
      * @param addr I2C address (default 0x69)
      * @return true if initialized successfully, false otherwise.
      */
-    bool begin(uint8_t addr = 0x69);
+    bool init(uint8_t addr = 0x69);
 
     /**
      * @brief Updates internal sensor state. If motion interrupt is active, publishes plots.
