@@ -5,7 +5,7 @@
 #ifndef FLIGHTCONTROLLER_H
 #define FLIGHTCONTROLLER_H
 
-#include <fases.h>
+#include <../../include/basurero/fases.h>
 
 #include "ports/LcdPort.h"
 #include "ports/LoggingPort.h"
