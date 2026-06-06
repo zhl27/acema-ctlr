@@ -2,7 +2,7 @@
 // Created by zhl on 6/3/26.
 //
 
-#include "mGPS.h"
+#include "../mGPS.h"
 
 #include "../utils/SerialPrint.h"
 

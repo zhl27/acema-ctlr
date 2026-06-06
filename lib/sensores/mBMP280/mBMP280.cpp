@@ -2,7 +2,7 @@
 // Created by zhl on 6/3/26.
 //
 
-#include "mBMP280.h"
+#include "../mBMP280.h"
 
 #include "../utils/SerialPrint.h"
 

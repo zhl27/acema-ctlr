@@ -2,7 +2,7 @@
 // Created by zhl on 6/3/26.
 //
 
-#include "mMPU6050.h"
+#include "../mMPU6050.h"
 
 #include "../utils/SerialPrint.h"
 

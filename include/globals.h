@@ -6,7 +6,7 @@
 #define ACEMA_CTLR_GLOBALS_H
 
 #include "data.h"
-#include "comms.h"
+#include "comm.h"
 #include "config.h"
 
 /*************************/
