@@ -3,16 +3,49 @@
 //
 
 #include "acciones.h"
+#include "utils/SerialPrint.h"
 
 
 // --- Hardware Mock Implementations ---
-void configurar_sensores() { Serial.println(" -> Sensores configurados."); }
-void configurar_actuadores() { Serial.println(" -> Actuadores configurados."); }
-void conectar_GSE() { static uint long t = 0; if(millis() - t > 2000){ Serial.println(" -> Intentando conectar con GSE..."); t = millis(); }}
-void get_cmd_GSE() { /* Reads incoming LoRa commands */ }
-void init_rutina_propulsion() { Serial.println(" -> ¡Rutina de propulsión encendida!"); }
-void apagar_motor() { Serial.println(" -> Motor APAGADO."); }
-void init_rutina_frenado_aerodinamico() { Serial.println(" -> Frenado aerodinámico activo."); }
-void desplegar_droge() { Serial.println(" -> Paracaídas DROGE desplegado."); }
-bool droge_estabilizado() { return true; }
-void desplegar_paracaidas_principal() { Serial.println(" -> ¡PARACAÍDAS PRINCIPAL DESPLEGADO!"); }
+void f_st_configurar_sensores() {
+    SerialPrint::msg(" -> Sensores configurados.");
+}
+
+void f_st_configurar_actuadores() {
+    SerialPrint::msg(" -> Actuadores configurados.");
+}
+
+void f_st_conectar_GSE() {
+    static unsigned int long t = 0;
+    if(millis() - t > 2000) {
+        SerialPrint::msg(" -> Intentando conectar con GSE..."); t = millis();
+    }
+}
+
+void f_st_get_cmd_GSE() {
+    /* Reads incoming LoRa commands */
+}
+
+void f_st_init_rutina_propulsion() {
+    SerialPrint::msg(" -> ¡Rutina de propulsión encendida!");
+}
+
+void f_st_apagar_motor() {
+    SerialPrint::msg(" -> Motor APAGADO.");
+}
+
+void f_st_init_rutina_frenado_aerodinamico() {
+    SerialPrint::msg(" -> Frenado aerodinámico activo.");
+}
+
+void f_st_desplegar_droge() {
+    SerialPrint::msg(" -> Paracaídas DROGE desplegado.");
+}
+
+bool st_droge_estabilizado() {
+    return true;
+}
+
+void f_st_desplegar_paracaidas_principal() {
+    SerialPrint::msg(" -> ¡PARACAÍDAS PRINCIPAL DESPLEGADO!");
+}

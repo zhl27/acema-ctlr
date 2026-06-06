@@ -29,4 +29,10 @@ typedef struct paquete_datos {
 } pkt_t;
 
 
+typedef struct {
+    int xyz;
+
+} sensores_data_t;
+
+
 #endif //ACEMA_CTLR_GLOBALS_H

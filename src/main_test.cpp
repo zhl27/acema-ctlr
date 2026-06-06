@@ -4,7 +4,7 @@
 
 #include "globals.h"
 
-#include <actuadores/SerialPrint.h> // Tu librería personalizada
+#include <utils/SerialPrint.h>
 #include "actuadores/mBuzzer.h"
 
 #include "sensores/mBMP280.h"
@@ -17,7 +17,7 @@ mBMP280 bmp;
 mGPS gps;
 mBuzzer buzzer(BUZZER_PIN);
 
-void setup() {
+void setup() { // seteamos variables y constantes iniciales
     SerialPrint::init(SERIAL_BAUDRATE);
 
     // initialize buzzer using mBuzzer implementation

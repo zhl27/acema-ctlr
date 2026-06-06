@@ -14,30 +14,31 @@
  * la ejecución de su flujo de operaciones.
  *
  * Estados:
- * - STATE_BUSCANDO_CONEXION: El sistema está intentando establecer una conexión.
- * - STATE_ESPERA_INICIO: El sistema está esperando el inicio del proceso.
- * - STATE_PROPULSION: El sistema se encuentra en la fase de propulsión activa.
- * - STATE_FASE_BALISTICA: El sistema está en la fase balística (movimiento sin propulsión).
- * - STATE_FRENANDO: El sistema está en la fase de desaceleración.
- * - STATE_APOGEO: El sistema ha alcanzado el punto más alto de su trayectoria.
- * - STATE_APERTURA: El sistema está en el proceso de despliegue (por ejemplo, de paracaídas).
- * - STATE_DESCENSO_RAPIDO: El sistema está en una fase de descenso rápido.
- * - STATE_DESCENSO_LENTO: El sistema está en una fase de descenso controlado y lento.
- * - STATE_ATERRIZAJE: El sistema ha alcanzado el suelo o completado su descenso.
+ * - ST_BUSCANDO_CONEXION: El sistema está intentando establecer una conexión.
+ * - ST_ESPERA_INICIO: El sistema está esperando el inicio del proceso.
+ * - ST_PROPULSION: El sistema se encuentra en la fase de propulsión activa.
+ * - ST_FASE_BALISTICA: El sistema está en la fase balística (movimiento sin propulsión).
+ * - ST_FRENANDO: El sistema está en la fase de desaceleración.
+ * - ST_APOGEO: El sistema ha alcanzado el punto más alto de su trayectoria.
+ * - ST_APERTURA: El sistema está en el proceso de despliegue (por ejemplo, de paracaídas).
+ * - ST_DESCENSO_RAPIDO: El sistema está en una fase de descenso rápido.
+ * - ST_DESCENSO_LENTO: El sistema está en una fase de descenso controlado y lento.
+ * - ST_ATERRIZAJE: El sistema ha alcanzado el suelo o completado su descenso.
  */
-enum Estado {
-    STATE_BUSCANDO_CONEXION,
-    STATE_ESPERA_INICIO,
-    STATE_PROPULSION,
-    STATE_FASE_BALISTICA,
-    STATE_FRENANDO,
-    STATE_APOGEO,
-    STATE_APERTURA,
-    STATE_DESCENSO_RAPIDO,
-    STATE_DESCENSO_LENTO,
-    STATE_ATERRIZAJE
-};
-Estado curr_state = STATE_S1; // estado inicial
+typedef enum FlightState {
+    ST_BUSCANDO_CONEXION,
+    ST_ESPERA_INICIO,
+    ST_PROPULSION,
+    ST_FASE_BALISTICA,
+    ST_FRENANDO,
+    ST_APOGEO,
+    ST_APERTURA,
+    ST_DESCENSO_RAPIDO,
+    ST_DESCENSO_LENTO,
+    ST_ATERRIZAJE
+} Estado;
+
+Estado curr_state = ST_BUSCANDO_CONEXION; // estado inicial
 
 
 #endif //ACEMA_CTLR_ESTADOS_H

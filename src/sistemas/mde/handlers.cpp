@@ -5,27 +5,31 @@
 #include "handlers.h"
 
 
-void handle_mde(){
-    if( estado >=  N_EStado) {
-        estado =flash.leerEstado ();
-        if(){
-            handle_error();
-        }
-    }
-    mde_cohete[estado]();
-}
+#include "acciones.h"
+#include "estados.h"
+#include "utils/SerialPrint.h"
 
 
-void handle_error() {
-    apagar_motor();
-    lanzar_paracaida();
-    estado = descenso;
-}
+// void handle_mde(){
+//     if( estado >=  N_EStado) {
+//         estado =flash.leerEstado ();
+//         if(){
+//             handle_error();
+//         }
+//     }
+//     mde_cohete[estado]();
+// }
+
+// void handle_error() {
+//     apagar_motor();
+//     lanzar_paracaida();
+//     estado = descenso;
+// }
 
 
 // --- State Machine Core Execution ---
 void runStateMachine() {
-    switch (currentState) {
+    switch (curr_state) {
 
         case STATE_BUSCANDO_CONEXION:
             if (isEntry) {
@@ -95,89 +99,89 @@ void runStateMachine() {
 
 // --- Transition / Guard Conditions Logic ---
 void handleStateTransitions() {
-    switch (currentState) {
+    switch (curr_state) {
 
         case STATE_BUSCANDO_CONEXION:
             // Simulating events via Serial inputs or hardware flags
-            if (g_cmd == "EV_CONECTADO") {
-                currentState = STATE_ESPERA_INICIO;
-                isEntry = true;
-                g_cmd = "";
-            } else if (g_cmd == "EV_FALLIDO") {
-                Serial.println("Re-evaluating Connection...");
-                currentState = STATE_BUSCANDO_CONEXION;
-                isEntry = true;
-                g_cmd = "";
-            }
+            // if (g_cmd == "EV_CONECTADO") {
+            //     currentState = STATE_ESPERA_INICIO;
+            //     isEntry = true;
+            //     g_cmd = "";
+            // } else if (g_cmd == "EV_FALLIDO") {
+            //     Serial.println("Re-evaluating Connection...");
+            //     currentState = STATE_BUSCANDO_CONEXION;
+            //     isEntry = true;
+            //     g_cmd = "";
+            // }
             break;
 
         case STATE_ESPERA_INICIO:
-            if (g_cmd == "START") {
-                g_vel_transmision = RAPIDA;
-                init_rutina_propulsion();
-                currentState = STATE_PROPULSION;
-                isEntry = true;
-                g_cmd = "";
-            }
+            // if (g_cmd == "START") {
+            //     g_vel_transmision = RAPIDA;
+            //     init_rutina_propulsion();
+            //     currentState = STATE_PROPULSION;
+            //     isEntry = true;
+            //     g_cmd = "";
+            // }
             break;
 
         case STATE_PROPULSION:
-            if (completar_flag) {
-                apagar_motor();
-                completar_flag = false;
-                currentState = STATE_FASE_BALISTICA;
-                isEntry = true;
-            }
+            // if (completar_flag) {
+            //     apagar_motor();
+            //     completar_flag = false;
+            //     currentState = STATE_FASE_BALISTICA;
+            //     isEntry = true;
+            // }
             break;
 
         case STATE_FASE_BALISTICA:
-            if (completar_flag) {
-                init_rutina_frenado_aerodinamico();
-                completar_flag = false;
-                currentState = STATE_FRENANDO;
-                isEntry = true;
-            }
+            // if (completar_flag) {
+            //     init_rutina_frenado_aerodinamico();
+            //     completar_flag = false;
+            //     currentState = STATE_FRENANDO;
+            //     isEntry = true;
+            // }
             break;
 
         case STATE_FRENANDO:
-            if (vel_vertical <= 0.0) { // Apogee checkpoint
-                // Action: [Completar o eliminar]
-                currentState = STATE_APOGEO;
-                isEntry = true;
-            }
+            // if (vel_vertical <= 0.0) { // Apogee checkpoint
+            //     // Action: [Completar o eliminar]
+            //     currentState = STATE_APOGEO;
+            //     isEntry = true;
+            // }
             break;
 
         case STATE_APOGEO:
-            if (completar_flag) {
-                desplegar_droge();
-                completar_flag = false;
-                currentState = STATE_APERTURA;
-                isEntry = true;
-            }
+            // if (completar_flag) {
+            //     desplegar_droge();
+            //     completar_flag = false;
+            //     currentState = STATE_APERTURA;
+            //     isEntry = true;
+            // }
             break;
 
         case STATE_APERTURA:
-            if (droge_estabilizado()) {
-                // Action: [Completar]
-                currentState = STATE_DESCENSO_RAPIDO;
-                isEntry = true;
-            }
+            // if (droge_estabilizado()) {
+            //     // Action: [Completar]
+            //     currentState = STATE_DESCENSO_RAPIDO;
+            //     isEntry = true;
+            // }
             break;
 
         case STATE_DESCENSO_RAPIDO:
-            if (altura <= 250.0 || vel_vertical <= 50.0) {
-                desplegar_paracaidas_principal();
-                currentState = STATE_DESCENSO_LENTO;
-                isEntry = true;
-            }
+            // if (altura <= 250.0 || vel_vertical <= 50.0) {
+            //     desplegar_paracaidas_principal();
+            //     currentState = STATE_DESCENSO_LENTO;
+            //     isEntry = true;
+            // }
             break;
 
         case STATE_DESCENSO_LENTO:
-            if (vel_vertical <= 5.0 || altura <= 50.0) {
-                g_vel_transmision = LENTA;
-                currentState = STATE_ATERRIZAJE;
-                isEntry = true;
-            }
+            // if (vel_vertical <= 5.0 || altura <= 50.0) {
+            //     g_vel_transmision = LENTA;
+            //     currentState = STATE_ATERRIZAJE;
+            //     isEntry = true;
+            // }
             break;
 
         case STATE_ATERRIZAJE:

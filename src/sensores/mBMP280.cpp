@@ -4,7 +4,7 @@
 
 #include "mBMP280.h"
 
-#include "actuadores/SerialPrint.h"
+#include "../utils/SerialPrint.h"
 
 // initialize
 mBMP280::mBMP280()

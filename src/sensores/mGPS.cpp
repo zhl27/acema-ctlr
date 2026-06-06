@@ -4,7 +4,7 @@
 
 #include "mGPS.h"
 
-#include "actuadores/SerialPrint.h"
+#include "../utils/SerialPrint.h"
 
 
 mGPS::mGPS(int uartNum, int rx, int tx, uint32_t baud)

@@ -3,6 +3,7 @@
   <component name="CidrRootsConfiguration">
     <excludeRoots>
       <file path="$PROJECT_DIR$/include/_basurero" />
+      <file path="$PROJECT_DIR$/src/sistemas/mde" />
     </excludeRoots>
   </component>
   <component name="ExternalStorageConfigurationManager" enabled="true" />

@@ -4,7 +4,9 @@
 
 #ifndef ACEMA_CTLR_HANDLERS_H
 #define ACEMA_CTLR_HANDLERS_H
+#include "estados.h"
 
+extern Estado curr_state; // Estado actual de la máquina de estados
 
 void handle_mde();
 void handle_error();
