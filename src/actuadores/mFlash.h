@@ -6,7 +6,29 @@
 #define ACEMA_CTLR_MFLASH_H
 
 
+#include <Arduino.h>
+#include <SPI.h>
+
 class mFlash {
+public:
+    // Constructor: Por defecto usa el GPIO 4 para el pin CS_FLASH
+    mFlash(uint8_t csPin = 4);
+
+    // Inicializa los pines y el bus SPI estándar del ESP32
+    void begin();
+
+    // Ejecuta la prueba de lectura e imprime el diagnóstico en el puerto Serial
+    bool testConnection(Stream &serialPort = Serial);
+
+private:
+    uint8_t _csPin;
+
+    // Comandos y configuraciones internas (Ocultas al usuario)
+    const uint8_t _CMD_READ_JEDEC_ID = 0x9F;
+    const uint32_t _SPI_SPEED = 10000000; // 10 MHz por seguridad
+
+    // Método privado de bajo nivel para interactuar con el bus SPI
+    void _leerChipID(uint8_t &manufacturerID, uint8_t &memoryTypeID, uint8_t &capacityID);
 };
 
 

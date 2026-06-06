@@ -5,34 +5,27 @@
 #ifndef ACEMA_CTLR_GLOBALS_H
 #define ACEMA_CTLR_GLOBALS_H
 
-#define UMBRAL_LANZAMIENTO 100 // TODO: falta implementar valor real
-#define SERIAL_BAUDRATE 115200
+#include "data.h"
+#include "comms.h"
+#include "config.h"
 
-#define configSUPPORT_STATIC_ALLOCATION 1
+/*************************/
+/*         GPIOs         */
+/*************************/
 
 #define BUZZER_PIN 25
 #define WIRE_SDA 21
 #define WIRE_SCL 22
+
+
+/*************************/
+/*    DIRECCIONES I2C    */
+/*************************/
+
 #define MPU_ADDR 0x69
 #define BMP280_ADDR 0x77
 
 
-typedef enum PROTOCOLO {
-    ERROR = 0x00,
-    MSG = 0x10,
-    PLOT = 0x01
-} protocolo_enum;
-
-typedef struct paquete_datos {
-    void* payload;
-    int len;
-} pkt_t;
-
-
-typedef struct {
-    int xyz;
-
-} sensores_data_t;
 
 
 #endif //ACEMA_CTLR_GLOBALS_H

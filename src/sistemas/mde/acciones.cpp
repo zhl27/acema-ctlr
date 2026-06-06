@@ -6,6 +6,8 @@
 #include "utils/SerialPrint.h"
 
 
+// TODO: Definir correctamente la funcionalidad de cada función de estado, actualmente son solo placeholders para simular la lógica de la máquina de estados.
+
 // --- Hardware Mock Implementations ---
 void f_st_configurar_sensores() {
     SerialPrint::msg(" -> Sensores configurados.");

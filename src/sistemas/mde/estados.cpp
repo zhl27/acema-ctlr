@@ -5,3 +5,4 @@
 #include "estados.h"
 
 
+Estado curr_state = ST_BUSCANDO_CONEXION;

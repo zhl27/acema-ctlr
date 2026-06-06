@@ -7,6 +7,9 @@
 #include "../utils/SerialPrint.h"
 
 
+// TODO: Falta revisión general de mMPU6050, especialmente en la lógica de actualización y detección de movimiento. Se recomienda implementar un Unit Test que simule movimientos significativos y menores para confirmar que el método update() solo actualiza y envía datos al plot cuando se detecta movimiento real, evitando falsos positivos por ruido o vibraciones menores.
+
+
 mMPU6050::mMPU6050()
     : accelX(0.0f), accelY(0.0f), accelZ(0.0f),
       gyroX(0.0f), gyroY(0.0f), gyroZ(0.0f), temp(0.0f) {}

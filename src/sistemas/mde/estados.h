@@ -25,7 +25,7 @@
  * - ST_DESCENSO_LENTO: El sistema está en una fase de descenso controlado y lento.
  * - ST_ATERRIZAJE: El sistema ha alcanzado el suelo o completado su descenso.
  */
-typedef enum FlightState {
+typedef enum FlightState { // TODO: Chequear que los Estados estén completos y sean los indicados.
     ST_BUSCANDO_CONEXION,
     ST_ESPERA_INICIO,
     ST_PROPULSION,
@@ -38,7 +38,7 @@ typedef enum FlightState {
     ST_ATERRIZAJE
 } Estado;
 
-Estado curr_state = ST_BUSCANDO_CONEXION; // estado inicial
+extern Estado curr_state; // Estado actual de la máquina de estados
 
 
 #endif //ACEMA_CTLR_ESTADOS_H
