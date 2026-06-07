@@ -57,6 +57,7 @@ void setup() {
     xTaskCreatePinnedToCore(Demo_Task2, "Demo_Task2", 4096, NULL,10, &myTaskHandle2, 1);
 
     vTaskDelete(NULL); // NULL hace referenica al task "void loop()"
+}
 
 void loop() {
     // NO LO USAMOS

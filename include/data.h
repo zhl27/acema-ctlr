@@ -4,6 +4,7 @@
 
 #ifndef ACEMA_CTLR_DATA_H
 #define ACEMA_CTLR_DATA_H
+#include <cstdint>
 
 /************************/
 /*     DATOS CRUDOS     */
