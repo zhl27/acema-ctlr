@@ -112,6 +112,8 @@ public:
      * @brief Envía un mensaje de error (ERR)
      */
     bool send_mensaje_error(const char* error);
+
+    bool read_paquete(pkt_t* pPkt);
 };
 
 

@@ -236,3 +236,12 @@ bool LoraWrapped::send_mensaje_error(const char* error) {
 
     return send_package(&paquete);
 }
+
+bool LoraWrapped::read_paquete(pkt_t *pPkt)
+{
+    if(pPkt == nullptr ||_st != CONNECTION_STATUS::CONNECTED){
+        return false;
+    }
+
+    return read_package(pPkt);
+}
