@@ -1,6 +1,6 @@
 #include <Arduino.h>
 
-#include <../lib/SerialPrint/SerialPrint.h>
+#include <SerialPrint.h>
 
 
 void setup() {

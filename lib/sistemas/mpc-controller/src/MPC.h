@@ -12,7 +12,7 @@ void Cd_MPC(double rho_0, double Vel, double Pos, double tgt_apogee, double t,
             double *Cd, double *ApogeeH_est, double *t_apogee_est);
 
 
-double fabs(double x) {
+inline double fabs(double x) {
 //    return (x < 0) ? -x : x; // branch-based impl
     union {
         double d;

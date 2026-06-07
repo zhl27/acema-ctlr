@@ -4,7 +4,7 @@
 
 #include "mFlash.h"
 
-// TODO: Falta revisión general de mFlash
+// TODO: Falta revisión manual general de mFlash
 
 mFlash::mFlash(uint8_t csPin) {
     _csPin = csPin;
