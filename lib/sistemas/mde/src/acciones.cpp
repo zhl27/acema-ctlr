@@ -3,7 +3,7 @@
 //
 
 #include "acciones.h"
-#include "utils/SerialPrint.h"
+#include "SerialPrint.h"
 
 
 // TODO: Definir correctamente la funcionalidad de cada función de estado, actualmente son solo placeholders para simular la lógica de la máquina de estados.

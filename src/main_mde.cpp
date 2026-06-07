@@ -2,7 +2,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/ringbuf.h"
 
-#include <utils/SerialPrint.h>
+#include "SerialPrint.h"
 #include "globals.h"
 
 

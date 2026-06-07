@@ -2,7 +2,7 @@
 // Created by zhl on 6/4/26.
 //
 
-#include "../mBuzzer.h"
+#include "mBuzzer.h"
 
 mBuzzer::mBuzzer(int pin) : buzzerPin(pin), state(false) {}
 

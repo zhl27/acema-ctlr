@@ -2,9 +2,9 @@
 // Created by zhl on 6/3/26.
 //
 
-#include "../mMPU6050.h"
+#include "mMPU6050.h"
 
-#include "../utils/SerialPrint.h"
+#include "SerialPrint.h"
 
 
 // TODO: Falta revisión general de mMPU6050, especialmente en la lógica de actualización y detección de movimiento. Se recomienda implementar un Unit Test que simule movimientos significativos y menores para confirmar que el método update() solo actualiza y envía datos al plot cuando se detecta movimiento real, evitando falsos positivos por ruido o vibraciones menores.

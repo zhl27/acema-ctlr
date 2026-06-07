@@ -2,9 +2,9 @@
 // Created by zhl on 6/3/26.
 //
 
-#include "../mBMP280.h"
+#include "mBMP280.h"
 
-#include "../utils/SerialPrint.h"
+#include "SerialPrint.h"
 
 // TODO: Crear Unit test para validar que el sensor detecta cambios significativos de presión/temperatura/altitud al soplar sobre él, y que no reacciona a cambios menores o ruido ambiental. Esto es crucial para confirmar que los umbrales definidos son adecuados para detectar el soplido sin generar falsos positivos.
 

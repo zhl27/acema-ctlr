@@ -2,9 +2,12 @@
 // Created by zhl on 6/3/26.
 //
 
-#include "../mGPS.h"
+#include "mGPS.h"
 
-#include "../utils/SerialPrint.h"
+#include <cstdint>
+#include <HardwareSerial.h>
+
+#include "SerialPrint.h"
 
 // TODO: Falta revisión general de mGPS, especialmente en la lógica de actualización y validación de datos GPS. Se recomienda implementar un Unit Test que simule la recepción de datos GPS con diferentes escenarios (ubicación válida, sin señal, cambios rápidos de ubicación) para confirmar que el método update() procesa correctamente los datos y actualiza las variables internas sin generar errores o bloqueos.
 

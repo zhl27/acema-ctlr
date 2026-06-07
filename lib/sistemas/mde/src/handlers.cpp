@@ -5,7 +5,7 @@
 #include "handlers.h"
 #include "acciones.h"
 #include "estados.h"
-#include "utils/SerialPrint.h"
+#include "SerialPrint.h"
 
 static bool isEntry = true;
 
@@ -32,7 +32,7 @@ void runStateMachine() {
 
         case ST_BUSCANDO_CONEXION:
             if (isEntry) {
-                Serial.println("[STATE] Buscando Conexión");
+                SerialPrint::msg("[STATE] Buscando Conexión");
                 f_st_configurar_sensores();
                 f_st_configurar_actuadores();
                 isEntry = false;
@@ -42,7 +42,7 @@ void runStateMachine() {
 
         case ST_ESPERA_INICIO:
             if (isEntry) {
-                Serial.println("[STATE] Espera Inicio");
+                SerialPrint::msg("[STATE] Espera Inicio");
                 // g_vel_transmision = LENTA;
                 isEntry = false;
             }
@@ -51,7 +51,7 @@ void runStateMachine() {
 
         case ST_PROPULSION:
             if (isEntry) {
-                Serial.println("[STATE] Propulsion");
+                SerialPrint::msg("[STATE] Propulsion");
                 f_st_init_rutina_propulsion();
                 isEntry = false;
             }
@@ -60,37 +60,37 @@ void runStateMachine() {
             // if (propSubState == SUB_ST_PRE_APERTURA_OX) {
             //     // Perform oxygen valve tasks...
             //     propSubState = SUB_ST_PRE_APERTURA_COMB;
-            //     Serial.println("  -> Substate: Pre_apertura_comb");
+            //     SerialPrint::msg("  -> Substate: Pre_apertura_comb");
             // }
             break;
 
         case ST_FASE_BALISTICA:
-            if (isEntry) { Serial.println("[STATE] Fase Balística"); isEntry = false; }
+            if (isEntry) { SerialPrint::msg("[STATE] Fase Balística"); isEntry = false; }
             // Monitoring physics/telemetry
             break;
 
         case ST_FRENANDO:
-            if (isEntry) { Serial.println("[STATE] Frenando"); isEntry = false; }
+            if (isEntry) { SerialPrint::msg("[STATE] Frenando"); isEntry = false; }
             break;
 
         case ST_APOGEO:
-            if (isEntry) { Serial.println("[STATE] Apogeo Reached"); isEntry = false; }
+            if (isEntry) { SerialPrint::msg("[STATE] Apogeo Reached"); isEntry = false; }
             break;
 
         case ST_APERTURA:
-            if (isEntry) { Serial.println("[STATE] Apertura"); isEntry = false; }
+            if (isEntry) { SerialPrint::msg("[STATE] Apertura"); isEntry = false; }
             break;
 
         case ST_DESCENSO_RAPIDO:
-            if (isEntry) { Serial.println("[STATE] Descenso Rápido"); isEntry = false; }
+            if (isEntry) { SerialPrint::msg("[STATE] Descenso Rápido"); isEntry = false; }
             break;
 
         case ST_DESCENSO_LENTO:
-            if (isEntry) { Serial.println("[STATE] Descenso Lento"); isEntry = false; }
+            if (isEntry) { SerialPrint::msg("[STATE] Descenso Lento"); isEntry = false; }
             break;
 
         case ST_ATERRIZAJE:
-            if (isEntry) { Serial.println("[STATE] ¡Aterrizaje Exitoso!"); isEntry = false; }
+            if (isEntry) { SerialPrint::msg("[STATE] ¡Aterrizaje Exitoso!"); isEntry = false; }
             break;
     }
 }
@@ -106,7 +106,7 @@ void handleStateTransitions() {
             //     isEntry = true;
             //     g_cmd = "";
             // } else if (g_cmd == "EV_FALLIDO") {
-            //     Serial.println("Re-evaluating Connection...");
+            //     SerialPrint::msg("Re-evaluating Connection...");
             //     currentState = ST_BUSCANDO_CONEXION;
             //     isEntry = true;
             //     g_cmd = "";

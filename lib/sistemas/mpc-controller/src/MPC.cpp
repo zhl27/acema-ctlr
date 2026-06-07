@@ -2,7 +2,7 @@
 // Created by lucaz on 11/3/2026.
 //
 
-#include "MPC.h"
+#include "../MPC.h"
 
 /**
  * Model Predictive Controller for Cd calculation (continuous update).
