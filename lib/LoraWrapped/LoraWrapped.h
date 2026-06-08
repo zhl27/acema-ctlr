@@ -6,14 +6,12 @@
 #ifndef LORAWRAPPED_H
 #define LORAWRAPPED_H
 
-#include <LoRa.h>
+#include <RadioLib.h>
+#include "LoraConfig.h"
 
 
-#define DEFAULT_SYNC_WORD 'J'
-#define DEFAULT_ENCRY_WORD '%' 
-#define DEFAULT_FREC 433E6
 #define DEFAULT_SPI_LORA SPI
-#define SIZE_BUFFER_MSG 128
+
 
 
 /* Estructuras provicionales*/
@@ -21,7 +19,6 @@ typedef struct PAQUETE {
     uint8_t len;
     uint8_t protocole;
     void* payload;
-
 } pkt_t;
 
 
@@ -32,7 +29,7 @@ typedef struct {
     float giroX;
     float giroY;
     float altitud;
-}dataPlot_t;
+} dataPlot_t;
 
 union pay_u {
     char msg[SIZE_BUFFER_MSG];
@@ -52,12 +49,21 @@ enum Protocolo: uint8_t {
     PONG    = 0X30
 };
 
+/* estados de la conexcion, para mejorar la reconeccion, proximamente*/
+typedef enum CONNECTION_STATUS: uint8_t {DISCONNECTED = 0x00, CONNECTED} connSts_t; /*CONNECTION_LOST */
 
 class LoraWrapped
 {
 private:
-    /* estados de la conexcion, para mejorar la reconeccion, proximamente*/
-    typedef enum CONNECTION_STATUS: uint8_t {DISCONNECTED = 0x00, CONNECTED} connSts_t; /*CONNECTION_LOST */
+    
+    // Punteros dinámicos de RadioLib según el chip
+    Module* _mod;
+    #if defined(MODULE_SX1278)
+        SX1278* _radio;
+    #elif defined(MODULE_SX1262)
+        SX1262* _radio;
+    #endif
+
     /* Palabra de sincronización con el modulo a comunicar, evita interferencias de otro módulo*/
     int _syncWord;
 
@@ -65,7 +71,6 @@ private:
     char _encryptWord;
 
     /* Buffer interno para enviar los datos de manera segura*/
-    pay_u _internalPayload_tx;
     pay_u _internalPayload_rx;
 
     /* Estado de la conexion*/
@@ -80,7 +85,7 @@ private:
 public:
     LoraWrapped(int ss, int reset, int dio0, SPIClass& spi = DEFAULT_SPI_LORA);
     ~LoraWrapped();
-    bool begin(int sw = DEFAULT_SYNC_WORD, char ew = DEFAULT_ENCRY_WORD, long frequency = DEFAULT_FREC);
+    bool begin(int sw = DEFAULT_SYNC_WORD, char ew = DEFAULT_ENCRY_WORD, float frequency = DEFAULT_FREC);
     
     /**
      * @brief Envia una petición de conexion del cohete al GSE

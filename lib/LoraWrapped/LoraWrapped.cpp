@@ -1,22 +1,38 @@
-#include <LoraWrapped.h>
+#include "LoraWrapped.h"
 
 
 
 LoraWrapped::LoraWrapped(int ss, int reset, int dio0, SPIClass& spi)
 {
-    LoRa.setPins(ss, reset, dio0);
-    LoRa.setSPI(spi);
     _st = CONNECTION_STATUS::DISCONNECTED;
+    
+    // Inicialización condicional del objeto de RadioLib según el chip elegido
+    #if defined(MODULE_SX1278)
+        _mod = new Module(LORA_NSS, LORA_DIO0, LORA_RST, LORA_DIO1);
+        _radio = new SX1278(_mod);
+    #elif defined(MODULE_SX1262)
+        _mod = new Module(LORA_NSS, LORA_DIO1, LORA_RST, LORA_BUSY);
+        _radio = new SX1262(_mod);
+    #endif
 }
 
 LoraWrapped::~LoraWrapped()
 {
+    delete _radio;
+    delete _mod;
 }
 
-bool LoraWrapped::begin(int sw, char ew, long frec){
+bool LoraWrapped::begin(int sw, char ew, float frec){
     this->_encryptWord = ew;
-    if(LoRa.begin(frec)) {
-        LoRa.setSyncWord(sw);
+    this->_syncWord = sw;
+
+    // Inicializar el chip físico
+    int state = _radio->begin(frec);
+    if (state == RADIOLIB_ERR_NONE) {
+        _radio->setSyncWord(sw);
+        
+        // CRUCIAL: Poner el radio en modo escucha asíncrona permanente
+        _radio->startReceive(); 
         return true;
     }
     return false;
@@ -57,61 +73,69 @@ bool LoraWrapped::begin(int sw, char ew, long frec){
 
 
 bool LoraWrapped::send_package(pkt_t * ptrPkt){
-    char encryptedByte = 0x00;
-    
-    if (ptrPkt == nullptr || !LoRa.beginPacket()){
-        return false; // Lora ocupado o puntero nulo
-    }
+    if (ptrPkt == nullptr) return false;
 
-    // primer byte: longitud
-    LoRa.write(encrypt_byte(ptrPkt->len));
-    // segundo byte: protocol
-    LoRa.write(encrypt_byte(ptrPkt->protocole));
+    // Crea un búfer temporal para consolidar la trama completa
+    uint8_t txBuffer[SIZE_BUFFER_MSG + 2];
+    txBuffer[0] = encrypt_byte(ptrPkt->len);
+    txBuffer[1] = encrypt_byte(ptrPkt->protocole);
 
-    // len's bytes, correspondientes a la longitud del playload
+    // Encriptación
     for (int i = 0; i < ptrPkt->len; i++) {
-        encryptedByte = encrypt_byte((char) (((uint8_t*)ptrPkt->payload)[i]));
-        LoRa.write(encryptedByte);
+        txBuffer[2 + i] = encrypt_byte(((uint8_t*)ptrPkt->payload)[i]);
     }
 
-    return (LoRa.endPacket(false)); // Modo síncrono
+    // RadioLib transmite todo el búfer de un solo golpe
+    int state = _radio->transmit(txBuffer, ptrPkt->len + 2);
+
+    // OBLIGATORIO: Volver a activar el modo escucha inmediatamente después de transmitir
+    _radio->startReceive();
+
+    return (state == RADIOLIB_ERR_NONE);
 }
 
 
-bool LoraWrapped::read_package(pkt_t *ptrPkt){
-    char decryptedByte = 0x00;
-    int packetSize = LoRa.parsePacket();
+bool LoraWrapped::read_package(pkt_t *ptrPkt) {
+    if (ptrPkt == nullptr) return false;
+
+    // Consulta el pin físico de interrupción para saber si realmente hay un paquete en el aire
+    #if defined(MODULE_SX1278)
+        bool packetReady = (digitalRead(LORA_DIO0) == HIGH);
+    #elif defined(MODULE_SX1262)
+        bool packetReady = (digitalRead(LORA_DIO1) == HIGH);
+    #endif
+
+    if (!packetReady) return false;
+
+    // Lee la longitud del paquete recibido y vuelca los datos
+    size_t length = _radio->getPacketLength();
+    uint8_t rxBuffer[SIZE_BUFFER_MSG + 2];
     
-    // minimo dos bytes
-    if (packetSize < 2 || ptrPkt == nullptr) {
-        return false; // No hay un puntero válido
-    }
+    int state = _radio->readData(rxBuffer, length);
+    
+    // Vuelve a activar la escucha de inmediato para no perder paquetes futuros
+    _radio->startReceive();
 
-    // lee encabezados
-    ptrPkt->len = encrypt_byte( (char)LoRa.read() );
-    ptrPkt->protocole = encrypt_byte( (char)LoRa.read() );
+    if (state != RADIOLIB_ERR_NONE || length < 2) return false;
 
-    // verificación de seguridad para evitar desbordamientos
-    if (ptrPkt->len > sizeof(pay_u) ){
-        return false;
-    }
+    // Desencripta encabezados primarios
+    ptrPkt->len = encrypt_byte((char)rxBuffer[0]);
+    ptrPkt->protocole = encrypt_byte((char)rxBuffer[1]);
 
-    // Asigna el puntero de la union según protocolo
-    if(ptrPkt->protocole  == C_PLOT ){
-        memset( (void*)&_internalPayload_rx.data, 0, sizeof(dataPlot_t));
-        ptrPkt->payload = (dataPlot_t*) &_internalPayload_rx.data; 
-    }
-    /* MSG, ERR : Mensajes de error de longitud 128 bytes, incluido el '\0' */
-    else{
-        memset( (void*)_internalPayload_rx.msg, 0, SIZE_BUFFER_MSG); // 128 
+    if (ptrPkt->len > SIZE_BUFFER_MSG) return false;
+
+    // Asigna el puntero de la unión según el protocolo 
+    if (ptrPkt->protocole == Protocolo::C_PLOT) {
+        memset((void*)&_internalPayload_rx.data, 0, sizeof(dataPlot_t));
+        ptrPkt->payload = (dataPlot_t*)&_internalPayload_rx.data;
+    } else {
+        memset((void*)_internalPayload_rx.msg, 0, sizeof(_internalPayload_rx.msg));
         ptrPkt->payload = (char*)_internalPayload_rx.msg;
     }
-    // ptrPkt->payload = PLOT? (dataPlot_t*) &payload.data: (char*)payload.msg;
-    // lectura y desencriptación directa
-    for(int i = 0; i< ptrPkt->len; i++){
-        if(LoRa.available()){
-            ((uint8_t*)ptrPkt->payload)[i] = encrypt_byte( (char)LoRa.read() );
-        }
+
+    // Desencriptar y rellenar el payload final
+    for (int i = 0; i < ptrPkt->len; i++) {
+        ((uint8_t*)ptrPkt->payload)[i] = encrypt_byte((char)rxBuffer[2 + i]);
     }
 
     return true;
@@ -119,14 +143,11 @@ bool LoraWrapped::read_package(pkt_t *ptrPkt){
 
 bool LoraWrapped::c_connect_to_GSE(){
     pkt_t paquete;
-    char *msg = "PING_COHETE";
+    const char *msg = "PING_COHETE";
     
-    // copia el mensaje en el paquete
-    strncpy(_internalPayload_tx.msg, msg, SIZE_BUFFER_MSG);
-    _internalPayload_tx.msg[SIZE_BUFFER_MSG - 1] = '\0';
-    // prepara el paquete con el protocolo ping
+    // Prepara el paquete
     paquete.protocole = Protocolo::PING;
-    paquete.payload = _internalPayload_tx.msg;
+    paquete.payload = (void*)msg;
     paquete.len = strlen(msg) + 1; // envía solo los bytes necesarios
 
     return send_package (&paquete);
@@ -151,11 +172,8 @@ bool LoraWrapped::g_accept_connection(){
         } 
 
         // Prepara la respuesta
-        strncpy(_internalPayload_tx.msg, respuesta, SIZE_BUFFER_MSG);
-        _internalPayload_tx.msg[SIZE_BUFFER_MSG - 1] = '\0';
-
         paqueteRespuesta.protocole = Protocolo::PONG;
-        paqueteRespuesta.payload = _internalPayload_tx.msg;
+        paqueteRespuesta.payload = (void*)respuesta;
         paqueteRespuesta.len = strlen(respuesta) + 1;
 
         // Envia la confirmación
@@ -188,11 +206,10 @@ bool LoraWrapped::send_datos(dataPlot_t datos) {
 
     // Verifica conexion
     if(_st !=CONNECTION_STATUS::CONNECTED) return false;
-    _internalPayload_tx.data = datos;
     
     // Prepara el paquete
     paquete.protocole = Protocolo::C_PLOT;
-    paquete.payload = &_internalPayload_tx.data;
+    paquete.payload = &datos;
     paquete.len = sizeof(dataPlot_t);
 
     // Envia el paquete
@@ -207,14 +224,12 @@ bool LoraWrapped::send_mensaje(const char* texto) {
     if (texto == nullptr || _st !=CONNECTION_STATUS::CONNECTED){
         return false;
     }
-    // Copia el texto al buffer de la unión
-    strncpy(_internalPayload_tx.msg, texto, SIZE_BUFFER_MSG);
-    _internalPayload_tx.msg[SIZE_BUFFER_MSG - 1] = '\0'; // Asegurar cierre de cadena
+
 
     // Configura el paquete de mensaje
     paquete.protocole = Protocolo::C_MGS; 
-    paquete.payload = _internalPayload_tx.msg;
-    paquete.len = strlen(_internalPayload_tx.msg) + 1; // +1 para incluir el '\0'
+    paquete.payload = (void*)texto;
+    paquete.len = strlen(texto) + 1; // +1 para incluir el '\0'
 
     return send_package(&paquete);
 }
@@ -224,15 +239,11 @@ bool LoraWrapped::send_mensaje_error(const char* error) {
     pkt_t paquete;
 
     if (error == nullptr || _st !=CONNECTION_STATUS::CONNECTED) return false;
-    
-    // Copia el error al buffer
-    strncpy(_internalPayload_tx.msg, error, SIZE_BUFFER_MSG);
-    _internalPayload_tx.msg[SIZE_BUFFER_MSG - 1] = '\0';
 
     // Configuramos el paquete como error
     paquete.protocole = Protocolo::C_ERR;
-    paquete.payload = _internalPayload_tx.msg;
-    paquete.len = strlen(_internalPayload_tx.msg) + 1;
+    paquete.payload = (void*)error;
+    paquete.len = strlen(error) + 1;
 
     return send_package(&paquete);
 }
