@@ -98,13 +98,13 @@ bool LoraWrapped::read_package(pkt_t *ptrPkt){
 
     // Asigna el puntero de la union según protocolo
     if(ptrPkt->protocole  == C_PLOT ){
-        memset( (void*)&_internalPayload.data, 0, sizeof(dataPlot_t));
-        ptrPkt->payload = (dataPlot_t*) &_internalPayload.data; 
+        memset( (void*)&_internalPayload_rx.data, 0, sizeof(dataPlot_t));
+        ptrPkt->payload = (dataPlot_t*) &_internalPayload_rx.data; 
     }
     /* MSG, ERR : Mensajes de error de longitud 128 bytes, incluido el '\0' */
     else{
-        memset( (void*)_internalPayload.msg, 0, SIZE_BUFFER_MSG); // 128 
-        ptrPkt->payload = (char*)_internalPayload.msg;
+        memset( (void*)_internalPayload_rx.msg, 0, SIZE_BUFFER_MSG); // 128 
+        ptrPkt->payload = (char*)_internalPayload_rx.msg;
     }
     // ptrPkt->payload = PLOT? (dataPlot_t*) &payload.data: (char*)payload.msg;
     // lectura y desencriptación directa
@@ -122,11 +122,11 @@ bool LoraWrapped::c_connect_to_GSE(){
     char *msg = "PING_COHETE";
     
     // copia el mensaje en el paquete
-    strncpy(_internalPayload.msg, msg, SIZE_BUFFER_MSG);
-    _internalPayload.msg[SIZE_BUFFER_MSG - 1] = '\0';
+    strncpy(_internalPayload_tx.msg, msg, SIZE_BUFFER_MSG);
+    _internalPayload_tx.msg[SIZE_BUFFER_MSG - 1] = '\0';
     // prepara el paquete con el protocolo ping
     paquete.protocole = Protocolo::PING;
-    paquete.payload = _internalPayload.msg;
+    paquete.payload = _internalPayload_tx.msg;
     paquete.len = strlen(msg) + 1; // envía solo los bytes necesarios
 
     return send_package (&paquete);
@@ -151,11 +151,11 @@ bool LoraWrapped::g_accept_connection(){
         } 
 
         // Prepara la respuesta
-        strncpy(_internalPayload.msg, respuesta, SIZE_BUFFER_MSG);
-        _internalPayload.msg[SIZE_BUFFER_MSG - 1] = '\0';
+        strncpy(_internalPayload_tx.msg, respuesta, SIZE_BUFFER_MSG);
+        _internalPayload_tx.msg[SIZE_BUFFER_MSG - 1] = '\0';
 
         paqueteRespuesta.protocole = Protocolo::PONG;
-        paqueteRespuesta.payload = _internalPayload.msg;
+        paqueteRespuesta.payload = _internalPayload_tx.msg;
         paqueteRespuesta.len = strlen(respuesta) + 1;
 
         // Envia la confirmación
@@ -188,11 +188,11 @@ bool LoraWrapped::send_datos(dataPlot_t datos) {
 
     // Verifica conexion
     if(_st !=CONNECTION_STATUS::CONNECTED) return false;
-    _internalPayload.data = datos;
+    _internalPayload_tx.data = datos;
     
     // Prepara el paquete
     paquete.protocole = Protocolo::C_PLOT;
-    paquete.payload = &_internalPayload.data;
+    paquete.payload = &_internalPayload_tx.data;
     paquete.len = sizeof(dataPlot_t);
 
     // Envia el paquete
@@ -208,13 +208,13 @@ bool LoraWrapped::send_mensaje(const char* texto) {
         return false;
     }
     // Copia el texto al buffer de la unión
-    strncpy(_internalPayload.msg, texto, SIZE_BUFFER_MSG);
-    _internalPayload.msg[SIZE_BUFFER_MSG - 1] = '\0'; // Asegurar cierre de cadena
+    strncpy(_internalPayload_tx.msg, texto, SIZE_BUFFER_MSG);
+    _internalPayload_tx.msg[SIZE_BUFFER_MSG - 1] = '\0'; // Asegurar cierre de cadena
 
     // Configura el paquete de mensaje
     paquete.protocole = Protocolo::C_MGS; 
-    paquete.payload = _internalPayload.msg;
-    paquete.len = strlen(_internalPayload.msg) + 1; // +1 para incluir el '\0'
+    paquete.payload = _internalPayload_tx.msg;
+    paquete.len = strlen(_internalPayload_tx.msg) + 1; // +1 para incluir el '\0'
 
     return send_package(&paquete);
 }
@@ -226,13 +226,13 @@ bool LoraWrapped::send_mensaje_error(const char* error) {
     if (error == nullptr || _st !=CONNECTION_STATUS::CONNECTED) return false;
     
     // Copia el error al buffer
-    strncpy(_internalPayload.msg, error, SIZE_BUFFER_MSG);
-    _internalPayload.msg[SIZE_BUFFER_MSG - 1] = '\0';
+    strncpy(_internalPayload_tx.msg, error, SIZE_BUFFER_MSG);
+    _internalPayload_tx.msg[SIZE_BUFFER_MSG - 1] = '\0';
 
     // Configuramos el paquete como error
     paquete.protocole = Protocolo::C_ERR;
-    paquete.payload = _internalPayload.msg;
-    paquete.len = strlen(_internalPayload.msg) + 1;
+    paquete.payload = _internalPayload_tx.msg;
+    paquete.len = strlen(_internalPayload_tx.msg) + 1;
 
     return send_package(&paquete);
 }

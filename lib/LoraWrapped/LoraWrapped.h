@@ -65,7 +65,8 @@ private:
     char _encryptWord;
 
     /* Buffer interno para enviar los datos de manera segura*/
-    pay_u _internalPayload;
+    pay_u _internalPayload_tx;
+    pay_u _internalPayload_rx;
 
     /* Estado de la conexion*/
     connSts_t _st;
