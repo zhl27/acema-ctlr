@@ -1,0 +1,186 @@
+#include <Arduino.h>
+#include <LoraWrapped.h>
+
+// ============================================================================
+//Comentar para compilar en ESP32
+//#define DEBUG_NANO
+// ============================================================================
+#if defined(DEBUG_NANO)
+
+// Pines típicos para un módulo LoRa conectado a un Nano
+#define NANO_LORA_CS   10
+#define NANO_LORA_RST  9
+#define NANO_LORA_DIO0 2
+#define NANO_LORA_DIO1 3 
+
+LoraWrapped lora(NANO_LORA_CS, NANO_LORA_RST, NANO_LORA_DIO0, NANO_LORA_DIO1, SPI);
+#else 
+// Definís los pines específicos que ruteaste en la PCB de tu ESP32
+#define ESP32_LORA_SCK  18
+#define ESP32_LORA_MISO 19
+#define ESP32_LORA_MOSI 23
+#define ESP32_LORA_CS   5
+#define ESP32_LORA_RST  14
+#define ESP32_LORA_DIO0 2
+#define ESP32_LORA_DIO1 4
+
+// Instanciamos pasándole los pines correspondientes
+LoraWrapped lora(ESP32_LORA_CS, ESP32_LORA_RST, ESP32_LORA_DIO0, ESP32_LORA_DIO1, SPI);
+#endif
+
+// Estados de la MDE del Cohete
+enum RocketState : uint8_t {
+    ROCKET_INIT,
+    ROCKET_DISCONNECTED,
+    ROCKET_WAITING_PONG,
+    ROCKET_CONNECTED
+};
+
+RocketState currentState = ROCKET_INIT;
+
+// Variables de control de tiempo y ciclos
+unsigned long previousMillis = 0;
+const long INTERVALO_TELEMETRIA = 500; // 500 ms de frecuencia de envío
+
+int cicloContador = 0;
+float simuladorAltitud = 0.0f;
+
+// ============================================================================
+// FUNCIÓN DE IMPRESIÓN ESTRUCTURAL Y HEXADECIMAL (CRUDO)
+// ============================================================================
+void mostrarEstructuraYHex(dataPlot_t* datos) {
+    uint8_t longitudTotal = sizeof(dataPlot_t);
+    uint8_t protocolo = Protocolo::C_PLOT;
+
+    Serial.println(F("\n--------------------------------------------------"));
+    Serial.println(F("--- ESTRUCTURA VISUAL DEL PAQUETE A ENVIAR ---"));
+    Serial.print(F(" Longitud del Payload (len): ")); Serial.print(longitudTotal); Serial.println(F(" bytes"));
+    Serial.print(F(" Identificador Protocolo:     0x0")); Serial.println(protocolo, HEX);
+    Serial.println(F(" Datos Internos Estructura:"));
+    Serial.print(F("   Altitud: ")); Serial.println(datos->altitud);
+    Serial.print(F("   GiroX:   ")); Serial.println(datos->giroX);
+    Serial.print(F("   GiroY:   ")); Serial.println(datos->giroY);
+    Serial.print(F("   DatoX:   ")); Serial.println(datos->datoX);
+    
+    // Imprimir el paquete tal como viajará en crudo por el aire [len][proto][payload]
+    Serial.print(F("PAQUETE CRUDO (HEX): "));
+    
+    // 1. Byte de longitud
+    if (longitudTotal < 16) Serial.print("0"); Serial.print(longitudTotal, HEX); Serial.print(" ");
+    // 2. Byte de protocolo
+    if (protocolo < 16) Serial.print("0"); Serial.print(protocolo, HEX); Serial.print(" ");
+    // 3. Bytes del payload struct
+    uint8_t* bytePointer = (uint8_t*)datos;
+    for (size_t i = 0; i < longitudTotal; i++) {
+        if (bytePointer[i] < 16) Serial.print("0");
+        Serial.print(bytePointer[i], HEX);
+        Serial.print(" ");
+    }
+    Serial.println(F("\n--------------------------------------------------"));
+}
+
+// ============================================================================
+// CONFIGURACIÓN PRINCIPAL
+// ============================================================================
+void setup() {
+    Serial.begin(115200);
+    Serial.println(F("[COHETE] Sistema inicializado de telemetría."));
+
+    #if defined(DEBUG_NANO) 
+    SPI.begin();
+    #else
+    SPI.begin(ESP32_LORA_SCK, ESP32_LORA_MISO, ESP32_LORA_MOSI, ESP32_LORA_CS);
+    #endif
+}
+
+// ============================================================================
+// LAZO PRINCIPAL
+// ============================================================================
+void loop() {
+    unsigned long currentMillis = millis();
+
+    switch (currentState) {
+
+        case ROCKET_INIT:
+            if (lora.begin(DEFAULT_SYNC_WORD, DEFAULT_ENCRY_WORD, DEFAULT_FREC)) {
+                Serial.println(F("[COHETE] Hardware LoRa enlazado. Estado: DISCONNECTED"));
+                currentState = ROCKET_DISCONNECTED;
+            } else {
+                Serial.println(F("[ERROR] No se pudo comunicar con el chip SX1276. Reintentando..."));
+                delay(2000); // Retardo seguro únicamente en fase de inicialización crítica
+            }
+            break;
+
+        case ROCKET_DISCONNECTED:
+            Serial.println(F("[COHETE] Enviando PING de conexión hacia el GSE..."));
+            if (lora.c_connect_to_GSE()) {
+                previousMillis = currentMillis; // Reseteamos temporizador para esperar el PONG
+                currentState = ROCKET_WAITING_PONG;
+            }
+            break;
+
+        case ROCKET_WAITING_PONG:
+            // Escucha no bloqueante del PONG
+            if (lora.c_connection_accepted()) {
+                Serial.println(F("[COHETE] ¡PONG Recibido! Enlace confirmado. Estado: CONNECTED"));
+                cicloContador = 0;
+                currentState = ROCKET_CONNECTED;
+            } 
+            // Time-out de reintento: si pasan 3 segundos sin respuesta, vuelve a intentar conectar
+            else if (currentMillis - previousMillis >= 3000) {
+                Serial.println(F("[WARN] Tiempo de espera de PONG agotado. Reintentando enlace..."));
+                currentState = ROCKET_DISCONNECTED;
+            }
+            break;
+
+        case ROCKET_CONNECTED:
+            // Evento temporizado cada 500 ms
+            if (currentMillis - previousMillis >= INTERVALO_TELEMETRIA) {
+                previousMillis = currentMillis;
+
+                // 1. Simulación circular de variables de ingeniería
+                simuladorAltitud += 2.5f; // Incremento progresivo
+                if (simuladorAltitud > 100.0f) {
+                    simuladorAltitud = 0.0f; // Reseteo circular de 0 a 100
+                }
+
+                dataPlot_t paqueteTelemetria;
+                paqueteTelemetria.altitud = simuladorAltitud;
+                paqueteTelemetria.giroX   = analogRead(A0) * (5.0f / 1023.0f); // Conversión ADC a Voltaje
+                paqueteTelemetria.giroY   = 0.0f;  // Variables estáticas de relleno
+                paqueteTelemetria.datoX   = cicloContador;
+
+                // 2. Impresión visual estructurada y cruda antes del envío
+                mostrarEstructuraYHex(&paqueteTelemetria);
+
+                // 3. Envío mediante método de alto nivel de la fachada
+                if (lora.send_datos(paqueteTelemetria)) {
+                    Serial.print(F("[TX] Telemetría enviada correctamente. Muestra: "));
+                    Serial.println(cicloContador + 1);
+                    cicloContador++;
+                } else {
+                    Serial.println(F("[ERROR TX] Pérdida de paquetes o hardware ocupado."));
+                }
+
+                // 4. Validación de ciclo de ráfagas (Cada 50 muestras)
+                if (cicloContador >= 50) {
+                    Serial.println(F("\n[EVENTO] Alcanzadas las 50 muestras. Enviando ráfaga de mensajes críticos..."));
+
+                    // Envío de mensaje string común
+                    if (lora.send_mensaje("HOLA DESDE LA ESTRATOSFERA")) {
+                        Serial.println(F("[TX STRING] Mensaje enviado: 'HOLA DESDE LA ESTRATOSFERA'"));
+                    }
+
+                    // Envío inmediato de mensaje string de error crítico
+                    if (lora.send_mensaje_error("Houston, tenemos un problema")) {
+                        Serial.println(F("[TX ERROR] Mensaje crítico enviado: 'Houston, tenemos un problema'"));
+                    }
+
+                    // Resetear contador para iniciar el siguiente ciclo de 50 telemetrías
+                    cicloContador = 0;
+                    Serial.println(F("[MDE] Reiniciando cuenta de ciclo de telemetría.\n"));
+                }
+            }
+            break;
+    }
+}

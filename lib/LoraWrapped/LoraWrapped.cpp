@@ -2,16 +2,18 @@
 
 
 
-LoraWrapped::LoraWrapped(int ss, int reset, int dio0, SPIClass& spi)
-{
+// Pasamos las variables del constructor directo a RadioLib
+LoraWrapped::LoraWrapped(int nss, int rst, int dio0, int dio1_or_busy, SPIClass& spi) {
     _st = CONNECTION_STATUS::DISCONNECTED;
-    
-    // Inicialización condicional del objeto de RadioLib según el chip elegido
+    _pinPacketReady = dio1_or_busy;
+    // RadioLib permite pasar la clase SPI como quinto argumento del módulo:
+    // Ya configura electricamente los pines 
     #if defined(MODULE_SX1278)
-        _mod = new Module(LORA_NSS, LORA_DIO0, LORA_RST, LORA_DIO1);
+        _mod = new Module(nss, dio0, rst, dio1_or_busy, spi);
         _radio = new SX1278(_mod);
     #elif defined(MODULE_SX1262)
-        _mod = new Module(LORA_NSS, LORA_DIO1, LORA_RST, LORA_BUSY);
+        // El SX1262 usa: NSS, DIO1, RST, BUSY
+        _mod = new Module(nss, dio0, rst, dio1_or_busy, spi); 
         _radio = new SX1262(_mod);
     #endif
 }
@@ -100,9 +102,9 @@ bool LoraWrapped::read_package(pkt_t *ptrPkt) {
 
     // Consulta el pin físico de interrupción para saber si realmente hay un paquete en el aire
     #if defined(MODULE_SX1278)
-        bool packetReady = (digitalRead(LORA_DIO0) == HIGH);
+        bool packetReady = (digitalRead(_pinPacketReady) == HIGH);
     #elif defined(MODULE_SX1262)
-        bool packetReady = (digitalRead(LORA_DIO1) == HIGH);
+        bool packetReady = (digitalRead(_pinPacketReady) == HIGH);
     #endif
 
     if (!packetReady) return false;

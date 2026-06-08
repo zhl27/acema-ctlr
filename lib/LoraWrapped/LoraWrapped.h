@@ -82,8 +82,9 @@ private:
 
     /* Cifrado de un byte con el método XOR*/
     inline char encrypt_byte(char dat) {return  ((char)dat)^_encryptWord ;};
+    int _pinPacketReady; // Pin DIO0 o Busy de acuerdo a modelo
 public:
-    LoraWrapped(int ss, int reset, int dio0, SPIClass& spi = DEFAULT_SPI_LORA);
+    LoraWrapped(int nss, int rst, int dio0, int dio1_or_busy, SPIClass& spi = SPI);
     ~LoraWrapped();
     bool begin(int sw = DEFAULT_SYNC_WORD, char ew = DEFAULT_ENCRY_WORD, float frequency = DEFAULT_FREC);
     
