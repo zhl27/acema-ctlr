@@ -1,9 +1,10 @@
 //
-// Created by zhl on 6/8/26.
+// Created by zhl on 6/10/26.
 //
 
-#ifndef ACEMA_CTLR_FUNCIONES_SENSOR_H
-#define ACEMA_CTLR_FUNCIONES_SENSOR_H
+#ifndef ACEMA_CTLR_FUNCIONES_DATOS_H
+#define ACEMA_CTLR_FUNCIONES_DATOS_H
+
 #include <cstdint>
 
 
@@ -32,7 +33,12 @@ vector3d<int16_t> f_sensor_get_momentum(uint8_t sensor_id); // Es la inercia. Se
 vector3d<int16_t> f_sensor_get_velocidad(uint8_t sensor_id); // Obtenida de la integracion de la aceleracion, pero con correcciones de drift y ruido. Se puede usar un filtro de Kalman o similar para mejorar la estimación.
 vector3d<int16_t> f_sensor_get_posicion(uint8_t sensor_id); // Nos permitiria dibujar un trazo del cohete en la GUI GSE
 
+// datos utilizados por el mcp controlador
+vector3d<int16_t> f_sensor_get_densidad_aire(uint8_t sensor_id); // rho
+// vector3d<int16_t> f_sensor_get_velocidad(uint8_t sensor_id);  // altura es lo mismo que posición vertical
+// int32_t f_sensor_get_altitud(uint8_t sensor_id); // ya definido arriba
 
 
 
-#endif //ACEMA_CTLR_FUNCIONES_SENSOR_H
+
+#endif //ACEMA_CTLR_FUNCIONES_DATOS_H
