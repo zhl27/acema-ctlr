@@ -5,77 +5,38 @@
 #ifndef ACEMA_CTLR_TIMER_H
 #define ACEMA_CTLR_TIMER_H
 
-
 #include <cstdint>
-#include <esp32-hal.h>
 
 /**
  * @class   Timer
  * @brief   Temporizador no bloqueante basado en milisegundos.
- * @details Utiliza aritmética de resta para ser inmune al desbordamiento de millis() cada 49 días.
  */
 class Timer {
+public:
+    // Definición del tipo de puntero a función clásico
+    typedef void (*TimerCallback)();
+
 private:
     uint32_t _duration;
     uint32_t _startTick;
     bool _expired;
     bool _running;
+    TimerCallback _callback;
 
 public:
-    /**
-       * @brief Constructor del temporizador.
-       */
-    Timer()
-      : _duration(0), _startTick(0), _expired(false), _running(false) {}
+    // Constructores
+    Timer();
+    Timer(TimerCallback callback);
 
-    /**
-       * @brief Inicia o reinicia el temporizador.
-       * @param ms Tiempo en milisegundos.
-       * @return true si el tiempo es válido, false si es 0.
-       */
-    bool shot(uint32_t ms) {
-        if (ms == 0) return false;
+    // Métodos principales
+    bool shot(uint32_t ms);
+    void update();
+    void stop();
 
-        _duration = ms;
-        _startTick = millis();
-        _running = true;
-        _expired = false;
-        return true;
-    }
-
-    /**
-       * @brief Actualiza el estado del temporizador. Debe llamarse en cada iteración del loop o HSM.
-       */
-    void update() {
-        if (_running && (millis() - _startTick >= _duration)) {
-            _expired = true;
-            _running = false;
-        }
-    }
-
-    /**
-       * @brief Verifica si el tiempo ha transcurrido.
-       * @return true si el tiempo se cumplió.
-       */
-    bool is_expired() const {
-        return _expired;
-    }
-
-    /**
-       * @brief Indica si el temporizador está contando actualmente.
-       */
-    bool is_running() const {
-        return _running;
-    }
-
-    /**
-       * @brief Detiene el temporizador y limpia los estados.
-       */
-    void stop() {
-        _running = false;
-        _expired = false;
-    }
+    // Getters y Setters
+    bool is_expired() const;
+    bool is_running() const;
+    void set_callback(TimerCallback callback);
 };
-
 
 #endif //ACEMA_CTLR_TIMER_H
