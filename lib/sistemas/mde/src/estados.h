@@ -26,13 +26,12 @@
  * - ST_ATERRIZAJE: El sistema ha alcanzado el suelo o completado su descenso.
  */
 typedef enum FlightState { // TODO: Chequear que los Estados estén completos y sean los indicados.
-    ST_BUSCANDO_CONEXION,
-    ST_ESPERA_INICIO,
+    ST_BUSCANDO_CONEXION, // fase de inicio
+    ST_ESPERA_INICIO, // 
     ST_PROPULSION,
     ST_FASE_BALISTICA,
     ST_FRENANDO,
-    ST_APOGEO,
-    ST_APERTURA,
+    ST_APOGEO,  // se abre drogue
     ST_DESCENSO_RAPIDO,
     ST_DESCENSO_LENTO,
     ST_ATERRIZAJE

@@ -196,7 +196,7 @@ void vuelo_mde_actualizar(cohete_t* self, datosVuelo_t* datos) {
   tmrLora.handle();
   tmrApogeo.handle();
 
-  if (self->estado < ST_VUELO_MAX) {
+  if (self->estado < ST_VUELO_NONE) {
     // Interrupción jerárquica de mayor nivel: Falla crítica de sensores
     if (SISTEMA.sensores.estado_hardware == HARDWARE_FALLA_CRITICA) {
       transicionErrorCritico(self, datos);

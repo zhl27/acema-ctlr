@@ -11,7 +11,7 @@
 /***********************/
 
 #define UMBRAL_LANZAMIENTO 100 // TODO: falta implementar valor real
-
+#define AREA_REFERENCIA_COHETE 0.01 // m^2, TODO: falta implementar valor real
 
 /***********************/
 /*         UART        */

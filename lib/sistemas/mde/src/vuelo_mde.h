@@ -19,23 +19,25 @@
 
 // --- Enumeraciones ---
 
-/** @brief Definición de los estados secuenciales del vuelo */
+/** @enum estadoVuelo_t
+ * @brief Definición de los estados secuenciales del vuelo */
 typedef enum {
-    ST_BUSCANDO_CONEXION = 0,
+    ST_INIT = 0, // Estado de inicialización
+    ST_BUSCANDO_CONEXION,
     ST_ESPERA_INICIO,
     ST_PROPULSION,
     ST_FASE_BALISTICA,
     ST_FRENANDO,
-    ST_APOGEO,
-    ST_APERTURA,
+    ST_APOGEO, // se abre drogue
     ST_DESCENSO_RAPIDO,
     ST_DESCENSO_LENTO,
     ST_ATERRIZAJE,
-    ST_VUELO_ERROR,
-    ST_VUELO_MAX // Límite de seguridad para la tabla de estados
+    ST_ERROR,
+    ST_NONE // Límite de seguridad para la tabla de estados
   } estadoVuelo_t;
 
-/** @brief Códigos de error críticos del sistema */
+/** @ENUM codigoError_t
+ * @brief Códigos de error críticos del sistema */
 typedef enum {
     ERR_NINGUNO = 0,
     ERR_CONEXION_GSE,
