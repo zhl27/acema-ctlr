@@ -3,7 +3,7 @@
 //
 
 #include "Fases.h"
-
+#define UMBRAL_LANZAMIENTO 10.0
 
 
 class Prevuelo : public Fase {

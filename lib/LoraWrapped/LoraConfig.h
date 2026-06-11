@@ -4,9 +4,8 @@
 // ============================================================================
 // SELECCIÓN DE MÓDULO (Descomenta SOLO UNO)
 // ============================================================================
-#define MODULE_SX1278
+// #define MODULE_SX1278
 // #define MODULE_SX1262
-
 
 
 #define SIZE_BUFFER_MSG 128

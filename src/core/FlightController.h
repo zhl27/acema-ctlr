@@ -6,7 +6,7 @@
 #define FLIGHTCONTROLLER_H
 
 #include <fases.h>
-
+#include <Arduino.h>
 #include "fases.h"
 #include "ports/LcdPort.h"
 #include "ports/LoggingPort.h"

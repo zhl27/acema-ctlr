@@ -6,8 +6,9 @@
 #ifndef LORAWRAPPED_H
 #define LORAWRAPPED_H
 
-#include <RadioLib.h>
 #include "LoraConfig.h"
+#include <RadioLib.h>
+
 
 
 #define DEFAULT_SPI_LORA SPI
@@ -84,7 +85,7 @@ private:
     inline char encrypt_byte(char dat) {return  ((char)dat)^_encryptWord ;};
     int _pinPacketReady; // Pin DIO0 o Busy de acuerdo a modelo
 public:
-    LoraWrapped(int nss, int rst, int dio0, int dio1_or_busy, SPIClass& spi = SPI);
+    LoraWrapped(uint32_t nss, uint32_t rst, uint32_t pin3, uint32_t pin4, SPIClass& spi = SPI);
     ~LoraWrapped();
     bool begin(int sw = DEFAULT_SYNC_WORD, char ew = DEFAULT_ENCRY_WORD, float frequency = DEFAULT_FREC);
     

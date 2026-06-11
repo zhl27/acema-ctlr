@@ -2,31 +2,32 @@
 #include <LoraWrapped.h>
 
 // ============================================================================
-//Comentar para compilar en ESP32
-//#define DEBUG_NANO
+// CONFIGURACIÓN CONDICIONAL DE PINES SEGÚN EL ENTORNO DEL .INI
 // ============================================================================
-#if defined(DEBUG_NANO)
 
-// Pines típicos para un módulo LoRa conectado a un Nano
-#define NANO_LORA_CS   10
-#define NANO_LORA_RST  9
-#define NANO_LORA_DIO0 2
-#define NANO_LORA_DIO1 3 
+#if defined(MICRO_ESP32)
+    // Pines asignados si compilas con: pio run -e CPU-esp32
+    #define LORA_SCK  18
+    #define LORA_MISO 19
+    #define LORA_MOSI 23
+    #define LORA_CS   5
+    #define LORA_RST  14
+    #define LORA_DIO0 2
+    #define LORA_DIO1 4
+// Instanciación única y genérica usando los alias de los macros
+LoraWrapped lora(LORA_CS, LORA_RST, LORA_DIO0, LORA_DIO1, SPI);
 
-LoraWrapped lora(NANO_LORA_CS, NANO_LORA_RST, NANO_LORA_DIO0, NANO_LORA_DIO1, SPI);
-#else 
-// Definís los pines específicos que ruteaste en la PCB de tu ESP32
-#define ESP32_LORA_SCK  18
-#define ESP32_LORA_MISO 19
-#define ESP32_LORA_MOSI 23
-#define ESP32_LORA_CS   5
-#define ESP32_LORA_RST  14
-#define ESP32_LORA_DIO0 2
-#define ESP32_LORA_DIO1 4
-
-// Instanciamos pasándole los pines correspondientes
-LoraWrapped lora(ESP32_LORA_CS, ESP32_LORA_RST, ESP32_LORA_DIO0, ESP32_LORA_DIO1, SPI);
+#elif defined(MICRO_NANO)
+    // Pines asignados si compilas con: pio run -e CPU-nano
+    #define LORA_CS   10  // Va a NSS (con divisor)
+    #define LORA_RST  9   // Va a RST (con divisor)
+    #define LORA_DIO1 2   // Va a DIO1 (directo)
+    #define LORA_BUSY RADIOLIB_NC   // Va a BUSY (directo)
+// El orden de los argumentos debe coincidir con tu constructor modificado:
+LoraWrapped lora(LORA_CS, LORA_RST, LORA_DIO1, LORA_BUSY, SPI);
 #endif
+
+
 
 // Estados de la MDE del Cohete
 enum RocketState : uint8_t {
@@ -66,9 +67,13 @@ void mostrarEstructuraYHex(dataPlot_t* datos) {
     Serial.print(F("PAQUETE CRUDO (HEX): "));
     
     // 1. Byte de longitud
-    if (longitudTotal < 16) Serial.print("0"); Serial.print(longitudTotal, HEX); Serial.print(" ");
+    if (longitudTotal < 16) {
+        Serial.print("0"); Serial.print(longitudTotal, HEX); Serial.print(" ");
+    }
     // 2. Byte de protocolo
-    if (protocolo < 16) Serial.print("0"); Serial.print(protocolo, HEX); Serial.print(" ");
+    if (protocolo < 16) {
+        Serial.print("0"); Serial.print(protocolo, HEX); Serial.print(" ");
+    }
     // 3. Bytes del payload struct
     uint8_t* bytePointer = (uint8_t*)datos;
     for (size_t i = 0; i < longitudTotal; i++) {
@@ -84,18 +89,47 @@ void mostrarEstructuraYHex(dataPlot_t* datos) {
 // ============================================================================
 void setup() {
     Serial.begin(115200);
+    delay(1000);
     Serial.println(F("[COHETE] Sistema inicializado de telemetría."));
 
-    #if defined(DEBUG_NANO) 
-    SPI.begin();
-    #else
-    SPI.begin(ESP32_LORA_SCK, ESP32_LORA_MISO, ESP32_LORA_MOSI, ESP32_LORA_CS);
+// Inicialización del bus SPI condicional
+    #if defined(MICRO_ESP32)
+        // El ESP32 mapea el SPI por software en las patas elegidas
+        SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_CS);
+        Serial.println("Inicializando SPI en modo ESP32...");
+    #elif defined(MICRO_NANO)
+        // El Nano usa sus pines fijos de hardware por defecto
+// 1. Configurar Chip Select
+        pinMode(LORA_CS, OUTPUT);
+        digitalWrite(LORA_CS, HIGH); 
+
+        // 2. Configurar el pin de Reset explícitamente desde el main para asegurar el arranque
+        pinMode(LORA_RST, OUTPUT);
+        digitalWrite(LORA_RST, LOW);    // Forzamos el reset físico (0V)
+        delay(20);                      // Mantenemos el reset 20ms
+        digitalWrite(LORA_RST, HIGH);   // Liberamos el reset (Sube a 3.2V)
+        delay(50);                      // CRUCIAL: Esperamos 50ms a que el SX1262 inicialice su firmware interno
+
+        // 3. Arrancar el SPI nativo a baja velocidad para los divisores
+        SPI.begin();
+        SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+
+        Serial.println("Inicializando SPI en modo Arduino Nano...");
+        
     #endif
+
+    if(lora.begin()) {
+        Serial.println("LoRa listo para el Cohete!");
+    } else {
+        Serial.println("Falla crítica en hardware LoRa");
+    }
 }
 
 // ============================================================================
 // LAZO PRINCIPAL
 // ============================================================================
+
+
 void loop() {
     unsigned long currentMillis = millis();
 

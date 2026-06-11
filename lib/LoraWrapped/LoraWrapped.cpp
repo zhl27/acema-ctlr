@@ -3,25 +3,23 @@
 
 
 // Pasamos las variables del constructor directo a RadioLib
-LoraWrapped::LoraWrapped(int nss, int rst, int dio0, int dio1_or_busy, SPIClass& spi) {
+LoraWrapped::LoraWrapped(uint32_t nss, uint32_t rst, uint32_t pin3, uint32_t pin4, SPIClass& spi) {
     _st = CONNECTION_STATUS::DISCONNECTED;
-    _pinPacketReady = dio1_or_busy;
-    // RadioLib permite pasar la clase SPI como quinto argumento del módulo:
-    // Ya configura electricamente los pines 
+    _pinPacketReady = pin3; 
+
     #if defined(MODULE_SX1278)
-        _mod = new Module(nss, dio0, rst, dio1_or_busy, spi);
+        _mod = new Module(nss, pin3, rst, pin4, spi);
         _radio = new SX1278(_mod);
     #elif defined(MODULE_SX1262)
-        // El SX1262 usa: NSS, DIO1, RST, BUSY
-        _mod = new Module(nss, dio0, rst, dio1_or_busy, spi); 
+        // Ahora sí, pin4 acepta RADIOLIB_NC (-1) de forma segura sin overflow
+        _mod = new Module(nss, pin3, rst, pin4, spi); 
         _radio = new SX1262(_mod);
     #endif
 }
 
 LoraWrapped::~LoraWrapped()
 {
-    delete _radio;
-    delete _mod;
+    if (_mod)   delete _mod;
 }
 
 bool LoraWrapped::begin(int sw, char ew, float frec){

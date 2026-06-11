@@ -5,7 +5,8 @@
 #ifndef SDCARDLOGGER_H
 #define SDCARDLOGGER_H
 #include <Printable.h>
-#include <File>
+#include <SD.h>
+
 
 class SdCardLogger {
     File file;
