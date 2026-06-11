@@ -6,21 +6,27 @@
 #define ACEMA_CTLR_DATA_H
 #include <cstdint>
 
+#include "vuelo_mde.h"
+
 /************************/
 /*     DATOS CRUDOS     */
 /************************/
 
 /**
- * @struct data_raw_mpc_t
+ * @struct data_raw_mpu_t
  * @brief Estructura de datos crudos de la MPU6050.
  *
  * Contiene los datos sin procesar del acelerómetro y giroscopio.
  */
 typedef struct {
-    float altitud;      ///< Altitud en metros
-    float velocidad;    ///< Velocidad en m/s
-    float posicion;     ///< Posición en metros
-} data_raw_mpc_t;
+    int16_t accel_x; // Aceleración X (Raw)
+    int16_t accel_y; // Aceleración Y (Raw)
+    int16_t accel_z; // Aceleración Z (Raw)
+    int16_t temp;    // Temperatura (Raw)
+    int16_t gyro_x;  // Velocidad angular X (Raw)
+    int16_t gyro_y;  // Velocidad angular Y (Raw)
+    int16_t gyro_z;  // Velocidad angular Z (Raw)
+} data_raw_mpu_t;
 
 /**
  * @struct data_raw_bmp_t
@@ -29,9 +35,8 @@ typedef struct {
  * Contiene los datos sin procesar del sensor barométrico.
  */
 typedef struct {
-    float presion;          ///< Presión en hPa
-    float temperatura_bmp;  ///< Temperatura en °C
-    float altitud;          ///< Altitud en metros
+    int32_t presion; ///< Presión cruda (valor de 20 bits 'up') [5]
+    int32_t temp; ///< Temperatura cruda (valor de 20 bits 'ut') [6]
 } data_raw_bmp_t;
 
 /**
@@ -39,12 +44,36 @@ typedef struct {
  * @brief Estructura de datos crudos del GPS.
  *
  * Contiene los datos sin procesar del receptor GPS.
+ *
+ * Posición: Coordenadas de latitud y longitud con una precisión horizontal autónoma de aproximadamente 2.5 metros (usando GPS) o 4.0 metros (usando GLONASS)
+ * Velocidad: Con una precisión de 0.1 m/s.
+ * Tiempo: Entrega una referencia temporal precisa, incluyendo una señal de pulso de tiempo (TIMEPULSE) configurable con una precisión de nanosegundos.
+ * Trayectoria (Heading): Dirección del movimiento con una precisión de 0.5 grados.
+ *
  */
 typedef struct {
     double latitud;     ///< Latitud en grados
     double longitud;    ///< Longitud en grados
-    uint32_t satelites; ///< Número de satélites detectados
-    bool gps_valido;    ///< Indicador de validez del GPS
+    // --- Posicionamiento ---
+    double latitud;           ///> Coordenadas en grados (NMEA ASCII o UBX Binario) [1]
+    double longitud;          ///> Coordenadas en grados (NMEA ASCII o UBX Binario) [1]
+    float altitud;            ///> Altitud en metros (Limite operativo: 50,000 m) [2, 3]
+    float precision_horizontal;        ///> Precision horizontal (Aprox. 2.5m en GPS / 4.0m GLONASS) [2, 3]
+
+    // --- Movimiento ---
+    float velocidad;          ///> Velocidad en m/s (Precision de 0.1 m/s) [2, 3]
+    float heading;            ///> Direccion del movimiento en grados (Precision de 0.5 grados) [2, 3]
+    float dinamica_max;       ///> Aceleracion soportada (Hasta 4g) [2, 3]
+
+    // --- Tiempo y Sincronizacion ---
+    uint32_t tiempo_utc;      ///> Referencia temporal sincronizada [2]
+    uint32_t freq_timepulse;  ///> Frecuencia configurable (0.25 Hz a 10 MHz) [2, 4]
+    uint32_t precision_pulso; ///> Precision de la señal de tiempo en nanosegundos (30ns a 100ns) [2, 3]
+
+    // --- Estado del Sistema ---
+    int nro_satelites;        ///> Numero de satelites (de un motor de 56 canales) [5, 6]
+    bool tiene_fix;           ///> Estado de posicionamiento (TTFF de 1s en Hot Start) [2, 3] --> TIFF es Time-To-First-Fix --> El dato "tiene_fix" indica si el módulo ha logrado sincronizarse con los satélites necesarios para calcular una posición geográfica válida
+    char sistema_activo;      ///> GPS, GLONASS o Galileo (via firmware) [7, 8]
 } data_raw_gps_t;
 
 
@@ -56,10 +85,10 @@ typedef struct {
  */
 typedef struct {
     data_raw_bmp_t bmp;  ///< Datos crudos del BMP280
-    data_raw_mpc_t mpc;  ///< Datos crudos del MPU6050
+    data_raw_mpu_t mpc;  ///< Datos crudos del MPU6050
     data_raw_gps_t gps;  ///< Datos crudos del GPS
+    uint64_t timestamp;  ///< Marca de tiempo de la lectura de los datos
 } data_raw_t;
-
 
 
 /**
@@ -71,78 +100,41 @@ typedef struct {
  *
  * @see data_all_t
  */
-typedef struct { // TODO: Revisar si esta estructura es necesaria o si podemos usar directamente data_all_t para la transmisión a GSE.
-    // BMP280
-    float presion;          ///< Presión en hPa
-    float temperatura_bmp;  ///< Temperatura BMP280 en °C
-    float altitud;          ///< Altitud en metros
+typedef struct {
+    int16_t posicion_relativa;
+    int16_t velocidad;
+    int16_t momentum; // inercia
+    estadoVuelo_t vuelo_estado_actual; // se va a ver como un integer
 
-    // MPU6050
-    float accel_x;          ///< Aceleración en eje X en m/s²
-    float accel_y;          ///< Aceleración en eje Y en m/s²
-    float accel_z;          ///< Aceleración en eje Z en m/s²
-    float gyro_x;           ///< Velocidad angular eje X en °/s
-    float gyro_y;           ///< Velocidad angular eje Y en °/s
-    float gyro_z;           ///< Velocidad angular eje Z en °/s
-    float temperatura_mpu;  ///< Temperatura MPU6050 en °C
+    double latitud;           ///> Coordenadas en grados (NMEA ASCII o UBX Binario) [1]
+    double longitud;          ///> Coordenadas en grados (NMEA ASCII o UBX Binario) [1]
+    float altitud;            ///> Altitud en metros (Limite operativo: 50,000 m) [2, 3]
 
-    // GPS
-    double latitud;         ///< Latitud en grados
-    double longitud;        ///< Longitud en grados
-    uint32_t satelites;     ///< Número de satélites
-    bool gps_valido;        ///< Validez del GPS
+    int nro_satelites;        ///> Numero de satelites (de un motor de 56 canales) [5, 6]
+    bool tiene_fix;           ///> Estado de posicionamiento (TTFF de 1s en Hot Start) [2, 3] --> TIFF es Time-To-First-Fix --> El dato "tiene_fix" indica si el módulo ha logrado sincronizarse con los satélites necesarios para calcular una posición geográfica válida
+    char sistema_activo;      ///> GPS, GLONASS o Galileo (via firmware) [7, 8]
+    // TODO: hay que considerar los datos procesados que se infieren de los crudos
+    // capaz alguno de los datos crudos no se envía a la GSE, o se envía solo un subconjunto de ellos, o se envían datos procesados derivados de los crudos.
+    // Eso depende del diseño de la telemetría y de las necesidades de la GSE.
+    uint64_t timestamp;  ///< Marca de tiempo de la lectura de los datos
 } data_gse_t;
 
 /**
  * @struct data_all_t
  * @brief Estructura universal de todos los datos del sistema.
  *
- * Contiene la información completa y procesada de todos los sensores:
- * BMP280 (presión y temperatura), MPU6050 (aceleración y giroscopío),
- * y GPS (posicionamiento global).
- *
  * @note Esta estructura se utiliza para almacenar y transmitir todas
  * las mediciones del sistema en una única entidad.
  *
- * @example
- * @code{.c}
- * // Ejemplo de uso
- * data_all_t datos;
- *
- * datos.bmp.presion = 1013.25f;
- * datos.bmp.temperatura_bmp = 24.5f;
- * datos.bmp.altitud = 120.0f;
- *
- * datos.mpc.altitud = 121.0f;
- * datos.mpc.velocidad = 15.2f;
- * datos.mpc.posicion = 42.0f;
- *
- * datos.gps.latitud = -34.6037;
- * datos.gps.longitud = -58.3816;
- * datos.gps.satelites = 8;
- * datos.gps.gps_valido = true;
- * @endcode
  */
 typedef struct { // TODO: Completar todos los datos
-    // BMP280
-    float presion;          ///< Presión en hPa
-    float temperatura_bmp;  ///< Temperatura BMP280 en °C
-    float altitud;          ///< Altitud en metros
+    data_raw_t data_raw; ///< Datos crudos de los sensores
+    int16_t posicion_relativa;
+    int16_t velocidad;
+    int16_t momentum; // inercia
+    estadoVuelo_t vuelo_estado_actual; // se va a ver como un integer
 
-    // MPU6050
-    float accel_x;          ///< Aceleración en eje X en m/s²
-    float accel_y;          ///< Aceleración en eje Y en m/s²
-    float accel_z;          ///< Aceleración en eje Z en m/s²
-    float gyro_x;           ///< Velocidad angular eje X en °/s
-    float gyro_y;           ///< Velocidad angular eje Y en °/s
-    float gyro_z;           ///< Velocidad angular eje Z en °/s
-    float temperatura_mpu;  ///< Temperatura MPU6050 en °C
-
-    // GPS
-    double latitud;         ///< Latitud en grados
-    double longitud;        ///< Longitud en grados
-    uint32_t satelites;     ///< Número de satélites
-    bool gps_valido;        ///< Validez del GPS
+    // TODO: Incluir todos los datos derivados de los datos crudos. Esto puede incluir datos procesados, inferidos o filtrados que se calculan a partir de los datos crudos, como altitud, velocidad, aceleración corregida, etc. La idea es que esta estructura se registre en el Flash, que funca como una suerte de caja negra del cohete.
 } data_all_t;
 
 
