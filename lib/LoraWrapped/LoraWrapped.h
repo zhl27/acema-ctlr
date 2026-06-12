@@ -6,6 +6,8 @@
 #ifndef LORAWRAPPED_H
 #define LORAWRAPPED_H
 
+#include <cstdint>
+
 #include "LoraConfig.h"
 #include <RadioLib.h>
 

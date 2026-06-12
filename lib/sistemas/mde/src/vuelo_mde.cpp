@@ -1,0 +1,211 @@
+//
+// Created by zhl on 6/8/26.
+//
+
+#include "vuelo_mde.h"
+
+
+/**
+ * @file vuelo_mde.cpp
+ * @brief Implementación de la Máquina de Estados plana para la secuencia de vuelo.
+ * @details MdE sin subestados. La ignición se realiza de forma directa mediante
+ * una chispa. Se mantienen las verificaciones de seguridad física del proyectil.
+ */
+
+#include "vuelo_mde.h"
+
+// Nota: Estas cabeceras simulan el acceso a tu hardware y timers reales.
+#include "sensores.h"
+#include "telemetria.h"
+#include "actuadores.h"
+#include "timer.h" // Asumiendo que existe una clase/struct Timer
+
+// --- Timers Estáticos y Callbacks ---
+
+static Timer tmrLora;        /**< Timer para reintentos de conexión Lora */
+static Timer tmrApogeo;      /**< Timer de seguridad para el drogue */
+
+// --- Variables y Estructuras Globales Externas ---
+extern sistema_vuelo_t SISTEMA;
+
+// --- Funciones Privadas / Helper ---
+
+/**
+ * @brief Protocolo de transición a estado de error y aborto.
+ */
+static void transicionErrorCritico(cohete_t* self, datosVuelo_t* datos) {
+  SISTEMA.flags.emergencia = 1;
+  self->estado = ST_VUELO_ERROR;
+  SISTEMA.telemetria.velocidad_tx = TX_RAPIDA;
+
+  // Si estamos en el aire (altitud significativa), forzar apertura de paracaídas principal
+  if (SISTEMA.sensores.altura > 10.0) {
+      actuadores_desplegar_paracaidas_principal();
+  } else {
+      actuadores_apagar_motor();
+  }
+}
+
+// --- Funciones de Estado de la MdE (Estáticas) ---
+
+static void st_buscando_conexion(cohete_t* self, datosVuelo_t* datos) {
+  // Condición de entrada única (primer intento de conexión)
+  if (datos->intentosLora == 0 && !tmrLora.isRunning()) {
+    sensores_configurar();
+    actuadores_configurar();
+    SISTEMA.telemetria.conectar_GSE();
+    datos->intentosLora++;
+    tmrLora.shot(2000);
+    return;
+  }
+
+  // Verificación de conexión tras expirar el timer
+  if (tmrLora.isExpired()) {
+    if (SISTEMA.telemetria.conectado) {
+      self->estado = ST_ESPERA_INICIO;
+    } else {
+      SISTEMA.telemetria.conectar_GSE();
+      datos->intentosLora++;
+
+      if (datos->intentosLora >= 5) {
+        SISTEMA.flags.codigoError = ERR_CONEXION_GSE;
+        transicionErrorCritico(self, datos);
+      } else {
+        tmrLora.shot(2000);
+      }
+    }
+  }
+}
+
+static void st_espera_inicio(cohete_t* self, datosVuelo_t* datos) {
+  SISTEMA.telemetria.velocidad_tx = TX_LENTA;
+
+  if (SISTEMA.flags.cmd_start) {
+    // Análisis de Errores: Verificación de Estacionariedad
+    bool checkAltura = (SISTEMA.sensores.altura < 1.0);
+    bool checkInclinacion = (SISTEMA.sensores.inclinacion >= 85.0 && SISTEMA.sensores.inclinacion <= 95.0);
+    bool checkAcel = (SISTEMA.sensores.aceleracion == 0.0);
+
+    if (checkAltura && checkInclinacion && checkAcel) {
+      SISTEMA.telemetria.velocidad_tx = TX_RAPIDA;
+      actuadores_generar_chispa(); // Ignición simple por chispa
+      self->estado = ST_PROPULSION;
+    } else {
+      SISTEMA.flags.codigoError = ERR_CONDICION_INICIAL;
+      SISTEMA.flags.cmd_start = 0;
+      transicionErrorCritico(self, datos);
+    }
+  }
+}
+
+static void st_propulsion(cohete_t* self, datosVuelo_t* datos) {
+  // Verificación de trayectoria segura
+  if (SISTEMA.sensores.inclinacion < 60.0 || SISTEMA.sensores.inclinacion > 120.0) {
+    SISTEMA.flags.codigoError = ERR_TRAYECTORIA_PELIGROSA;
+    actuadores_apagar_motor();
+    transicionErrorCritico(self, datos);
+    return;
+  }
+
+  // Transición natural post-combustión
+  if (SISTEMA.flags.combustion_completada) {
+    actuadores_apagar_motor();
+    self->estado = ST_FASE_BALISTICA;
+  }
+}
+
+static void st_fase_balistica(cohete_t* self, datosVuelo_t* datos) {
+  if (SISTEMA.sensores.vel_vertical <= datos->umbralVelFrenado) {
+    actuadores_init_rutina_frenado_aerodinamico();
+    self->estado = ST_FRENANDO;
+  }
+}
+
+static void st_frenando(cohete_t* self, datosVuelo_t* datos) {
+  if (SISTEMA.sensores.vel_vertical <= 0.0) {
+    self->estado = ST_APOGEO;
+  }
+}
+
+static void st_apogeo(cohete_t* self, datosVuelo_t* datos) {
+  actuadores_desplegar_drogue();
+  self->estado = ST_APERTURA;
+  tmrApogeo.shot(3000);
+}
+
+static void st_apertura(cohete_t* self, datosVuelo_t* datos) {
+  bool drogue_estabilizado = (SISTEMA.sensores.inclinacion >= 80.0 && SISTEMA.sensores.inclinacion <= 100.0) &&
+                             (SISTEMA.sensores.variacion_aceleracion < 0.5);
+
+  if (drogue_estabilizado) {
+    self->estado = ST_DESCENSO_RAPIDO;
+  }
+  else if (tmrApogeo.isExpired()) {
+    SISTEMA.flags.codigoError = ERR_DROGUE_FALLIDO;
+    actuadores_desplegar_paracaidas_principal();
+    self->estado = ST_DESCENSO_LENTO;
+  }
+}
+
+static void st_descenso_rapido(cohete_t* self, datosVuelo_t* datos) {
+  if (SISTEMA.sensores.altura <= 250.0 || SISTEMA.sensores.vel_vertical <= -50.0) {
+    actuadores_desplegar_paracaidas_principal();
+    self->estado = ST_DESCENSO_LENTO;
+  }
+}
+
+static void st_descenso_lento(cohete_t* self, datosVuelo_t* datos) {
+  if (SISTEMA.sensores.vel_vertical >= -5.0 || SISTEMA.sensores.altura <= 0.5) {
+    SISTEMA.telemetria.velocidad_tx = TX_LENTA;
+    self->estado = ST_ATERRIZAJE;
+  }
+}
+
+static void st_aterrizaje(cohete_t* self, datosVuelo_t* datos) {
+  // Rutina de baliza (ej. activar zumbador, emitir coordenadas GPS)
+  (void)self;
+  (void)datos;
+}
+
+static void st_error(cohete_t* self, datosVuelo_t* datos) {
+  // Bloqueo de seguridad tras un error crítico.
+  // El hardware ya fue asegurado en transicionErrorCritico().
+  (void)self;
+  (void)datos;
+}
+
+// --- Despachador Principal ---
+
+/** @brief Array de punteros a función mapeado estrictamente contra estadoVuelo_t */
+const vuelo_estado_func_t TABLA_ESTADOS_VUELO[] = {
+  st_buscando_conexion,
+  st_espera_inicio,
+  st_propulsion,
+  st_fase_balistica,
+  st_frenando,
+  st_apogeo,
+  st_apertura,
+  st_descenso_rapido,
+  st_descenso_lento,
+  st_aterrizaje,
+  st_error
+};
+
+void vuelo_mde_actualizar(cohete_t* self, datosVuelo_t* datos) {
+  // Actualización de tiempos
+  tmrLora.handle();
+  tmrApogeo.handle();
+
+  if (self->estado < ST_VUELO_NONE) {
+    // Interrupción jerárquica de mayor nivel: Falla crítica de sensores
+    if (SISTEMA.sensores.estado_hardware == HARDWARE_FALLA_CRITICA) {
+      transicionErrorCritico(self, datos);
+    }
+
+    // Llamada dinámica a la función correspondiente al estado actual
+    TABLA_ESTADOS_VUELO[self->estado](self, datos);
+  } else {
+    // Fall-back por si la memoria del estado se corrompe y salta fuera del índice
+    transicionErrorCritico(self, datos);
+  }
+}
