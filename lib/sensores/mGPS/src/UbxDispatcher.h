@@ -1,0 +1,100 @@
+/**
+ * @file UbxDispatcher.h
+ * @brief
+ * @author Joe Cruz (jocruz@frba.utn.edu.ar)
+ * @date 19-06-2023
+ */
+
+#ifndef UBX_DISPATCHER_H
+#define UBX_DISPATCHER_H
+
+
+
+
+// ==========================================
+// Includes
+// ==========================================
+
+#include <cstdint>
+#include <assert.h>
+#include <cstddef>
+#include "UbxProtocols.h"
+
+//Fuerza al compilador a empaquetar estructuras estrechamente con una alineación de 1 byte
+#pragma pack(push, 1)
+
+// ==========================================
+// Encabezado/trama del protocolo de transporte UBX
+// ==========================================
+typedef struct UBX_HEADER{
+    char    sync[2];    // 0xB5 0x62
+
+    union{
+        struct 
+        {
+            uint8_t     msgClass;   // Class ID
+            uint8_t     msgID;      // Message ID
+            uint16_t    length;     // Tamaño del payload, en Litle eldian
+        };
+        uint8_t subEncabezado[4];
+    };
+    uint8_t ckA;
+    uint8_t ckB;
+}ubx_header_t;
+
+
+#pragma pack(pop)
+
+
+/**
+ * @class UbxDispacher
+ * @details
+ * 
+ */
+class UbxDispatcher {
+public:
+    UbxDispatcher(const UbxRegMsg_t **ptrTablaMsg, const size_t tamanioTabla);
+    ~UbxDispatcher();
+
+    /* Posibles aplicaciones*/
+    void pushByte(uint8_t byte);
+    void handleFSM(uint8_t byte){
+        (this->*stActual)(byte);
+    };
+
+    template <typename T>
+    T* getPayload()const{
+        return static_cast<T*>(_ptrPayloadActual);
+    };
+
+
+private:
+    enum STATE: uint8_t {WAIT_SYNC1, WAIT_SYNC2, LOAD_SUBENCABEZADO, LOAD_PAYLOAD, IGNORE_PAYLOAD, CHECKSUM} estadoActual;
+    enum SYNC: uint8_t {_1 = 0xB5, _2 = 0x62};
+
+    ubx_header_t _header;
+
+    /** @details Puntero a un vector de registros de mensajes */
+    const UbxRegMsg_t** _tablaMsg;
+
+    /* Tamaño de la tabla*/
+    const size_t _tablaMsgSize;
+
+    /* Puntero al payload que se carga*/
+    uint8_t* _ptrPayloadActual;
+    /* Index del vector */
+    size_t _offsetActual;
+    uint16_t _payloadCounter;
+    uint8_t  _checksumModulo[2];  // Almacena temporalmente el CK_A y CK_B que llegan del UART
+
+    void(UbxDispatcher::*stActual)(uint8_t);
+
+    void waitSync1(uint8_t);
+    void waitSync2(uint8_t);
+    void loadSubencabezado(uint8_t);
+    void loadPayload(uint8_t);
+    void ignorePayload(uint8_t);
+    void checksum(uint8_t);
+};
+
+#endif
