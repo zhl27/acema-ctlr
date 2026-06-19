@@ -52,8 +52,6 @@ typedef struct {
  *
  */
 typedef struct {
-    double latitud;     ///< Latitud en grados
-    double longitud;    ///< Longitud en grados
     // --- Posicionamiento ---
     double latitud;           ///> Coordenadas en grados (NMEA ASCII o UBX Binario) [1]
     double longitud;          ///> Coordenadas en grados (NMEA ASCII o UBX Binario) [1]

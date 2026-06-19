@@ -4,6 +4,22 @@
 
 #include "SerialPrint.h"
 #include "globals.h"
+#include "data.h"
+#include "sensores.h"
+
+// Global instance of the flight system // TODO: PENSAR SI ES NECESARIO
+// sistema_vuelo_t SISTEMA = {
+//     .sensores = {
+//         .altura = 0.0f,
+//         .inclinacion = 0.0f,
+//         .aceleracion = 0.0f,
+//         .vel_vertical = 0.0f,
+//         .variacion_aceleracion = 0.0f,
+//         .estado_hardware = HARDWARE_OK
+//     },
+//     .estado_vuelo = ST_INIT,
+//     .codigo_error = 0
+// };
 
 const size_t RBUF_SIZE = 1024; // bytes per ring buffer
 
