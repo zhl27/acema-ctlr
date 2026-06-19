@@ -13,6 +13,7 @@ bool callbackPvtEjecutado = false;
 // Callback de prueba
 void onNavPvtReceived() {
     callbackPvtEjecutado = true;
+    // TODO: Hacer que la funcion reciba void* para parsear datos
 }
 
 // Tabla de registros
