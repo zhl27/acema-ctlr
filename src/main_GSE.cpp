@@ -126,6 +126,7 @@ void loop() {
 
         case GSE_RECEIVING_DATA:
             pkt_t paqueteRecibido;
+            // TODO: COMPLETAR
             
             // Instanciamos el método genérico público de lectura de la fachada
             // Nota: internamente gestiona la asignación y limpieza según protocolo

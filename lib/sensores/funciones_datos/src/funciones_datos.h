@@ -8,6 +8,7 @@
 #include <cstdint>
 
 #include "Vector3D.h"
+#include "config.h"
 
 
 Vector3D<int16_t> f_sensor_get_aceleracion();

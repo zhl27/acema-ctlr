@@ -21,6 +21,18 @@
 //     .codigo_error = 0
 // };
 
+#include "LoraWrapped.h"
+    // Pines asignados si compilas con: pio run -e CPU-esp32
+    #define LORA_SCK  18
+    #define LORA_MISO 19
+    #define LORA_MOSI 23
+    #define LORA_CS   5
+    #define LORA_RST  14
+    #define LORA_DIO0 2
+    #define LORA_DIO1 4
+// Instanciación única y genérica usando los alias de los macros
+LoraWrapped lora(LORA_CS, LORA_RST, LORA_DIO0, LORA_DIO1, SPI);
+
 const size_t RBUF_SIZE = 1024; // bytes per ring buffer
 
 // Ring buffer handles
@@ -76,6 +88,9 @@ void setup() {
     delay(100);
 }
 
+void loop(){
+    
+}
 
 // TODO: Pensar sobre este texto: "You need to gather large bursts of hardware data inside an Interrupt Service Routine (ISR) to be processed later by a task."
 void vTaskReadSensors(void *pvParameters) {

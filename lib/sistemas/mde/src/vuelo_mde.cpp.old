@@ -2,7 +2,7 @@
 // Created by zhl on 6/8/26.
 //
 
-#include "vuelo_mde.h"
+//#include "vuelo_mde.h"
 
 
 /**
@@ -12,21 +12,15 @@
  * una chispa. Se mantienen las verificaciones de seguridad física del proyectil.
  */
 
-#include "vuelo_mde.h"
-
 // Nota: Estas cabeceras simulan el acceso a tu hardware y timers reales.
-#include "sensores.h"
-#include "telemetria.h"
-#include "actuadores.h"
-#include "timer.h" // Asumiendo que existe una clase/struct Timer
+// #include "sensores.h"
+// #include "actuadores.h"
+// #include "Timer.h"
 
 // --- Timers Estáticos y Callbacks ---
 
 static Timer tmrLora;        /**< Timer para reintentos de conexión Lora */
 static Timer tmrApogeo;      /**< Timer de seguridad para el drogue */
-
-// --- Variables y Estructuras Globales Externas ---
-extern sistema_vuelo_t SISTEMA;
 
 // --- Funciones Privadas / Helper ---
 
