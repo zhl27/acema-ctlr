@@ -68,7 +68,7 @@ void UbxDispatcher::loadSubencabezado(uint8_t byte)
             {
                 _offsetActual = i;
                 _ptrPayloadActual = _tablaMsg[i]->payloadBuffer;
-                (_tablaMsg[i]->onReceive)();
+//               (_tablaMsg[i]->onReceive)();
                 mensajeEncontrado = true;
                 break;
             }
