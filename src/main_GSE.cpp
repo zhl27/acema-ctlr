@@ -139,7 +139,14 @@ void loop() {
                 // es exponer un método público en tu fachada o usar una estructura dedicada.
                 // Dado que tu fachada lee automáticamente en base al búfer privado, implementamos la recepción:
             }
-            
+            if(lora.read_paquete(&paqueteRecibido)){
+                #ifndef DEBUG
+                sendBinaryToGUI(&paqueteRecibido); 
+                #endif
+                #ifdef DEBUG
+                printPacketDebug(&paqueteRecibido);
+                #endif
+            }
             // Nota de integración: Para poder procesar datos continuos de manera limpia, 
             // asumimos que implementaste o usás un método público de lectura en la fachada, 
             // aquí emulamos la recepción usando los buffers internos expuestos por el comportamiento de la clase.
