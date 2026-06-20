@@ -6,6 +6,8 @@
 #include "globals.h"
 #include "data.h"
 #include "sensores.h"
+#include <string.h>
+#include <stdio.h>
 
 // Global instance of the flight system // TODO: PENSAR SI ES NECESARIO
 // sistema_vuelo_t SISTEMA = {
@@ -57,7 +59,7 @@ void setup() {
     Serial.begin(115200);
 
     while (!Serial)
-        delay(10); // will pause mcu until serial console opens
+        delay(1000); // will pause mcu until serial console opens
 
     SerialPrint::msg("Setup");
 
@@ -83,20 +85,124 @@ void setup() {
         SerialPrint::msg("xFlashRingbuf creado");
     }
 
+    // Create tasks with priority hierarchy
+    xTaskCreate(vTaskReadSensors, "ReadSensors", 4096, NULL, 4, &xTaskReadSensorsHandle); // TODO: Hacer un Profile. Ver si es overkill usar 4096 WORDs para esto. Ojo: WORD = 4 bits en la esp32. "You can use uxTaskGetStackHighWaterMark() to monitor unused stack space"
+    xTaskCreate(vTaskStateMachine, "StateMachine", 4096, NULL, 3, &xTaskStateMachineHandle);
+    xTaskCreate(vTaskFlash, "Flash", 4096, NULL, 3, &xTaskFlashHandle);
+    xTaskCreate(vTaskLora, "Lora", 4096, NULL, 2, &xTaskLoraHandle);
+
     vTaskDelete(NULL); // NULL hace referenica al task default que maneja a "void loop()"
 
     delay(100);
 }
 
 void loop(){
-    
+    // NO SE USA ESTO
 }
 
 // TODO: Pensar sobre este texto: "You need to gather large bursts of hardware data inside an Interrupt Service Routine (ISR) to be processed later by a task."
 void vTaskReadSensors(void *pvParameters) {
     while (1) {
-        SerialPrint::msg("Leyendo sensores...");
-        // Aquí iría la lógica de lectura de sensores y envío a la cola
-        vTaskDelay(1000 / portTICK_PERIOD_MS); // Simula un retardo de 1 segundo entre lecturas
+        // Mock: generate a fake sensor payload and send to the ring buffers
+        char payload[128];
+        static int seq = 0;
+        float mock_alt = 100.0f + (seq * 0.1f);
+        float mock_acc = 0.01f * seq;
+        int len = snprintf(
+            payload,
+            sizeof(payload),
+            "SENSOR;seq=%d;alt=%.2f;acc=%.3f", seq++, mock_alt, mock_acc);
+
+        Serial.printf("[ReadSensors] Emitting: %s\n", payload);
+
+        if (xStateMachineRingbuf != NULL) {
+            if (xRingbufferSend(xStateMachineRingbuf, (void *)payload, (size_t)(len + 1), pdMS_TO_TICKS(10)) != pdTRUE) {
+                SerialPrint::err("xRingbufferSend -> xStateMachineRingbuf failed");
+            }
+        }
+
+        if (xFlashRingbuf != NULL) {
+            if (xRingbufferSend(xFlashRingbuf, (void *)payload, (size_t)(len + 1), pdMS_TO_TICKS(10)) != pdTRUE) {
+                SerialPrint::err("xRingbufferSend -> xFlashRingbuf failed");
+            }
+        }
+
+        if (xLoraRingbuf != NULL) {
+            if (xRingbufferSend(xLoraRingbuf, (void *)payload, (size_t)(len + 1), pdMS_TO_TICKS(10)) != pdTRUE) {
+                SerialPrint::err("xRingbufferSend -> xLoraRingbuf failed");
+            }
+        }
+
+        // Simulate a 1 second sampling interval
+        vTaskDelay(pdMS_TO_TICKS(1000)); // it yields CPU to lower priorities for 1s
+    }
+}
+
+// Mock implementation of the State Machine task: consumes sensor messages and forwards/acts on them
+void vTaskStateMachine(void *pvParameters) {
+    (void)pvParameters;
+    for (;;) {
+
+        #ifdef DEBUG
+        Serial.printf("[StateMachine] Checking for messages...\n");
+        xPortGetCoreID()
+        #endif
+
+        size_t item_size = 0;
+        char *item = (char *) xRingbufferReceive(xStateMachineRingbuf, &item_size, pdMS_TO_TICKS(2000));
+        if (item != NULL) {
+            Serial.printf("[StateMachine] Received (%d bytes): %s\n", (int)item_size, item);
+
+            // For the mock, forward the received payload to the Lora and Flash ringbuffers as well
+            if (xLoraRingbuf != NULL) {
+                if (xRingbufferSend(xLoraRingbuf, (void *)item, item_size, pdMS_TO_TICKS(10)) != pdTRUE) {
+                    SerialPrint::err("StateMachine -> xLoraRingbuf send failed");
+                }
+            }
+            if (xFlashRingbuf != NULL) {
+                if (xRingbufferSend(xFlashRingbuf, (void *)item, item_size, pdMS_TO_TICKS(10)) != pdTRUE) {
+                    SerialPrint::err("StateMachine -> xFlashRingbuf send failed");
+                }
+            }
+
+            // Return the item to the ringbuffer
+            vRingbufferReturnItem(xStateMachineRingbuf, (void *)item);
+
+        } else {
+            // timeout
+            SerialPrint::msg("[StateMachine] No messages (timeout)");
+        }
+    }
+}
+
+// Mock implementation of the Flash task: consumes items from the Flash ringbuffer and "persists" them
+void vTaskFlash(void *pvParameters) {
+    (void)pvParameters;
+    for (;;) {
+        size_t item_size = 0;
+        char *item = (char *) xRingbufferReceive(xFlashRingbuf, &item_size, pdMS_TO_TICKS(5000));
+        if (item != NULL) {
+            Serial.printf("[Flash] Persisting (%d bytes): %s\n", (int)item_size, item);
+            // TODO: In a real implementation, write to SD/flash. Here we just log.
+            vRingbufferReturnItem(xFlashRingbuf, (void *)item);
+        } else {
+            SerialPrint::msg("[Flash] No items to persist (timeout)");
+        }
+    }
+}
+
+// Mock implementation of the Lora task: consumes items and "sends" them over LoRa
+void vTaskLora(void *pvParameters) {
+    (void)pvParameters;
+    for (;;) {
+        size_t item_size = 0;
+        char *item = (char *) xRingbufferReceive(xLoraRingbuf, &item_size, pdMS_TO_TICKS(3000));
+        if (item != NULL) {
+            Serial.printf("[Lora] Sending (%d bytes): %s\n", (int)item_size, item);
+            // TODO: In a real implementation, pass to the LoraWrapped instance. Here we just log.
+            vRingbufferReturnItem(xLoraRingbuf, (void *)item);
+        } else {
+            SerialPrint::msg("[Lora] No messages to send (timeout)");
+        }
     }
 }
