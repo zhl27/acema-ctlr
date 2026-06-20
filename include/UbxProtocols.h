@@ -4,9 +4,16 @@
 #include <cstdint>
 
 
+
 // ==========================================
 // Protocolos class
 // ==========================================
+typedef enum UBX_SYNC: uint8_t {
+    SYNC_1 = 0xB5,
+    SYNC_2 = 0x62
+}ubx_sync_e;
+
+
 typedef enum UBX_CLASS: uint8_t {
     NAV = 0X01,
     RXM = 0X02,
@@ -104,6 +111,163 @@ typedef struct NAV_PVT {
 static_assert(sizeof(nav_pvt_t) == 84, "Size of nav_pvt_t must be exactly 84 bytes!");
 
 
+#pragma pack(push, 1)
+
+
+// ==========================================
+// ID's de la clase CGF (CONFIGURATION)
+// ==========================================
+typedef enum UBX_ID_CFG: uint8_t{
+    ANT =   0X13,
+    CFG =   0X09,
+    DAT =   0X06,
+    GNSS =  0X3E,
+    INF =   0X02,
+    ITFM =  0X39,
+    LOGFILTER = 0X47,
+    MSG =   0X01,
+    NAV5 =  0X24,
+    NAVX5 = 0X23,
+    NMEA =  0X17,
+    PM2 =   0X3B,
+    PRT =   0X00,
+    RATE =  0X08,
+    RINV =  0X34,
+    RST =   0X04,
+    RXM =   0X11,
+    SBAS =  0X16,
+    TP5 =   0X31,
+    USB =   0X1B
+}ubx_id_cfg_e;
+
+// ==========================================
+// Payload para UBX-CFG-PRT (Configuración de Puerto UART)
+// ==========================================
+typedef struct {
+    uint8_t  portID;         // Usualmente 1 para UART1
+    uint8_t  reserved1;
+    
+    union 
+    {
+        struct
+        {
+            uint16_t en:1;
+            uint16_t pol:1;
+            uint16_t pin:5;
+            uint16_t thres:9;
+        }bitfield;
+        uint16_t txReady;
+    }txReady;                // Configuración del pin TX Ready (0 = inactivo)
+    
+    union{
+        struct
+        {
+            uint32_t reserved0:4;
+            //
+            uint32_t reserved1:2;
+            uint32_t charLen:2;
+            //
+            uint32_t reserved2:1;
+            uint32_t parity:3;
+            //
+            uint32_t nStopBits:2;
+            uint32_t reserved3:18;
+        }bitfield;
+        uint32_t mode;           // Configuración UART (Ej: 0x08D0 = 8N1)
+    }mode;
+
+    uint32_t baudRate;       // Baudios (Ej: 115200)
+
+    union {
+        struct 
+        {
+            uint16_t inUbx:1;
+            uint16_t inNmea:1;
+            uint16_t inRtcm:1;
+            uint16_t reserved0:13;
+        }bitfield;
+        uint16_t inProtoMask;    // Máscara entrada (Bit 0 = UBX, Bit 1 = NMEA)
+    } inProtoMask;
+
+    union {
+        struct 
+        {
+            uint16_t outUbx:1;
+            uint16_t outNmea:1;
+            uint16_t reserved0:14;
+        }bitfield;
+        uint16_t outProtoMask;   // Máscara salida  (Bit 0 = UBX, Bit 1 = NMEA)
+    } outProtoMask;
+
+    union{
+        struct 
+        {
+            uint16_t reserved0:1;
+            uint16_t extendedTxTimeout:1;
+            uint16_t reserved1:14;
+        }bitfield;
+        uint16_t flags;          // Flags de timeout
+    } flags;
+    uint16_t reserved2;
+} cfg_prt_uart_t;
+
+// ==========================================
+// Payload para UBX-CFG-RATE (Tasa de actualización)
+// ==========================================
+typedef struct {
+    uint16_t measRate;       // Periodo de medición en milisegundos (Ej: 100ms = 10Hz)
+    uint16_t navRate;        // Ciclos de medición por ciclo de navegación (usualmente 1)
+    uint16_t timeRef;        // 0 = UTC, 1 = GPS Time
+} cfg_rate_t;
+
+// ==========================================
+// Payload para UBX-CFG-MSG (Habilitar mensajes)
+// ==========================================
+typedef struct {
+    uint8_t msgClass;        // Clase del mensaje a habilitar (Ej: 0x01 para NAV)
+    uint8_t msgID;           // ID del mensaje (Ej: 0x07 para PVT)
+    uint8_t rate;            // Tasa de envío (1 = una vez por ciclo de navegación)
+} cfg_msg_t;
+
+// ==========================================
+// Payload para UBX-CFG-NAV5 (Filtro de Kalman / Modelo Dinámico)
+// ==========================================
+// Modelos dinámicos útiles: 
+//     Dynamic Platform model:
+enum NAV5_DYN_MODEL: uint8_t{
+    Portable =      0,
+    Stationary =    2,
+    Pedestrian =    3,
+    Automotive =    4,
+    Sea = 5,
+    Airborne_1G =      6,      // with <1g Acceleration
+    Airborne_2G =      7,      // with <2g Acceleration
+    Airborne_4G =      8       // with <4g Acceleration
+};
+// 0 = Portable, 2 = Estacionario, 3 = Peatón, 4 = Automotriz (Robot de piso), 
+// 6 = Airborne < 1G, 7 = Airborne < 2G, 8 = Airborne < 4G (Cohetes/Alta dinámica)
+typedef struct {
+    uint16_t mask;           // Máscara de parámetros a aplicar (0x0001 = cambiar dynModel)
+    uint8_t  dynModel;       // Modelo dinámico seleccionado
+    uint8_t  fixMode;        // 1=2D only, 2=3D only, 3=Auto 2D/3D
+    int32_t  fixedAlt;       // Altitud fija para modo 2D
+    uint32_t fixedAltVar;    // Varianza de altitud
+    int8_t   minElev;        // Elevación mínima del satélite (grados)
+    uint8_t  drLimit;        // Límite de Dead Reckoning
+    uint16_t pDop;           // Máscara de PDOP
+    uint16_t tDop;
+    uint16_t pAcc;
+    uint16_t tAcc;
+    uint8_t  staticHoldThresh;
+    uint8_t  dgpsTimeOut;
+    uint8_t  cnoThreshNumSVs;
+    uint8_t  cnoThresh;
+    uint16_t pAccExt;
+    uint16_t tAccExt;
+    uint8_t  reserved[16];
+} cfg_nav5_t;
+
+#pragma pack(pop)
 
 
 /**
@@ -117,5 +281,8 @@ typedef struct UBX_REGISTRO_MENSAJES
     uint16_t length;
     void (*onReceive)();
 } UbxRegMsg_t;
+
+
+
 
 #endif
