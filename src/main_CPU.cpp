@@ -41,7 +41,7 @@ RocketState currentState = ROCKET_INIT;
 
 // Variables de control de tiempo y ciclos
 unsigned long previousMillis = 0;
-const long INTERVALO_TELEMETRIA = 500; // 500 ms de frecuencia de envío
+const long INTERVALO_TELEMETRIA = 10; // 500 ms de frecuencia de envío
 
 int cicloContador = 0;
 float simuladorAltitud = 0.0f;
@@ -154,17 +154,21 @@ void loop() {
             break;
 
         case ROCKET_WAITING_PONG:
+            // acá van las acciones de estado
             // Escucha no bloqueante del PONG
-            if (lora.c_connection_accepted()) {
+            if (lora.c_connection_accepted()) { // todos los ifs son eventos
+                // acá van las acciones de transición
                 Serial.println(F("[COHETE] ¡PONG Recibido! Enlace confirmado. Estado: CONNECTED"));
                 cicloContador = 0;
                 currentState = ROCKET_CONNECTED;
-            } 
+            }
             // Time-out de reintento: si pasan 3 segundos sin respuesta, vuelve a intentar conectar
             else if (currentMillis - previousMillis >= 3000) {
                 Serial.println(F("[WARN] Tiempo de espera de PONG agotado. Reintentando enlace..."));
                 currentState = ROCKET_DISCONNECTED;
+                //contador++
             }
+            //if (contador >= 5) { currentState = }
             break;
 
         case ROCKET_CONNECTED:
@@ -197,13 +201,14 @@ void loop() {
                 }
 
                 // 4. Validación de ciclo de ráfagas (Cada 50 muestras)
-                if (cicloContador >= 50) {
+                if (cicloContador % 50 == 0) {
                     Serial.println(F("\n[EVENTO] Alcanzadas las 50 muestras. Enviando ráfaga de mensajes críticos..."));
 
                     // Envío de mensaje string común
                     if (lora.send_mensaje("HOLA DESDE LA ESTRATOSFERA")) {
                         Serial.println(F("[TX STRING] Mensaje enviado: 'HOLA DESDE LA ESTRATOSFERA'"));
                     }
+                    lora.c_connect_to_GSE(); // envia el ping // TODO: implementar healthcheck de la gse-esp más robusto.
 
                     // Envío inmediato de mensaje string de error crítico
                     if (lora.send_mensaje_error("Houston, tenemos un problema")) {
@@ -211,8 +216,8 @@ void loop() {
                     }
 
                     // Resetear contador para iniciar el siguiente ciclo de 50 telemetrías
-                    cicloContador = 0;
-                    Serial.println(F("[MDE] Reiniciando cuenta de ciclo de telemetría.\n"));
+                    // cicloContador = 0;
+                    // Serial.println(F("[MDE] Reiniciando cuenta de ciclo de telemetría.\n"));
                 }
             }
             break;
