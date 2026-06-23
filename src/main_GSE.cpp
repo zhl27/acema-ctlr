@@ -46,6 +46,9 @@ void sendBinaryToGUI(pkt_t* pkt) {
 #endif
 
 #ifdef DEBUG
+
+int CONTADOR = 1;
+
 // Imprime la estructura completa del paquete y su volcado en Hexadecimal
 void printPacketDebug(pkt_t* pkt) {
     Serial.println(F("\n=================================================="));
@@ -53,8 +56,15 @@ void printPacketDebug(pkt_t* pkt) {
     Serial.print(F(" | Protocolo: 0x")); Serial.println(pkt->protocole, HEX);
     
     // Imprimir de acuerdo al tipo de protocolo detectado
-    if (pkt->protocole == Protocolo::C_PLOT) {
+    
+    if(pkt->protocole == Protocolo::PING){
+        lora.send_pong();
+    }
+    else if (pkt->protocole == Protocolo::C_PLOT) {
         dataPlot_t* datos = (dataPlot_t*)pkt->payload;
+
+        CONTADOR = datos->datoX;
+
         Serial.println(F("--- DATOS DE TELEMETRÍA (PLOT) ---"));
         Serial.print(F("  DatoX:   ")); Serial.println(datos->datoX);
         Serial.print(F("  GiroX:   ")); Serial.println(datos->giroX);
@@ -79,6 +89,7 @@ void printPacketDebug(pkt_t* pkt) {
     Serial.println(F("\n=================================================="));
 }
 #endif
+
 
 // ============================================================================
 // CONFIGURACIÓN PRINCIPAL
@@ -105,7 +116,7 @@ void loop() {
                 #ifdef DEBUG
                 Serial.println(F("[GSE] Modulo LoRa inicializado con éxito. Esperando cohete..."));
                 #endif
-                currentState = GSE_WAITING_CONNECTION;
+                currentState = GSE_RECEIVING_DATA;//GSE_WAITING_CONNECTION;
             } else {
                 #ifdef DEBUG
                 Serial.println(F("[ERROR] Falló inicialización de LoRa. Reintentando en 2s..."));
@@ -130,7 +141,7 @@ void loop() {
             // Instanciamos el método genérico público de lectura de la fachada
             // Nota: internamente gestiona la asignación y limpieza según protocolo
             // Pasamos un puntero a una estructura externa provisional para capturar los metadatos.
-            if (lora.g_accept_connection() == false) { 
+            //if (lora.g_accept_connection() == false) { 
                 // g_accept_connection lee paquetes internamente, pero para capturar los datos
                 // de telemetría continuos llamamos directamente a la lectura del paquete.
                 
@@ -138,13 +149,17 @@ void loop() {
                 // Como read_package es privada, una alternativa limpia para que el GSE lea datos genéricos
                 // es exponer un método público en tu fachada o usar una estructura dedicada.
                 // Dado que tu fachada lee automáticamente en base al búfer privado, implementamos la recepción:
-            }
+            //}
             if(lora.read_paquete(&paqueteRecibido)){
                 #ifndef DEBUG
                 sendBinaryToGUI(&paqueteRecibido); 
                 #endif
                 #ifdef DEBUG
                 printPacketDebug(&paqueteRecibido);
+                Serial.println("============================================");
+                Serial.print("MUESRA NUMERO :");
+                Serial.println(CONTADOR);
+                Serial.println("============================================");
                 #endif
             }
             // Nota de integración: Para poder procesar datos continuos de manera limpia, 

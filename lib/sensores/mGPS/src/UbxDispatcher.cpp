@@ -140,7 +140,9 @@ void UbxDispatcher::checksum(uint8_t byte)
             // (Si entramos desde ignorePayload, _offsetActual no será válido, validamos protección)
             if(stActual != &UbxDispatcher::ignorePayload && _tablaMsg[_offsetActual]->onReceive != nullptr)
             {
-                _tablaMsg[_offsetActual]->onReceive();
+                // Reentrabilidad, el registro de mensajes almacena tanto a la direccion
+                // pasandola al funcion callback del dato como su funcion 
+                _tablaMsg[_offsetActual]->onReceive( _tablaMsg[_offsetActual]->payloadBuffer );
             }
         }
         else

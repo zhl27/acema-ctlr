@@ -143,7 +143,7 @@ bool LoraWrapped::read_package(pkt_t *ptrPkt) {
 
 bool LoraWrapped::c_connect_to_GSE(){
     pkt_t paquete;
-    const char *msg = "PING_COHETE";
+    const char *msg = "PING_COHETE"; // TODO: redundante
     
     // Prepara el paquete
     paquete.protocole = Protocolo::PING;
@@ -166,7 +166,7 @@ bool LoraWrapped::g_accept_connection(){
     }
     
     if( paqueteRecibido.protocole == Protocolo::PING){
-        // Verifica la integridad del mensaje
+        // Verifica la integridad del mensaje // TODO: redundante. se puede simplificar el ping pong usando solamente C_PING y C_PONG.
         if(strcmp((char*)paqueteRecibido.payload, "PING_COHETE") != 0){
             return false;
         } 
@@ -248,9 +248,24 @@ bool LoraWrapped::send_mensaje_error(const char* error) {
     return send_package(&paquete);
 }
 
+bool LoraWrapped::send_pong()
+{
+    pkt_t paqueteRespuesta;
+    // mensaje de respuesta(PONG)
+    const char* respuesta = "CONEXION_ACEPTADA";
+    // Prepara la respuesta
+    paqueteRespuesta.protocole = Protocolo::PONG;
+    paqueteRespuesta.payload = (void*)respuesta;
+    paqueteRespuesta.len = strlen(respuesta) + 1;
+
+    // Envia la confirmación
+    _st = CONNECTION_STATUS::CONNECTED;
+    return send_package(&paqueteRespuesta);
+}
+
 bool LoraWrapped::read_paquete(pkt_t *pPkt)
 {
-    if(pPkt == nullptr ||_st != CONNECTION_STATUS::CONNECTED){
+    if(pPkt == nullptr /*||_st != CONNECTION_STATUS::CONNECTED*/){
         return false;
     }
 
