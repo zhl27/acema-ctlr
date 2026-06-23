@@ -25,7 +25,6 @@ typedef struct PAQUETE {
 } pkt_t;
 
 
-
 /* PROVI VA EN GLOALS.H*/
 typedef struct {
     int datoX;

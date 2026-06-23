@@ -1,10 +1,8 @@
 //
-// Created by zhl on 6/3/26.
+// Created by zhl on 6/11/26.
 //
 
-#include "acciones.h"
-#include "SerialPrint.h"
-
+#include "funciones_de_estado.h"
 
 // TODO: Definir correctamente la funcionalidad de cada función de estado, actualmente son solo placeholders para simular la lógica de la máquina de estados.
 

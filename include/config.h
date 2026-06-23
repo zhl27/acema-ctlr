@@ -6,6 +6,22 @@
 #define ACEMA_CTLR_CONFIG_H
 
 
+/*************************/
+/*         GPIOs         */
+/*************************/
+
+#define BUZZER_PIN 25
+#define WIRE_SDA 21
+#define WIRE_SCL 22
+
+
+/*************************/
+/*    DIRECCIONES I2C    */
+/*************************/
+
+#define MPU_ADDR 0x69
+#define BMP280_ADDR 0x77
+
 /***********************/
 /*         MdE         */
 /***********************/

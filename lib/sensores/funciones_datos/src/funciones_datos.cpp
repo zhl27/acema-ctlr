@@ -53,5 +53,6 @@ int16_t f_sensor_get_densidad_aire() { // rho --> se calcula con el barometro
 }
 
 Vector3D<int16_t> f_sensor_get_drag() {
-    return 1/2 * f_sensor_get_densidad_aire() * AREA_REFERENCIA_COHETE * Cd * V^2;
+    return Vector3D<int16_t>{0, 0, 0};
+    //return 1/2 * f_sensor_get_densidad_aire() * AREA_REFERENCIA_COHETE * Cd * V*V;
 }

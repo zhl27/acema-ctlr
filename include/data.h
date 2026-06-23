@@ -4,13 +4,6 @@
 
 #ifndef ACEMA_CTLR_DATA_H
 #define ACEMA_CTLR_DATA_H
-#include <cstdint>
-
-#include "vuelo_mde.h"
-
-/************************/
-/*     DATOS CRUDOS     */
-/************************/
 
 /**
  * @struct data_raw_mpu_t
@@ -52,8 +45,6 @@ typedef struct {
  *
  */
 typedef struct {
-    double latitud;     ///< Latitud en grados
-    double longitud;    ///< Longitud en grados
     // --- Posicionamiento ---
     double latitud;           ///> Coordenadas en grados (NMEA ASCII o UBX Binario) [1]
     double longitud;          ///> Coordenadas en grados (NMEA ASCII o UBX Binario) [1]
@@ -104,7 +95,7 @@ typedef struct {
     int16_t posicion_relativa;
     int16_t velocidad;
     int16_t momentum; // inercia
-    estadoVuelo_t vuelo_estado_actual; // se va a ver como un integer
+    //estadoVuelo_t vuelo_estado_actual; // se va a ver como un integer
 
     double latitud;           ///> Coordenadas en grados (NMEA ASCII o UBX Binario) [1]
     double longitud;          ///> Coordenadas en grados (NMEA ASCII o UBX Binario) [1]
@@ -132,12 +123,10 @@ typedef struct { // TODO: Completar todos los datos
     int16_t posicion_relativa;
     int16_t velocidad;
     int16_t momentum; // inercia
-    estadoVuelo_t vuelo_estado_actual; // se va a ver como un integer
+    //estadoVuelo_t vuelo_estado_actual; // se va a ver como un integer
 
     // TODO: Incluir todos los datos derivados de los datos crudos. Esto puede incluir datos procesados, inferidos o filtrados que se calculan a partir de los datos crudos, como altitud, velocidad, aceleración corregida, etc. La idea es que esta estructura se registre en el Flash, que funca como una suerte de caja negra del cohete.
-} data_all_t;
-
-
+} data_all_t; ///< Todos los datos obtenidos del ambiente a través de los sensores --> YA ESTÁN SANITIZADOS Y FILTRADOS!
 
 
 #endif //ACEMA_CTLR_DATA_H
