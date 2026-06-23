@@ -3,11 +3,10 @@
 #include "freertos/ringbuf.h"
 
 #include "SerialPrint.h"
-#include "globals.h"
 #include "data.h"
 #include "sensores.h"
-#include <string.h>
-#include <stdio.h>
+#include <cstring>
+#include <cstdio>
 
 // Global instance of the flight system // TODO: PENSAR SI ES NECESARIO
 // sistema_vuelo_t SISTEMA = {
@@ -64,6 +63,7 @@ void setup() {
     SerialPrint::msg("Setup");
 
 
+    // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
     xStateMachineRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
     if (xStateMachineRingbuf == NULL) {
         SerialPrint::err("Error al crear xStateMachineRingbuf");
@@ -143,10 +143,9 @@ void vTaskStateMachine(void *pvParameters) {
     (void)pvParameters;
     for (;;) {
 
-        #ifdef DEBUG
-        Serial.printf("[StateMachine] Checking for messages...\n");
-        xPortGetCoreID()
-        #endif
+#ifdef DEBUG_ESP32
+        SerialPrint::plot("Core ID (StateMachine)", xPortGetCoreID());
+#endif
 
         size_t item_size = 0;
         char *item = (char *) xRingbufferReceive(xStateMachineRingbuf, &item_size, pdMS_TO_TICKS(2000));
@@ -159,11 +158,15 @@ void vTaskStateMachine(void *pvParameters) {
                     SerialPrint::err("StateMachine -> xLoraRingbuf send failed");
                 }
             }
-            if (xFlashRingbuf != NULL) {
-                if (xRingbufferSend(xFlashRingbuf, (void *)item, item_size, pdMS_TO_TICKS(10)) != pdTRUE) {
-                    SerialPrint::err("StateMachine -> xFlashRingbuf send failed");
-                }
-            }
+            // TODO: Esto de abajo creo que no sería necesario
+            // if (xFlashRingbuf != NULL) {
+            //     if (xRingbufferSend(xFlashRingbuf, (void *)item, item_size, pdMS_TO_TICKS(10)) != pdTRUE) {
+            //         SerialPrint::err("StateMachine -> xFlashRingbuf send failed");
+            //     }
+            // }
+
+            // TODO: DEFINIR ACÁ LAS FUNCIONES DE LA MDE PARA ACTUALIZARLA.
+
 
             // Return the item to the ringbuffer
             vRingbufferReturnItem(xStateMachineRingbuf, (void *)item);
@@ -179,6 +182,11 @@ void vTaskStateMachine(void *pvParameters) {
 void vTaskFlash(void *pvParameters) {
     (void)pvParameters;
     for (;;) {
+
+#ifdef DEBUG_ESP32
+        SerialPrint::plot("Core ID (Flash)", xPortGetCoreID());
+#endif
+
         size_t item_size = 0;
         char *item = (char *) xRingbufferReceive(xFlashRingbuf, &item_size, pdMS_TO_TICKS(5000));
         if (item != NULL) {
@@ -195,6 +203,11 @@ void vTaskFlash(void *pvParameters) {
 void vTaskLora(void *pvParameters) {
     (void)pvParameters;
     for (;;) {
+
+#ifdef DEBUG_ESP32
+        SerialPrint::plot("Core ID (Lora)", xPortGetCoreID());
+#endif
+
         size_t item_size = 0;
         char *item = (char *) xRingbufferReceive(xLoraRingbuf, &item_size, pdMS_TO_TICKS(3000));
         if (item != NULL) {
