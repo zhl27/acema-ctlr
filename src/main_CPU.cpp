@@ -41,7 +41,7 @@ RocketState currentState = ROCKET_INIT;
 
 // Variables de control de tiempo y ciclos
 unsigned long previousMillis = 0;
-const long INTERVALO_TELEMETRIA = 500; // 500 ms de frecuencia de envío
+const long INTERVALO_TELEMETRIA = 5000; // 5s de frecuencia de envío
 
 int cicloContador = 0;
 float simuladorAltitud = 0.0f;
@@ -168,7 +168,7 @@ void loop() {
             break;
 
         case ROCKET_CONNECTED:
-            // Evento temporizado cada 500 ms
+            // Evento temporizado cada INTERVALO_TELEMETRIA (s)
             if (currentMillis - previousMillis >= INTERVALO_TELEMETRIA) {
                 previousMillis = currentMillis;
 
@@ -197,7 +197,7 @@ void loop() {
                 }
 
                 // 4. Validación de ciclo de ráfagas (Cada 50 muestras)
-                if (cicloContador >= 50) {
+                if (cicloContador >= 5) {
                     Serial.println(F("\n[EVENTO] Alcanzadas las 50 muestras. Enviando ráfaga de mensajes críticos..."));
 
                     // Envío de mensaje string común
