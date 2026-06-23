@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <LoraWrapped.h>
 #include "mBuzzer.h"
-#include "globals.h"
+#include "config.h"
 
 // ============================================================================
 // CONFIGURACIÓN CONDICIONAL DE PINES SEGÚN EL ENTORNO DEL .INI
