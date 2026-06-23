@@ -3,6 +3,17 @@
 
 #include <cstdint>
 
+/**
+ * @struct UbxRegistroMensajes
+ */
+typedef struct UBX_REGISTRO_MENSAJES
+{
+    uint8_t msgClass;
+    uint8_t msgID;
+    uint8_t* payloadBuffer;
+    uint16_t length;
+    void (*onReceive)(void*);
+} UbxRegMsg_t;
 
 
 // ==========================================
@@ -270,17 +281,7 @@ typedef struct {
 #pragma pack(pop)
 
 
-/**
- * @struct UbxRegistroMensajes
- */
-typedef struct UBX_REGISTRO_MENSAJES
-{
-    uint8_t msgClass;
-    uint8_t msgID;
-    uint8_t* payloadBuffer;
-    uint16_t length;
-    void (*onReceive)();
-} UbxRegMsg_t;
+
 
 
 
