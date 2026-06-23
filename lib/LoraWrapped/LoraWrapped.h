@@ -123,6 +123,11 @@ public:
      */
     bool send_mensaje_error(const char* error);
 
+    /**
+     * @brief Envía un PONG(ERR)
+     */
+    bool send_pong();
+
     bool read_paquete(pkt_t* pPkt);
 };
 
