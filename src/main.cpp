@@ -34,7 +34,7 @@
 // Instanciación única y genérica usando los alias de los macros
 LoraWrapped lora(LORA_CS, LORA_RST, LORA_DIO0, LORA_DIO1, SPI);
 
-const size_t RBUF_SIZE = 1024; // bytes per ring buffer
+constexpr size_t RBUF_SIZE = 1024; // bytes per ring buffer
 
 // Ring buffer handles
 RingbufHandle_t xStateMachineRingbuf;
