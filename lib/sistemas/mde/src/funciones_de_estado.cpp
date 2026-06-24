@@ -4,6 +4,8 @@
 
 #include "funciones_de_estado.h"
 
+#include "SerialPrint.h"
+
 // TODO: Definir correctamente la funcionalidad de cada función de estado, actualmente son solo placeholders para simular la lógica de la máquina de estados.
 
 // --- Hardware Mock Implementations ---
@@ -42,8 +44,8 @@ void f_st_desplegar_droge() {
     SerialPrint::msg(" -> Paracaídas DROGE desplegado.");
 }
 
-bool st_droge_estabilizado() {
-    return true;
+void st_droge_estabilizado() {
+    return;
 }
 
 void f_st_desplegar_paracaidas_principal() {

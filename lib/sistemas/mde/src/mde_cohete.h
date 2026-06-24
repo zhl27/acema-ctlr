@@ -7,6 +7,7 @@
 
 
 #include "data.h"
+#include "funciones_de_estado.h"
 
 
 /** @enum estado_vuelo_t
@@ -74,6 +75,20 @@ mde_data_t COHETE = {
         .velocidad = 0,
         .momentum = 0,
     },
+};
+
+/** @brief Tabla de funciones de estado mapeada al enum estadoValvula_t. */
+constexpr f_st_t MDE_COHETE[]{
+    f_st_configurar_sensores,
+    f_st_configurar_actuadores,
+    f_st_conectar_GSE,
+    f_st_get_cmd_GSE,
+    f_st_init_rutina_propulsion,
+    f_st_apagar_motor,
+    f_st_init_rutina_frenado_aerodinamico,
+    f_st_desplegar_droge,
+    st_droge_estabilizado,
+    f_st_desplegar_paracaidas_principal
 };
 
 void mde_cohete_actualizar(data_all_t* datos_sensores);
