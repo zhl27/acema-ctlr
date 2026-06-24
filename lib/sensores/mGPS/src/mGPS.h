@@ -6,7 +6,7 @@
 #define ACEMA_CTLR_MGPS_H
 #include <cstdint>
 
-//#include "TinyGPS++.h"
+#include "TinyGPS++.h"
 
 /**
  * @class mGPS
@@ -36,10 +36,7 @@ public:
     /**
      * @brief Initializes Serial connection.
      */
-    void init(){
-        ubx_pkt_t paquete;
-        nav_pvt_t nav;
-    }
+    void init();
 
     /**
      * @brief Reads incoming serial data, feeds the GPS decoder, and publishes updates when new data is available.

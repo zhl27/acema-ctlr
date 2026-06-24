@@ -6,12 +6,26 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
+#include <LoraWrapped.h>
+
+// INCLUIDO PARA QUE NO TENGA FALLOS DE SPI. CREO QUE SI NO SE USA RADIOLIB, HAY QUE DESINCLUIRLO 
+    // Pines asignados si compilas con: pio run -e CPU-esp32
+    #define LORA_SCK  18
+    #define LORA_MISO 19
+    #define LORA_MOSI 23
+    #define LORA_CS   5
+    #define LORA_RST  14
+    #define LORA_DIO0 2
+    #define LORA_DIO1 4
+// Instanciación única y genérica usando los alias de los macros
+LoraWrapped lora(LORA_CS, LORA_RST, LORA_DIO0, LORA_DIO1, SPI);
 
 // ==========================================
 // Configuraciones de Hardware
 // ==========================================
-#define TXD1_PIN (GPIO_NUM_26)
-#define RXD1_PIN (GPIO_NUM_34)
+#define TXD1_PIN (GPIO_NUM_17)
+#define RXD1_PIN (GPIO_NUM_16)
+
 #define BUF_SIZE (1024)
 
 // ==========================================
@@ -90,8 +104,8 @@ bool waitAck(uint8_t cls, uint8_t id, uint32_t timeoutMs) {
 // ==========================================
 
 // Tabla de registros que el UbxDispatcher usará para rutear
-const UbxRegMsg_t regPvt = {UBX_CLASS::NAV, UBX_ID_NAV::PVT, (uint8_t*)&mi_pvt_data, sizeof(nav_pvt_t), onPvtReceived};
-const UbxRegMsg_t regAck = {UBX_CLASS::ACK, 0x01, nullptr, 0, onAckReceived}; // ACK-ACK
+const UbxRegMsg_t regPvt = {static_cast<uint8_t>(UBX_CLASS::NAV), static_cast<uint8_t>(UBX_ID_NAV::PVT), (uint8_t*)&mi_pvt_data, sizeof(nav_pvt_t), onPvtReceived};
+const UbxRegMsg_t regAck = {static_cast<uint8_t>(UBX_CLASS::ACK), 0x01, nullptr, 0, onAckReceived}; // ACK-ACK
 const UbxRegMsg_t* tablaRegistros[] = {&regPvt, &regAck};
 
 void gps_task(void* pvParameters) {
