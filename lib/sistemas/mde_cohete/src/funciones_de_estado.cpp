@@ -1,6 +1,6 @@
 #include "funciones_de_estado.h"
 
-#include "src/mde_cohete.h"
+#include "mde_cohete.h"
 #include "SerialPrint.h"
 //#include <Arduino.h>
 

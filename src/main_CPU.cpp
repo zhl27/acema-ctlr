@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <LoraWrapped.h>
+#include <../lib/io/LoraWrapped/src/LoraWrapped.h>
 #include "mBuzzer.h"
 #include "config.h"
 

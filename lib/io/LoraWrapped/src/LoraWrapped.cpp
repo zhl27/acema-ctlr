@@ -72,7 +72,7 @@ bool LoraWrapped::begin(int sw, char ew, float frec){
 */
 
 
-bool LoraWrapped::send_package(pkt_t * ptrPkt){
+bool LoraWrapped::send_package(pkt_t * ptrPkt) const {
     if (ptrPkt == nullptr) return false;
 
     // Crea un búfer temporal para consolidar la trama completa
@@ -141,7 +141,7 @@ bool LoraWrapped::read_package(pkt_t *ptrPkt) {
     return true;
 }
 
-bool LoraWrapped::c_connect_to_GSE(){
+bool LoraWrapped::c_connect_to_GSE() const {
     pkt_t paquete;
     const char *msg = "PING_COHETE"; // TODO: redundante
     
@@ -201,7 +201,7 @@ bool LoraWrapped::c_connection_accepted() {
 
 
 
-bool LoraWrapped::send_datos(dataPlot_t datos) {
+bool LoraWrapped::send_datos(dataPlot_t datos) const {
     pkt_t paquete;
 
     // Verifica conexion
@@ -217,7 +217,7 @@ bool LoraWrapped::send_datos(dataPlot_t datos) {
 }
 
 
-bool LoraWrapped::send_mensaje(const char* texto) {
+bool LoraWrapped::send_mensaje(const char* texto) const {
     pkt_t paquete;
 
     // verifica la conexion o si existe el mensaje
@@ -235,7 +235,7 @@ bool LoraWrapped::send_mensaje(const char* texto) {
 }
 
 
-bool LoraWrapped::send_mensaje_error(const char* error) {
+bool LoraWrapped::send_mensaje_error(const char* error) const {
     pkt_t paquete;
 
     if (error == nullptr || _st !=CONNECTION_STATUS::CONNECTED) return false;

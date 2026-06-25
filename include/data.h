@@ -2,6 +2,7 @@
 // Created by zhl on 6/6/26.
 //
 
+#include <cstdint>
 #ifndef ACEMA_CTLR_DATA_H
 #define ACEMA_CTLR_DATA_H
 
@@ -132,3 +133,5 @@ typedef struct { // TODO: Completar todos los datos
 #endif //ACEMA_CTLR_DATA_H
 
 
+
+#include <cstdint>

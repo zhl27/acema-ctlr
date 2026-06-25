@@ -6,7 +6,7 @@
 #include <cstdio>
 
 
-#include "LoraWrapped.h"
+#include "../lib/io/LoraWrapped/src/LoraWrapped.h"
 #include "mde_cohete.h"
 #include "SerialPrint.h"
 #include "sensores.h"
