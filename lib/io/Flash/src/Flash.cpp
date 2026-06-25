@@ -4,7 +4,7 @@
 
 #include "Flash.h"
 
-
+// Driver
 // TODO: Falta revisión manual general de Flash
 
 Flash::Flash(uint8_t csPin) {

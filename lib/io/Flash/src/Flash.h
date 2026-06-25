@@ -11,7 +11,7 @@
 class Flash {
 public:
     // Constructor: Por defecto usa el GPIO 4 para el pin CS_FLASH
-    Flash(uint8_t csPin = 4);
+    explicit Flash(uint8_t csPin = 4);
 
     // Inicializa los pines y el bus SPI estándar del ESP32
     void begin() const;

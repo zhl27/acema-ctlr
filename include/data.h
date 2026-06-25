@@ -126,7 +126,7 @@ typedef struct { // TODO: Completar todos los datos
     //estadoVuelo_t vuelo_estado_actual; // se va a ver como un integer
 
     // TODO: Incluir todos los datos derivados de los datos crudos. Esto puede incluir datos procesados, inferidos o filtrados que se calculan a partir de los datos crudos, como altitud, velocidad, aceleración corregida, etc. La idea es que esta estructura se registre en el Flash, que funca como una suerte de caja negra del cohete.
-} data_all_t; ///< Todos los datos obtenidos del ambiente a través de los sensores --> YA ESTÁN SANITIZADOS Y FILTRADOS!
+} data_all_t; ///< Todos los datos originados del ambiente a través de los sensores que YA ESTÁN SANITIZADOS Y FILTRADOS!
 
 
 #endif //ACEMA_CTLR_DATA_H
