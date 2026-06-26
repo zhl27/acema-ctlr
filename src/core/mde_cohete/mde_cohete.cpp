@@ -26,7 +26,7 @@ void manejar_error(data_all_t* datos_sensores) {
 
 
 
-mde_data_t COHETE = {
+system_data_t COHETE = {
     .estado = ST_INIT,
     .error = ERR_NINGUNO,
     .vuelo_en_silencio_radio = false,

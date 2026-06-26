@@ -110,10 +110,10 @@ typedef struct {
         float gps_hdop;
     } contexto_fisico;
 
-} mde_data_t;
+} system_data_t;
 
 // DEFINICIÓN DE LA INSTANCIA GLOBAL DE VUELO
-extern mde_data_t COHETE;
+extern system_data_t COHETE;
 
 /** @brief Tabla de punteros a función estrictamente mapeada a estado_vuelo_t */
 extern const f_st_t MDE_COHETE[];
