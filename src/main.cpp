@@ -2,28 +2,18 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/ringbuf.h"
 
-#include "SerialPrint.h"
-#include "data.h"
-#include "sensores.h"
 #include <cstring>
 #include <cstdio>
 
-// Global instance of the flight system // TODO: PENSAR SI ES NECESARIO
-// sistema_vuelo_t SISTEMA = {
-//     .sensores = {
-//         .altura = 0.0f,
-//         .inclinacion = 0.0f,
-//         .aceleracion = 0.0f,
-//         .vel_vertical = 0.0f,
-//         .variacion_aceleracion = 0.0f,
-//         .estado_hardware = HARDWARE_OK
-//     },
-//     .estado_vuelo = ST_INIT,
-//     .codigo_error = 0
-// };
 
-#include "LoraWrapped.h"
-    // Pines asignados si compilas con: pio run -e CPU-esp32
+#include "../lib/io/LoraWrapped/src/LoraWrapped.h"
+#include "mde_cohete.h"
+#include "SerialPrint.h"
+#include "sensores.h"
+#include "data.h"
+
+
+// Pines asignados si compilas con: pio run -e CPU-esp32
     #define LORA_SCK  18
     #define LORA_MISO 19
     #define LORA_MOSI 23
@@ -150,29 +140,27 @@ void vTaskStateMachine(void *pvParameters) {
         size_t item_size = 0;
         char *item = (char *) xRingbufferReceive(xStateMachineRingbuf, &item_size, pdMS_TO_TICKS(2000));
         if (item != NULL) {
-            Serial.printf("[StateMachine] Received (%d bytes): %s\n", (int)item_size, item);
+            // 2. Validar que el tamaño recibido coincide exactamente con nuestro struct
+            if (item_size == sizeof(data_all_t)) {
 
-            // For the mock, forward the received payload to the Lora and Flash ringbuffers as well
-            if (xLoraRingbuf != NULL) {
-                if (xRingbufferSend(xLoraRingbuf, (void *)item, item_size, pdMS_TO_TICKS(10)) != pdTRUE) {
-                    SerialPrint::err("StateMachine -> xLoraRingbuf send failed");
-                }
+                data_all_t* datos_sensores = (data_all_t*) item;
+
+                // (Opcional) Guardar una copia por si hay que evaluar la MDE sin datos nuevos
+                // memcpy(&ultimos_datos, datos_sensores, sizeof(data_all_t));
+
+                mde_cohete_actualizar(datos_sensores);
+
+            } else {
+                SerialPrint::msg("[StateMachine] ERROR: Tamaño de item no coincide con data_all_t");
             }
-            // TODO: Esto de abajo creo que no sería necesario
-            // if (xFlashRingbuf != NULL) {
-            //     if (xRingbufferSend(xFlashRingbuf, (void *)item, item_size, pdMS_TO_TICKS(10)) != pdTRUE) {
-            //         SerialPrint::err("StateMachine -> xFlashRingbuf send failed");
-            //     }
-            // }
 
-            // TODO: DEFINIR ACÁ LAS FUNCIONES DE LA MDE PARA ACTUALIZARLA.
-
-
-            // Return the item to the ringbuffer
-            vRingbufferReturnItem(xStateMachineRingbuf, (void *)item);
+            // Liberar la memoria del RingBuffer para que el productor pueda seguir escribiendo
+            vRingbufferReturnItem(xStateMachineRingbuf, item);
 
         } else {
-            // timeout
+            // TIMEOUT: No llegaron datos nuevos en los últimos 10ms.
+            // Si la MDE necesita evaluar temporizadores (ej. ST_EVALUAR_SUPERVIVENCIA_DROGUE)
+            // podrías llamarla aquí pasándole 'ultimos_datos'.
             SerialPrint::msg("[StateMachine] No messages (timeout)");
         }
     }

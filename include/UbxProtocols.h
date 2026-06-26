@@ -4,7 +4,7 @@
 #include <cstdint>
 
 /**
- * @struct UbxRegistroMensajes
+ * @struct UBX_REGISTRO_MENSAJES
  */
 typedef struct UBX_REGISTRO_MENSAJES
 {
@@ -130,10 +130,10 @@ static_assert(sizeof(nav_pvt_t) == 84, "Size of nav_pvt_t must be exactly 84 byt
 // ==========================================
 typedef enum UBX_ID_CFG: uint8_t{
     ANT =   0X13,
-    CFG =   0X09,
+    CFG_ID =   0X09,
     DAT =   0X06,
     GNSS =  0X3E,
-    INF =   0X02,
+    INF_ID =   0X02,
     ITFM =  0X39,
     LOGFILTER = 0X47,
     MSG =   0X01,
@@ -145,8 +145,8 @@ typedef enum UBX_ID_CFG: uint8_t{
     RATE =  0X08,
     RINV =  0X34,
     RST =   0X04,
-    RXM =   0X11,
-    SBAS =  0X16,
+    RXM_ID =   0X11,
+    SBAS_ID =  0X16,
     TP5 =   0X31,
     USB =   0X1B
 }ubx_id_cfg_e;

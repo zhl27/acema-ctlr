@@ -51,7 +51,7 @@ enum Protocolo: uint8_t {
     PONG    = 0X30
 };
 
-/* estados de la conexcion, para mejorar la reconeccion, proximamente*/
+/* estados de la conexion, para mejorar la reconexion, proximamente*/
 typedef enum CONNECTION_STATUS: uint8_t {DISCONNECTED = 0x00, CONNECTED} connSts_t; /*CONNECTION_LOST */
 
 class LoraWrapped
@@ -66,10 +66,10 @@ private:
         SX1262* _radio;
     #endif
 
-    /* Palabra de sincronización con el modulo a comunicar, evita interferencias de otro módulo*/
+    /* Palabra de sincronización con el módulo a comunicar, evita interferencias de otro módulo*/
     int _syncWord;
 
-    /* caracter de encriptación, en caso de interseeción espía XD*/
+    /* caracter de encriptación, en caso de intersección espía XD*/
     char _encryptWord;
 
     /* Buffer interno para enviar los datos de manera segura*/
@@ -79,11 +79,11 @@ private:
     connSts_t _st;
 
     /* Funciones de bajo nivel, des/encriptación y envio*/
-    bool send_package(pkt_t *ptrPkt);
+    bool send_package(pkt_t *ptrPkt) const;
     bool read_package(pkt_t *ptrPkt);
 
     /* Cifrado de un byte con el método XOR*/
-    inline char encrypt_byte(char dat) {return  ((char)dat)^_encryptWord ;};
+    inline char encrypt_byte(const char dat) const {return  ((char)dat)^_encryptWord ;};
     int _pinPacketReady; // Pin DIO0 o Busy de acuerdo a modelo
 public:
     LoraWrapped(uint32_t nss, uint32_t rst, uint32_t pin3, uint32_t pin4, SPIClass& spi = SPI);
@@ -93,7 +93,7 @@ public:
     /**
      * @brief Envia una petición de conexion del cohete al GSE
      */
-    bool c_connect_to_GSE();
+    bool c_connect_to_GSE() const;
 
     /**
      * @brief Verifica la conexion estable con el GSE
@@ -110,17 +110,17 @@ public:
     /**
      * @brief Envía datos de telemetría (struct dataPlot_t)
      */
-    bool send_datos(dataPlot_t dato);
+    bool send_datos(dataPlot_t dato) const;
 
     /**
      * @brief Envía un mensaje de texto genérico (MSG)
      */
-    bool send_mensaje(const char* texto);
+    bool send_mensaje(const char* texto) const;
 
     /**
      * @brief Envía un mensaje de error (ERR)
      */
-    bool send_mensaje_error(const char* error);
+    bool send_mensaje_error(const char* error) const;
 
     /**
      * @brief Envía un PONG(ERR)

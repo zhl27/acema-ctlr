@@ -1,6 +1,3 @@
-//
-// Created by lucaz on 11/3/2026.
-//
 
 #include "MPC.h"
 
