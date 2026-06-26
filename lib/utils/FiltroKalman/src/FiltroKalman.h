@@ -8,16 +8,6 @@
 
 #include <Eigen/Dense>
 
-template <typename T>
-bool es_dato_R1(T dato) {
-    // check if dato is not vector
-
-    return true; // TODO: definir como se calcula
-}
-
-
-
-
 class KalmanFilter {
 private:
     // Matrices del filtro
