@@ -1,4 +1,4 @@
-#ifndef EXAMPLE-UBX-CONFIGURATOR
+#ifdef EXAMPLE-UBX-CONFIGURATOR
 
 #include "UbxDispatcher.h"
 #include "UbxConfigurator.h"

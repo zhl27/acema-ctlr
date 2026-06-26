@@ -1,4 +1,4 @@
-#include "UbxConfigurator.h"
+#include <UbxConfigurator.h>
 #include <cstring> // Necesario para memset y memcpy
 
 
@@ -34,7 +34,7 @@ bool UbxConfigurator::setPortUart(uint32_t baudrate) {
     payload.outProtoMask.outProtoMask = 0x0001; 
 
     // Clase 0x06 (CFG), ID 0x00 (PRT) [cite: 617, 622]
-    return buildAndSend(UBX_CLASS::CFG, UBX_ID_CFG::PRT, (uint8_t*)&payload, sizeof(cfg_prt_uart_t));
+    return buildAndSend(UBX_CLASS::CFG, static_cast<uint8_t>(UBX_ID_CFG::PRT), (uint8_t*)&payload, sizeof(cfg_prt_uart_t));
 }
 
 bool UbxConfigurator::setNavigationRate(uint8_t rateHz) {
@@ -51,19 +51,19 @@ bool UbxConfigurator::setNavigationRate(uint8_t rateHz) {
     payload.timeRef = 1; // 1 = Alineado a tiempo GPS (0 = UTC) [cite: 631]
 
     // Clase 0x06 (CFG), ID 0x08 (RATE) [cite: 631]
-    return buildAndSend(UBX_CLASS::CFG, UBX_ID_CFG::RATE, (uint8_t*)&payload, sizeof(cfg_rate_t));
+    return buildAndSend(UBX_CLASS::CFG, static_cast<uint8_t>(UBX_ID_CFG::RATE), (uint8_t*)&payload, sizeof(cfg_rate_t));
 }
 
-bool UbxConfigurator::setDynamicModel(uint8_t model) {
+bool UbxConfigurator::setDynamicModel(nav_dyn_model_e model) {
     cfg_nav5_t payload;
     memset(&payload, 0, sizeof(cfg_nav5_t));
 
     // Solo queremos modificar el modelo dinámico, le pasamos la máscara específica (Bit 0) [cite: 612]
     payload.mask = 0x0001; 
-    payload.dynModel = model;
+    payload.dynModel = static_cast<uint8_t>(model);
 
     // Clase 0x06 (CFG), ID 0x24 (NAV5) [cite: 611]
-    return buildAndSend(UBX_CLASS::CFG, UBX_ID_CFG::NAV5, (uint8_t*)&payload, sizeof(cfg_nav5_t));
+    return buildAndSend(UBX_CLASS::CFG, static_cast<uint8_t>(UBX_ID_CFG::NAV5), (uint8_t*)&payload, sizeof(cfg_nav5_t));
 }
 
 
@@ -75,7 +75,7 @@ bool UbxConfigurator::enableRegisteredMessages(const UbxRegMsg_t **ptrTablaMsg, 
         uint8_t id = ptrTablaMsg[i]->msgID;
 
         // No tiene sentido pedirle al GPS que nos envíe periódicamente un ACK
-        if (cls == UBX_CLASS::ACK) {
+        if (cls == static_cast<uint8_t>(UBX_CLASS::ACK)) {
             continue; 
         }
 
@@ -85,7 +85,7 @@ bool UbxConfigurator::enableRegisteredMessages(const UbxRegMsg_t **ptrTablaMsg, 
         msgPayload.rate = 1; // Enviar en cada ciclo
 
         // Enviamos el comando UBX-CFG-MSG (0x06 0x01)
-        bool success = buildAndSend(UBX_CLASS::CFG, UBX_ID_CFG::MSG, (uint8_t*)&msgPayload, sizeof(cfg_msg_t));
+        bool success = buildAndSend(UBX_CLASS::CFG, static_cast<uint8_t>(UBX_ID_CFG::MSG), (uint8_t*)&msgPayload, sizeof(cfg_msg_t));
         
         if (!success) {
             allSuccess = false; // Registramos si falló alguno
@@ -99,7 +99,7 @@ bool UbxConfigurator::enableRegisteredMessages(const UbxRegMsg_t **ptrTablaMsg, 
 // Ensamblador y Motor de Sincronización
 // ==========================================
 
-bool UbxConfigurator::buildAndSend(uint8_t msgClass, uint8_t msgID, const uint8_t* payload, size_t payloadSize) {
+bool UbxConfigurator::buildAndSend(ubx_class_e msgClass, uint8_t msgID, const uint8_t* payload, size_t payloadSize) {
     const size_t MAX_PACKET_SIZE = 128;
     size_t packetSize; 
     uint8_t buffer[MAX_PACKET_SIZE];
@@ -115,11 +115,11 @@ bool UbxConfigurator::buildAndSend(uint8_t msgClass, uint8_t msgID, const uint8_
     if (packetSize > MAX_PACKET_SIZE) return false; // Protección de memoria
 
     // 1. Caracteres de Sincronización
-    buffer[0] = UBX_SYNC::SYNC_1;
-    buffer[1] = UBX_SYNC::SYNC_2;
+    buffer[0] = static_cast<uint8_t>(UBX_SYNC::SYNC_1);
+    buffer[1] = static_cast<uint8_t>(UBX_SYNC::SYNC_2);
 
     // 2. Encabezado (Little Endian)
-    buffer[2] = msgClass;
+    buffer[2] = static_cast<uint8_t>(msgClass);
     buffer[3] = msgID;
     buffer[4] = payloadSize & 0xFF; // Solo asigna el primer byte
     buffer[5] = (payloadSize >> 8) & 0xFF;
@@ -145,5 +145,5 @@ bool UbxConfigurator::buildAndSend(uint8_t msgClass, uint8_t msgID, const uint8_
 
     // 6. Bloqueo RTOS esperando respuesta
     // Le decimos a la capa superior: "Dormime hasta recibir un ACK para esta Clase e ID. Time-out en 1500ms"
-    return _waitFunc(msgClass, msgID, 1500);
+    return _waitFunc(static_cast<uint8_t>(msgClass), msgID, 1500);
 }

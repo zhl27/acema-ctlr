@@ -3,7 +3,7 @@
 
 #include <cstdint>
 #include <cstddef>
-#include "UbxProtocols.h"
+#include <UbxProtocols.h>
 #include "UbxDispatcher.h" // Para conocer UbxRegMsg_t
 
 class UbxConfigurator {
@@ -41,7 +41,7 @@ public:
      * @brief Ajusta el modelo dinámico del filtro de Kalman.
      * @param model 4=Auto (Robots), 8=Airborne<4G (Cohetes), etc.
      */
-    bool setDynamicModel(uint8_t model);
+    bool setDynamicModel(nav_dyn_model_e model);
 
     /**
      * @brief Lee la tabla del Dispatcher y pide al GPS que envíe todo.
@@ -59,7 +59,7 @@ private:
      * @brief Método interno genérico. 
      * Arma el paquete completo (Header + Payload + Checksum) y lo envía.
      */
-    bool buildAndSend(uint8_t msgClass, uint8_t msgID, const uint8_t* payload, size_t payloadSize);
+    bool buildAndSend(ubx_class_e msgClass, uint8_t msgID, const uint8_t* payload, size_t payloadSize);
 };
 
 #endif

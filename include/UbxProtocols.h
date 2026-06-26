@@ -1,6 +1,18 @@
 #ifndef UBX_PROTOCOLS_H
 #define UBX_PROTOCOLS_H
 
+
+/**
+ * SE DEBE CAMBIAR LA ARQUITECTURA DE LAS DECLARACIONES. ESTÁ TODO SOLUCIONADO CON ALAMBRE 
+ * Y CASTEOS ESTÁTICOS. EL CONFICTO VIENE QUE AL SER SÓLO ENUM, HAY "NOMBRES" QUE SE REPITEN Y
+ * NO COMPILA. USÉ ENNUM CLASS PARA QUE ESTÉN FUERTEMENTE TIPADOS PERO LAS FIRMAS DE LOS MÉTODOS
+ * ESPERABAN UN UINT8_T, DE ALLÍ LOS CASTEOS. 
+ * 
+ * EL GROSO PROBLEMA ES CON EL ID. AHÍ CREO QUE SE DEBE USAR SPACENAME PARA PODER DECLARAR
+ * OTROS ID. POR AHORA SÓLO USO CASTEO ESTÁTICOS
+ *   
+ */
+
 #include <cstdint>
 
 /**
@@ -19,13 +31,13 @@ typedef struct UBX_REGISTRO_MENSAJES
 // ==========================================
 // Protocolos class
 // ==========================================
-typedef enum UBX_SYNC: uint8_t {
+typedef enum class UBX_SYNC: uint8_t {
     SYNC_1 = 0xB5,
     SYNC_2 = 0x62
 }ubx_sync_e;
 
 
-typedef enum UBX_CLASS: uint8_t {
+typedef enum class UBX_CLASS: uint8_t {
     NAV = 0X01,
     RXM = 0X02,
     INF = 0X04,
@@ -41,7 +53,7 @@ typedef enum UBX_CLASS: uint8_t {
 // ==========================================
 // ID's de la clase NAV (Navigation)
 // ==========================================
-typedef enum UBX_ID_NAV: uint8_t{
+typedef enum class UBX_ID_NAV: uint8_t{
     POSLLH = 0X02,
     PVT = 0x07,
     SBAS = 0X32
@@ -128,7 +140,7 @@ static_assert(sizeof(nav_pvt_t) == 84, "Size of nav_pvt_t must be exactly 84 byt
 // ==========================================
 // ID's de la clase CGF (CONFIGURATION)
 // ==========================================
-typedef enum UBX_ID_CFG: uint8_t{
+typedef enum class UBX_ID_CFG: uint8_t{
     ANT =   0X13,
     CFG_ID =   0X09,
     DAT =   0X06,
@@ -245,7 +257,7 @@ typedef struct {
 // ==========================================
 // Modelos dinámicos útiles: 
 //     Dynamic Platform model:
-enum NAV5_DYN_MODEL: uint8_t{
+typedef enum class NAV5_DYN_MODEL: uint8_t{
     Portable =      0,
     Stationary =    2,
     Pedestrian =    3,
@@ -254,7 +266,7 @@ enum NAV5_DYN_MODEL: uint8_t{
     Airborne_1G =      6,      // with <1g Acceleration
     Airborne_2G =      7,      // with <2g Acceleration
     Airborne_4G =      8       // with <4g Acceleration
-};
+}nav_dyn_model_e;
 // 0 = Portable, 2 = Estacionario, 3 = Peatón, 4 = Automotriz (Robot de piso), 
 // 6 = Airborne < 1G, 7 = Airborne < 2G, 8 = Airborne < 4G (Cohetes/Alta dinámica)
 typedef struct {
@@ -279,10 +291,6 @@ typedef struct {
 } cfg_nav5_t;
 
 #pragma pack(pop)
-
-
-
-
 
 
 
