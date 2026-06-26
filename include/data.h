@@ -3,6 +3,8 @@
 //
 
 #include <cstdint>
+
+#include "UbxProtocols.h"
 #ifndef ACEMA_CTLR_DATA_H
 #define ACEMA_CTLR_DATA_H
 
@@ -33,40 +35,40 @@ typedef struct {
     int32_t temp; ///< Temperatura cruda (valor de 20 bits 'ut') [6]
 } data_raw_bmp_t;
 
-/**
- * @struct data_raw_gps_t
- * @brief Estructura de datos crudos del GPS.
- *
- * Contiene los datos sin procesar del receptor GPS.
- *
- * Posición: Coordenadas de latitud y longitud con una precisión horizontal autónoma de aproximadamente 2.5 metros (usando GPS) o 4.0 metros (usando GLONASS)
- * Velocidad: Con una precisión de 0.1 m/s.
- * Tiempo: Entrega una referencia temporal precisa, incluyendo una señal de pulso de tiempo (TIMEPULSE) configurable con una precisión de nanosegundos.
- * Trayectoria (Heading): Dirección del movimiento con una precisión de 0.5 grados.
- *
- */
-typedef struct {
-    // --- Posicionamiento ---
-    double latitud;           ///> Coordenadas en grados (NMEA ASCII o UBX Binario) [1]
-    double longitud;          ///> Coordenadas en grados (NMEA ASCII o UBX Binario) [1]
-    float altitud;            ///> Altitud en metros (Limite operativo: 50,000 m) [2, 3]
-    float precision_horizontal;        ///> Precision horizontal (Aprox. 2.5m en GPS / 4.0m GLONASS) [2, 3]
-
-    // --- Movimiento ---
-    float velocidad;          ///> Velocidad en m/s (Precision de 0.1 m/s) [2, 3]
-    float heading;            ///> Direccion del movimiento en grados (Precision de 0.5 grados) [2, 3]
-    float dinamica_max;       ///> Aceleracion soportada (Hasta 4g) [2, 3]
-
-    // --- Tiempo y Sincronizacion ---
-    uint32_t tiempo_utc;      ///> Referencia temporal sincronizada [2]
-    uint32_t freq_timepulse;  ///> Frecuencia configurable (0.25 Hz a 10 MHz) [2, 4]
-    uint32_t precision_pulso; ///> Precision de la señal de tiempo en nanosegundos (30ns a 100ns) [2, 3]
-
-    // --- Estado del Sistema ---
-    int nro_satelites;        ///> Numero de satelites (de un motor de 56 canales) [5, 6]
-    bool tiene_fix;           ///> Estado de posicionamiento (TTFF de 1s en Hot Start) [2, 3] --> TIFF es Time-To-First-Fix --> El dato "tiene_fix" indica si el módulo ha logrado sincronizarse con los satélites necesarios para calcular una posición geográfica válida
-    char sistema_activo;      ///> GPS, GLONASS o Galileo (via firmware) [7, 8]
-} data_raw_gps_t;
+// /**
+//  * @struct data_raw_gps_t
+//  * @brief Estructura de datos crudos del GPS.
+//  *
+//  * Contiene los datos sin procesar del receptor GPS.
+//  *
+//  * Posición: Coordenadas de latitud y longitud con una precisión horizontal autónoma de aproximadamente 2.5 metros (usando GPS) o 4.0 metros (usando GLONASS)
+//  * Velocidad: Con una precisión de 0.1 m/s.
+//  * Tiempo: Entrega una referencia temporal precisa, incluyendo una señal de pulso de tiempo (TIMEPULSE) configurable con una precisión de nanosegundos.
+//  * Trayectoria (Heading): Dirección del movimiento con una precisión de 0.5 grados.
+//  *
+//  */
+// typedef struct {
+//     // --- Posicionamiento ---
+//     double latitud;           ///> Coordenadas en grados (NMEA ASCII o UBX Binario) [1]
+//     double longitud;          ///> Coordenadas en grados (NMEA ASCII o UBX Binario) [1]
+//     float altitud;            ///> Altitud en metros (Limite operativo: 50,000 m) [2, 3]
+//     float precision_horizontal;        ///> Precision horizontal (Aprox. 2.5m en GPS / 4.0m GLONASS) [2, 3]
+//
+//     // --- Movimiento ---
+//     float velocidad;          ///> Velocidad en m/s (Precision de 0.1 m/s) [2, 3]
+//     float heading;            ///> Direccion del movimiento en grados (Precision de 0.5 grados) [2, 3]
+//     float dinamica_max;       ///> Aceleracion soportada (Hasta 4g) [2, 3]
+//
+//     // --- Tiempo y Sincronizacion ---
+//     uint32_t tiempo_utc;      ///> Referencia temporal sincronizada [2]
+//     uint32_t freq_timepulse;  ///> Frecuencia configurable (0.25 Hz a 10 MHz) [2, 4]
+//     uint32_t precision_pulso; ///> Precision de la señal de tiempo en nanosegundos (30ns a 100ns) [2, 3]
+//
+//     // --- Estado del Sistema ---
+//     int nro_satelites;        ///> Numero de satelites (de un motor de 56 canales) [5, 6]
+//     bool tiene_fix;           ///> Estado de posicionamiento (TTFF de 1s en Hot Start) [2, 3] --> TIFF es Time-To-First-Fix --> El dato "tiene_fix" indica si el módulo ha logrado sincronizarse con los satélites necesarios para calcular una posición geográfica válida
+//     char sistema_activo;      ///> GPS, GLONASS o Galileo (via firmware) [7, 8]
+// } data_raw_gps_t;
 
 
 /**
@@ -78,8 +80,8 @@ typedef struct {
 typedef struct {
     data_raw_bmp_t bmp;  ///< Datos crudos del BMP280
     data_raw_mpu_t mpc;  ///< Datos crudos del MPU6050
-    data_raw_gps_t gps;  ///< Datos crudos del GPS
-    uint64_t timestamp;  ///< Marca de tiempo de la lectura de los datos
+    nav_pvt_t gps;       ///< Datos crudos del GPS
+    uint64_t elapsed_time;  ///< Marca de tiempo de la lectura de los datos
 } data_raw_t;
 
 
@@ -113,10 +115,18 @@ typedef struct {
 
 /**
  * @struct data_all_t
- * @brief Estructura universal de todos los datos del sistema.
+ * @brief Estructura de datos ya sanitizados y útiles para la GSE y el MPC.
  *
  * @note Esta estructura se utiliza para almacenar y transmitir todas
  * las mediciones del sistema en una única entidad.
+ *
+ *  La decision de unificar todas las mediciones en un unico struct
+ *  radica del hecho de que los datos van a venir en un flujo.
+ *  Es decir, vamos a estar recibiendo datos constantemente.
+ *
+ *  Los subsistemas toman ese flujo de datos, y deciden qué datos del flujo les sirve.
+ *
+ *  Elegimos un flujo de datos, en lugar de hacer que los sensores envién eventos, ya que de todas formas tenemos al Flash (caja negra)
  *
  */
 typedef struct { // TODO: Completar todos los datos

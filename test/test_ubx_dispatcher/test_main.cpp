@@ -1,7 +1,7 @@
 #include <unity.h>
 #include <cstring>
 #include <cstddef>
-#include "../../lib/sensores/mGPS/src/UbxDispatcher.h"
+#include "UbxDispatcher.h"
 #include "UbxProtocols.h"
 
 // ==========================================

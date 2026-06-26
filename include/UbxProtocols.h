@@ -4,7 +4,7 @@
 #include <cstdint>
 
 /**
- * @struct UbxRegistroMensajes
+ * @struct UBX_REGISTRO_MENSAJES
  */
 typedef struct UBX_REGISTRO_MENSAJES
 {

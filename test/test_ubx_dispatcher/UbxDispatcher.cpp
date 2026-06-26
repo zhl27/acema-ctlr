@@ -1,4 +1,4 @@
-#include "../../lib/sensores/mGPS/src/UbxDispatcher.h"
+#include "UbxDispatcher.h"
 #include <cstring>
 #include <cstddef>
 /**
