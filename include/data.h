@@ -2,11 +2,12 @@
 // Created by zhl on 6/6/26.
 //
 
-#include <cstdint>
 
-#include "UbxProtocols.h"
 #ifndef ACEMA_CTLR_DATA_H
 #define ACEMA_CTLR_DATA_H
+
+#include <cstdint>
+#include "UbxProtocols.h"
 
 /**
  * @struct data_raw_mpu_t
@@ -129,14 +130,51 @@ typedef struct {
  *  Elegimos un flujo de datos, en lugar de hacer que los sensores envién eventos, ya que de todas formas tenemos al Flash (caja negra)
  *
  */
-typedef struct { // TODO: Completar todos los datos
-    data_raw_t data_raw; ///< Datos crudos de los sensores
-    int16_t posicion_relativa;
-    int16_t velocidad;
-    int16_t momentum; // inercia
-    //estadoVuelo_t vuelo_estado_actual; // se va a ver como un integer
+/**
+ * @enum EstadoVuelo
+ * @brief Máquina de estados explícita para la telemetría
+ */
+enum EstadoVuelo : uint8_t {
+    IDLE_PAD = 0,
+    IMPULSO_ASCENSO = 1,
+    VUELO_BALISTICO = 2,
+    APOGEO_DETECTADO = 3,
+    DESCENSO_DROGUE = 4,
+    DESCENSO_PRINCIPAL = 5,
+    ATERRIZADO = 6
+};
 
-    // TODO: Incluir todos los datos derivados de los datos crudos. Esto puede incluir datos procesados, inferidos o filtrados que se calculan a partir de los datos crudos, como altitud, velocidad, aceleración corregida, etc. La idea es que esta estructura se registre en el Flash, que funca como una suerte de caja negra del cohete.
+typedef struct {
+    data_raw_t data_raw;              // Flujo crudo original
+
+    // --- CINEMÁTICA LINEAL (Eje Z absoluto calibrado al cielo) ---
+    float altura_m;                   // Altura filtrada sobre el suelo
+    float velocidad_z_m_s;            // Velocidad vertical real
+    float aceleracion_z_m_s2;         // Aceleración lineal absoluta (sin gravedad)
+
+    // --- DINÁMICA ---
+    float momentum_kg_m_s;            // Cantidad de movimiento (P = m * v)
+
+    // --- CINEMÁTICA ANGULAR ---
+    float vel_angular_x;              // Pitch rate (deg/s o rad/s)
+    float vel_angular_y;              // Roll rate
+    float vel_angular_z;              // Yaw rate
+    float vel_rotacional_rpm;         // Magnitud escalar del spin centrífugo
+
+    // --- ORIENTACIÓN ESPACIAL (Filtro Complementario) ---
+    float pitch_deg;
+    float roll_deg;
+
+    // --- AMBIENTALES PROCESADOS ---
+    float temperatura_amb_c;          // Tomada estrictamente del BMP280
+    float densidad_aire_kg_m3;        // Calculada por ley de gases ideales
+
+    // --- TELEMETRÍA EMPAQUETADA (Tus requerimientos originales) ---
+    int16_t posicion_relativa;        // Altura casteada para ahorrar ancho de banda LoRa
+    int16_t velocidad;                // Velocidad vertical casteada
+    int16_t momentum;                 // Momentum casteado
+    uint8_t vuelo_estado_actual;      // EstadoVuelo as integer
+
 } data_all_t; ///< Todos los datos originados del ambiente a través de los sensores que YA ESTÁN SANITIZADOS Y FILTRADOS!
 
 

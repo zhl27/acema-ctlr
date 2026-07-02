@@ -6,10 +6,9 @@
 #include <cstdio>
 
 
-#include "../lib/transport/LoraWrapped/src/LoraWrapped.h"
-#include "mde_cohete.h"
+#include "LoraWrapped.h"
+#include "core/mde_cohete/mde_cohete.h"
 #include "SerialPrint.h"
-#include "sensores.h"
 #include "data.h"
 
 
@@ -138,12 +137,12 @@ void vTaskStateMachine(void *pvParameters) {
 #endif
 
         size_t item_size = 0;
-        char *item = (char *) xRingbufferReceive(xStateMachineRingbuf, &item_size, pdMS_TO_TICKS(2000));
-        if (item != NULL) {
+        const auto item = static_cast<char *>(xRingbufferReceive(xStateMachineRingbuf, &item_size, pdMS_TO_TICKS(2000)));
+        if (item != nullptr) {
             // 2. Validar que el tamaño recibido coincide exactamente con nuestro struct
             if (item_size == sizeof(data_all_t)) {
 
-                data_all_t* datos_sensores = (data_all_t*) item;
+                auto* datos_sensores = reinterpret_cast<data_all_t *>(item);
 
                 // (Opcional) Guardar una copia por si hay que evaluar la MDE sin datos nuevos
                 // memcpy(&ultimos_datos, datos_sensores, sizeof(data_all_t));
