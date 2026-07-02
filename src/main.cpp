@@ -150,17 +150,17 @@ void vTaskStateMachine(void *pvParameters) {
                 // memcpy(&ultimos_datos, datos_sensores, sizeof(data_raw_t));
 
                 // NOTA: Asegúrate de que mde_cohete_actualizar acepte un puntero a data_raw_t
-                mde_cohete_actualizar(datos_sensores);
+                // mde_cohete_actualizar(datos_sensores);
 
             } else {
-                SerialPrint::msg("[StateMachine] ERROR: Tamaño de item no coincide con data_all_t");
+                // SerialPrint::msg("[StateMachine] ERROR: Tamaño de item no coincide con data_all_t");
             }
 
             // 4. Free the memory
             vRingbufferReturnItem(xStateMachineRingbuf, item);
 
         } else {
-            SerialPrint::msg("[StateMachine] No messages (timeout)");
+            // SerialPrint::msg("[StateMachine] No messages (timeout)");
         }
     }
 }
@@ -183,13 +183,13 @@ void vTaskFlash(void *pvParameters) {
                 data_all_t *datos_sensores = static_cast<data_all_t *>(item);
 
                 // Print a specific member of the struct (like elapsed_time) instead of %s
-                Serial.printf("[Flash] Persisting (%d bytes). Time: %lu\n", static_cast<int>(item_size), micros());
+                // Serial.printf("[Flash] Persisting (%d bytes). Time: %lu\n", static_cast<int>(item_size), micros());
 
                 // TODO: In a real implementation, write 'datos' to SD/flash.
             }
             vRingbufferReturnItem(xFlashRingbuf, item);
         } else {
-            SerialPrint::msg("[Flash] No items to persist (timeout)");
+            // SerialPrint::msg("[Flash] No items to persist (timeout)");
         }
     }
 }
@@ -213,7 +213,7 @@ void vTaskLora(void *pvParameters) {
 
                 // Print a specific member of the struct instead of %s
                 // Serial.printf("[Lora] Sending (%d bytes). Time: %lu\n", static_cast<int>(item_size), micros());
-                GSE::actualizar_graficas(datos_sensores);
+                GSE::actualizar(datos_sensores);
 
             }
             vRingbufferReturnItem(xLoraRingbuf, item);
