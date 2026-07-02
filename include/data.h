@@ -8,6 +8,8 @@
 
 #include <cstdint>
 #include "UbxProtocols.h"
+#include <stdio.h>
+#include <stdint.h>
 
 /**
  * @struct data_raw_mpu_t
@@ -164,6 +166,48 @@ typedef struct {
 
 } data_all_t; ///< Todos los datos originados del ambiente a través de los sensores que YA ESTÁN SANITIZADOS Y FILTRADOS!
 
+
+// TODO: poner "printear_data" en un lugar mejor
+#include <Arduino.h>
+inline void printear_data(const data_all_t *data) {
+    // Verificación de seguridad para evitar cuelgues si el puntero es nulo
+    if (data == NULL) {
+        Serial.printf("Error: Puntero de telemetría nulo.\n");
+        return;
+    }
+
+    Serial.printf("\n========= ESTADO DE VUELO COHETE =========\n");
+
+    Serial.printf("--- CINEMÁTICA LINEAL ---\n");
+    Serial.printf("Altura:             %.2f m\n", data->altura_m);
+    Serial.printf("Velocidad Z:        %.2f m/s\n", data->velocidad_z_m_s);
+    Serial.printf("Aceleración Z:      %.2f m/s^2\n", data->aceleracion_z_m_s2);
+
+    Serial.printf("--- DINÁMICA ---\n");
+    Serial.printf("Momentum:           %.2f kg*m/s\n", data->momentum_kg_m_s);
+
+    Serial.printf("--- CINEMÁTICA ANGULAR ---\n");
+    Serial.printf("Vel Angular X:      %.2f °/s (Pitch)\n", data->vel_angular_x);
+    Serial.printf("Vel Angular Y:      %.2f °/s (Roll)\n", data->vel_angular_y);
+    Serial.printf("Vel Angular Z:      %.2f °/s (Yaw)\n", data->vel_angular_z);
+    Serial.printf("Vel Rotacional:     %.2f RPM\n", data->vel_rotacional_rpm);
+
+    Serial.printf("--- ORIENTACIÓN ESPACIAL ---\n");
+    Serial.printf("Pitch:              %.2f °\n", data->pitch_deg);
+    Serial.printf("Roll:               %.2f °\n", data->roll_deg);
+
+    Serial.printf("--- AMBIENTALES PROCESADOS ---\n");
+    Serial.printf("Temperatura Amb:    %.2f °C\n", data->temperatura_amb_c);
+    Serial.printf("Densidad Aire:      %.4f kg/m^3\n", data->densidad_aire_kg_m3);
+
+    Serial.printf("--- TELEMETRÍA EMPAQUETADA (LoRa) ---\n");
+    // Los int16_t se imprimen con %d ya que se promueven implícitamente a int
+    Serial.printf("Posición Relativa:  %d\n", data->posicion_relativa);
+    Serial.printf("Velocidad:          %d\n", data->velocidad);
+    Serial.printf("Momentum:           %d\n", data->momentum);
+
+    Serial.printf("==========================================\n\n");
+}
 
 #endif //ACEMA_CTLR_DATA_H
 

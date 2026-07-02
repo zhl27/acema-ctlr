@@ -25,18 +25,9 @@ typedef struct PACKET {
     void* payload;
 } pkt_t;
 
-
-/* PROVI VA EN GLOALS.H*/
-typedef struct {
-    int datoX;
-    float giroX;
-    float giroY;
-    float altitud;
-} data_plot_t;
-
 union pay_u {
     char msg[SIZE_BUFFER_MSG];
-    data_plot_t data;
+    data_all_t data;
 };
 
 enum lora_protocol: uint8_t {

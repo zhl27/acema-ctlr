@@ -95,8 +95,8 @@ int LoraWrapped::_read_packet(pkt_t *ptrPkt) {
 
     // Asigna el puntero de la unión según el protocolo 
     if (ptrPkt->protocole == lora_protocol::C_PLOT) {
-        memset((void*)&_internalPayload_rx.data, 0, sizeof(data_plot_t));
-        ptrPkt->payload = (data_plot_t*)&_internalPayload_rx.data;
+        memset((void*)&_internalPayload_rx.data, 0, sizeof(data_all_t));
+        ptrPkt->payload = (data_all_t*)&_internalPayload_rx.data;
     } else {
         memset((void*)_internalPayload_rx.msg, 0, sizeof(_internalPayload_rx.msg));
         ptrPkt->payload = static_cast<char *>(_internalPayload_rx.msg);
@@ -182,7 +182,7 @@ int LoraWrapped::send_data(data_all_t datos) const {
     // Prepara el paquete
     paquete.protocole = lora_protocol::C_PLOT;
     paquete.payload = &datos;
-    paquete.len = sizeof(data_all_t);
+    paquete.len = sizeof(datos);
 
     // Envia el paquete
     return _send_packet(&paquete);

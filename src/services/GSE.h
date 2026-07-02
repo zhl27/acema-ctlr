@@ -47,9 +47,9 @@ public:
     static int enviar_mensaje(const char* mensaje);
     static int enviar_error(const char* error);
 
-    static void actualizar();
+    static void actualizar(data_all_t *data);
 
-    static void _printear_struct_y_hex(data_plot_t* datos);
+    static void _printear_struct_y_hex(data_all_t* datos);
 
     static RocketState estado_mde();
 };
