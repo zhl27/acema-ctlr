@@ -6,6 +6,20 @@
 #define ACEMA_CTLR_DATAFILTER_H
 #include "data.h"
 
+class IFilter {
+
+    /*valor de inicio */
+    void virtual inicializar(float) = 0;
+
+    /* Actualización */
+    float virtual actualizar(float) = 0; 
+
+    /* Reseteo */
+    void virtual resetear() = 0;
+};
+
+
+
 // TODO: por ahora lo modelamos como un util (static), pero idealmente debemos hacerlo clase, para permitir flexibilidad y desacople. Queremos poder pasarle filtros (sea Filtro complementario, sea filtro de kalman, etc.), y crear una instancia DataFilter con distintas combinaciones de estas.
 class DataFilter {
 public:
@@ -36,6 +50,5 @@ private:
     static float _h_pad_offset;
     static bool _iniciado;
 };
-
 
 #endif //ACEMA_CTLR_DATAFILTER_H
