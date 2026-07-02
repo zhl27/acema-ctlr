@@ -204,7 +204,7 @@ void loop() {
                 }
 
                 // 4. Validación de ciclo de ráfagas (Cada 50 muestras)
-                if (cicloContador >= 5) {
+                if (cicloContador % 5 == 0)  {
                     Serial.println(F("\n[EVENTO] Alcanzadas las 50 muestras. Enviando ráfaga de mensajes críticos..."));
 
                     // Envío de mensaje string común
@@ -218,8 +218,8 @@ void loop() {
                     }
 
                     // Resetear contador para iniciar el siguiente ciclo de 50 telemetrías
-                    cicloContador = 0;
-                    Serial.println(F("[MDE] Reiniciando cuenta de ciclo de telemetría.\n"));
+                    // cicloContador = 0;
+                    // Serial.println(F("[MDE] Reiniciando cuenta de ciclo de telemetría.\n"));
                 }
             }
             break;
