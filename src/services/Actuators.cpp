@@ -4,7 +4,8 @@
 
 #include "Actuators.h"
 
-Actuators::Actuators() {}
+Actuators::Actuators() : _pyro(), _servo() {
+}
 
 bool Actuators::init() {
     bool success = true;

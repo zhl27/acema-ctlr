@@ -27,6 +27,8 @@ public:
     // Constructor que encapsula la inicialización
     explicit mServo(mServoConfig_t* cfg);
 
+    mServo();
+
     // API de control (sin inicialización externa)
     float leerAngulo();
     void setAngulo(float ang, uint16_t degPerSec);

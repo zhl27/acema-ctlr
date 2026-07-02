@@ -10,6 +10,8 @@
 #include "core/mde_cohete/mde_cohete.h"
 #include "SerialPrint.h"
 #include "data.h"
+#include "services/DataFilter.h"
+#include "services/Sensors.h"
 
 
 // Pines asignados si compilas con: pio run -e CPU-esp32
@@ -47,9 +49,14 @@ void setup() {
     Serial.begin(115200);
 
     while (!Serial)
-        delay(1000); // will pause mcu until serial console opens
+        vTaskDelay(pdMS_TO_TICKS(1000));
 
-    SerialPrint::msg("Setup");
+    SerialPrint::msg("Comenzando el setup...");
+
+    // Initialize the kinematic filter (Adjust mass and pad offset as needed for your launch)
+    // TODO: FALTA MODIFICAR DATAFILTER DE FORMA ACORDE A LOS REQUERIMIENTOS.
+    DataFilter::init(15.0f, 0.0f);
+    Sensors::init();
 
 
     // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
@@ -92,33 +99,38 @@ void loop(){
 // TODO: Pensar sobre este texto: "You need to gather large bursts of hardware data inside an Interrupt Service Routine (ISR) to be processed later by a task."
 void vTaskReadSensors(void *pvParameters) {
     while (1) {
-        // Mock: generate a fake sensor payload and send to the ring buffers
-        char payload[128];
-        static int seq = 0;
-        float mock_alt = 100.0f + (seq * 0.1f);
-        float mock_acc = 0.01f * seq;
-        int len = snprintf(
-            payload,
-            sizeof(payload),
-            "SENSOR;seq=%d;alt=%.2f;acc=%.3f", seq++, mock_alt, mock_acc);
+        // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
+        // 1. Obtener datos crudos
+        const data_raw_t raw = Sensors::getRawData();
 
-        Serial.printf("[ReadSensors] Emitting: %s\n", payload);
+        // 2. Procesar a través del filtro de Kalman/Complementario
+        // Esto genera all_data, el cual también guarda una copia de 'raw' en su interior
+        const data_all_t all_data = DataFilter::process(raw);
 
+        // 3. Hacia MDE: Envía SOLAMENTE data_all_t
         if (xStateMachineRingbuf != NULL) {
-            if (xRingbufferSend(xStateMachineRingbuf, (void *)payload, (size_t)(len + 1), pdMS_TO_TICKS(10)) != pdTRUE) {
-                SerialPrint::err("xRingbufferSend -> xStateMachineRingbuf failed");
+            if (xRingbufferSend(xStateMachineRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(10)) != pdTRUE) {
+                SerialPrint::err("xRingbufferSend -> xStateMachineRingbuf failed (all_data)");
             }
         }
 
+        // 4. Hacia Flash: Envía data_raw_t y data_all_t
         if (xFlashRingbuf != NULL) {
-            if (xRingbufferSend(xFlashRingbuf, (void *)payload, (size_t)(len + 1), pdMS_TO_TICKS(10)) != pdTRUE) {
-                SerialPrint::err("xRingbufferSend -> xFlashRingbuf failed");
+            // if (xRingbufferSend(xFlashRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(10)) != pdTRUE) {
+            //     SerialPrint::err("xRingbufferSend -> xFlashRingbuf failed (raw)");
+            // }
+            if (xRingbufferSend(xFlashRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(10)) != pdTRUE) {
+                SerialPrint::err("xRingbufferSend -> xFlashRingbuf failed (all_data)");
             }
         }
 
+        // 5. Hacia LoRa: Envía data_raw_t y data_all_t
         if (xLoraRingbuf != NULL) {
-            if (xRingbufferSend(xLoraRingbuf, (void *)payload, (size_t)(len + 1), pdMS_TO_TICKS(10)) != pdTRUE) {
-                SerialPrint::err("xRingbufferSend -> xLoraRingbuf failed");
+            // if (xRingbufferSend(xLoraRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(10)) != pdTRUE) {
+            //     SerialPrint::err("xRingbufferSend -> xLoraRingbuf failed (raw)");
+            // }
+            if (xRingbufferSend(xLoraRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(10)) != pdTRUE) {
+                SerialPrint::err("xRingbufferSend -> xLoraRingbuf failed (all_data)");
             }
         }
 
@@ -137,29 +149,28 @@ void vTaskStateMachine(void *pvParameters) {
 #endif
 
         size_t item_size = 0;
-        const auto item = static_cast<char *>(xRingbufferReceive(xStateMachineRingbuf, &item_size, pdMS_TO_TICKS(2000)));
-        if (item != nullptr) {
-            // 2. Validar que el tamaño recibido coincide exactamente con nuestro struct
+        // 1. Receive as a generic void pointer
+        void *item = xRingbufferReceive(xStateMachineRingbuf, &item_size, pdMS_TO_TICKS(2000));
+
+        if (item != NULL) {
             if (item_size == sizeof(data_all_t)) {
 
-                auto* datos_sensores = reinterpret_cast<data_all_t *>(item);
+                data_all_t *datos_sensores = static_cast<data_all_t *>(item);
 
                 // (Opcional) Guardar una copia por si hay que evaluar la MDE sin datos nuevos
-                // memcpy(&ultimos_datos, datos_sensores, sizeof(data_all_t));
+                // memcpy(&ultimos_datos, datos_sensores, sizeof(data_raw_t));
 
+                // NOTA: Asegúrate de que mde_cohete_actualizar acepte un puntero a data_raw_t
                 mde_cohete_actualizar(datos_sensores);
 
             } else {
                 SerialPrint::msg("[StateMachine] ERROR: Tamaño de item no coincide con data_all_t");
             }
 
-            // Liberar la memoria del RingBuffer para que el productor pueda seguir escribiendo
+            // 4. Free the memory
             vRingbufferReturnItem(xStateMachineRingbuf, item);
 
         } else {
-            // TIMEOUT: No llegaron datos nuevos en los últimos 10ms.
-            // Si la MDE necesita evaluar temporizadores (ej. ST_EVALUAR_SUPERVIVENCIA_DROGUE)
-            // podrías llamarla aquí pasándole 'ultimos_datos'.
             SerialPrint::msg("[StateMachine] No messages (timeout)");
         }
     }
@@ -175,11 +186,19 @@ void vTaskFlash(void *pvParameters) {
 #endif
 
         size_t item_size = 0;
-        char *item = (char *) xRingbufferReceive(xFlashRingbuf, &item_size, pdMS_TO_TICKS(5000));
+        void *item = xRingbufferReceive(xFlashRingbuf, &item_size, pdMS_TO_TICKS(5000));
+
         if (item != NULL) {
-            Serial.printf("[Flash] Persisting (%d bytes): %s\n", (int)item_size, item);
-            // TODO: In a real implementation, write to SD/flash. Here we just log.
-            vRingbufferReturnItem(xFlashRingbuf, (void *)item);
+            if (item_size == sizeof(data_all_t)) {
+
+                data_all_t *datos_sensores = static_cast<data_all_t *>(item);
+
+                // Print a specific member of the struct (like elapsed_time) instead of %s
+                Serial.printf("[Flash] Persisting (%d bytes). Time: %lu\n", static_cast<int>(item_size), micros());
+
+                // TODO: In a real implementation, write 'datos' to SD/flash.
+            }
+            vRingbufferReturnItem(xFlashRingbuf, item);
         } else {
             SerialPrint::msg("[Flash] No items to persist (timeout)");
         }
@@ -196,11 +215,19 @@ void vTaskLora(void *pvParameters) {
 #endif
 
         size_t item_size = 0;
-        char *item = (char *) xRingbufferReceive(xLoraRingbuf, &item_size, pdMS_TO_TICKS(3000));
+        void *item = xRingbufferReceive(xLoraRingbuf, &item_size, pdMS_TO_TICKS(3000));
+
         if (item != NULL) {
-            Serial.printf("[Lora] Sending (%d bytes): %s\n", (int)item_size, item);
-            // TODO: In a real implementation, pass to the LoraWrapped instance. Here we just log.
-            vRingbufferReturnItem(xLoraRingbuf, (void *)item);
+            if (item_size == sizeof(data_all_t)) {
+
+                data_all_t *datos_sensores = static_cast<data_all_t *>(item);
+
+                // Print a specific member of the struct instead of %s
+                Serial.printf("[Lora] Sending (%d bytes). Time: %lu\n", static_cast<int>(item_size), micros());
+
+                // TODO: Pass 'datos' to the LoraWrapped instance.
+            }
+            vRingbufferReturnItem(xLoraRingbuf, item);
         } else {
             SerialPrint::msg("[Lora] No messages to send (timeout)");
         }

@@ -44,7 +44,7 @@
  * @brief Máquina de estados secuencial de vuelo ACEMA
  */
 typedef enum {
-    ST_INIT = 0,
+    ST_INIT = 0, //
     ST_WARMUP_MPU,             // Calentamiento térmico obligatorio de 5 min
     ST_BUSCANDO_CONEXION_GSE,  // Intento de enlace GSE (No bloqueante, con timeout)
     ST_ESPERA_GPS_FIX,         // Esperando 3D Fix
@@ -60,6 +60,16 @@ typedef enum {
     ST_ERROR,                  // Estado de captura de excepciones
     ST_NULL
 } estado_vuelo_t;
+
+// enum EstadoVuelo : uint8_t {
+//     IDLE_PAD = 0,
+//     IMPULSO_ASCENSO = 1,
+//     VUELO_BALISTICO = 2,
+//     APOGEO_DETECTADO = 3,
+//     DESCENSO_DROGUE = 4,
+//     DESCENSO_PRINCIPAL = 5,
+//     ATERRIZADO = 6
+// };
 
 /** @enum cod_error_t
  * @brief Códigos de error instantáneos y de diagnóstico

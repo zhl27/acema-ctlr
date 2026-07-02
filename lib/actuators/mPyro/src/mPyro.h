@@ -24,6 +24,8 @@ public:
     mPyro(uint8_t pinActivar, uint8_t pinContinuidad, int umbralVoltaje = 1000)
         : _pinActivar(pinActivar), _pinContinuidad(pinContinuidad), _armado(false), _umbralVoltaje(umbralVoltaje) {}
 
+    mPyro();
+
     /**
      * @brief Configura los modos de los pines. Debe llamarse dentro del setup().
      */

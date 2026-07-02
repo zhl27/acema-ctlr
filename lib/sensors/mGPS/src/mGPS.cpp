@@ -1,7 +1,7 @@
 //
 // Created by zhl on 6/3/26.
 //
-/*
+
 #include "mGPS.h"
 
 #include <cstdint>
@@ -10,6 +10,7 @@
 #include "SerialPrint.h"
 
 // TODO: Falta revisión general de mGPS, especialmente en la lógica de actualización y validación de datos GPS. Se recomienda implementar un Unit Test que simule la recepción de datos GPS con diferentes escenarios (ubicación válida, sin señal, cambios rápidos de ubicación) para confirmar que el método update() procesa correctamente los datos y actualiza las variables internas sin generar errores o bloqueos.
+// TODO: Usar IMPLEMENTACION DE JOE en lugar de mGPS.
 
 mGPS::mGPS(int uartNum, int rx, int tx, uint32_t baud)
     : serialGPS(uartNum), rxPin(rx), txPin(tx), baudRate(baud) {}
@@ -42,4 +43,3 @@ void mGPS::update() {
 
 
 }
-    */

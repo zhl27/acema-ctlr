@@ -127,25 +127,13 @@ typedef struct {
  *
  *  Los subsistemas toman ese flujo de datos, y deciden qué datos del flujo les sirve.
  *
- *  Elegimos un flujo de datos, en lugar de hacer que los sensores envién eventos, ya que de todas formas tenemos al Flash (caja negra)
+ *  Elegimos un flujo de datos, en lugar de hacer que los sensores envíen eventos, ya que de todas formas tenemos al Flash (caja negra)
  *
  */
-/**
- * @enum EstadoVuelo
- * @brief Máquina de estados explícita para la telemetría
- */
-enum EstadoVuelo : uint8_t {
-    IDLE_PAD = 0,
-    IMPULSO_ASCENSO = 1,
-    VUELO_BALISTICO = 2,
-    APOGEO_DETECTADO = 3,
-    DESCENSO_DROGUE = 4,
-    DESCENSO_PRINCIPAL = 5,
-    ATERRIZADO = 6
-};
+
 
 typedef struct {
-    data_raw_t data_raw;              // Flujo crudo original
+    // data_raw_t data_raw;           // Flujo crudo original // TODO: Ver si hace falta.
 
     // --- CINEMÁTICA LINEAL (Eje Z absoluto calibrado al cielo) ---
     float altura_m;                   // Altura filtrada sobre el suelo
@@ -173,7 +161,6 @@ typedef struct {
     int16_t posicion_relativa;        // Altura casteada para ahorrar ancho de banda LoRa
     int16_t velocidad;                // Velocidad vertical casteada
     int16_t momentum;                 // Momentum casteado
-    uint8_t vuelo_estado_actual;      // EstadoVuelo as integer
 
 } data_all_t; ///< Todos los datos originados del ambiente a través de los sensores que YA ESTÁN SANITIZADOS Y FILTRADOS!
 
