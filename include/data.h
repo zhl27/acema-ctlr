@@ -38,42 +38,6 @@ typedef struct {
     int32_t temp; ///< Temperatura cruda (valor de 20 bits 'ut') [6]
 } data_raw_bmp_t;
 
-// /**
-//  * @struct data_raw_gps_t
-//  * @brief Estructura de datos crudos del GPS.
-//  *
-//  * Contiene los datos sin procesar del receptor GPS.
-//  *
-//  * Posición: Coordenadas de latitud y longitud con una precisión horizontal autónoma de aproximadamente 2.5 metros (usando GPS) o 4.0 metros (usando GLONASS)
-//  * Velocidad: Con una precisión de 0.1 m/s.
-//  * Tiempo: Entrega una referencia temporal precisa, incluyendo una señal de pulso de tiempo (TIMEPULSE) configurable con una precisión de nanosegundos.
-//  * Trayectoria (Heading): Dirección del movimiento con una precisión de 0.5 grados.
-//  *
-//  */
-// typedef struct {
-//     // --- Posicionamiento ---
-//     double latitud;           ///> Coordenadas en grados (NMEA ASCII o UBX Binario) [1]
-//     double longitud;          ///> Coordenadas en grados (NMEA ASCII o UBX Binario) [1]
-//     float altitud;            ///> Altitud en metros (Limite operativo: 50,000 m) [2, 3]
-//     float precision_horizontal;        ///> Precision horizontal (Aprox. 2.5m en GPS / 4.0m GLONASS) [2, 3]
-//
-//     // --- Movimiento ---
-//     float velocidad;          ///> Velocidad en m/s (Precision de 0.1 m/s) [2, 3]
-//     float heading;            ///> Direccion del movimiento en grados (Precision de 0.5 grados) [2, 3]
-//     float dinamica_max;       ///> Aceleracion soportada (Hasta 4g) [2, 3]
-//
-//     // --- Tiempo y Sincronizacion ---
-//     uint32_t tiempo_utc;      ///> Referencia temporal sincronizada [2]
-//     uint32_t freq_timepulse;  ///> Frecuencia configurable (0.25 Hz a 10 MHz) [2, 4]
-//     uint32_t precision_pulso; ///> Precision de la señal de tiempo en nanosegundos (30ns a 100ns) [2, 3]
-//
-//     // --- Estado del Sistema ---
-//     int nro_satelites;        ///> Numero de satelites (de un motor de 56 canales) [5, 6]
-//     bool tiene_fix;           ///> Estado de posicionamiento (TTFF de 1s en Hot Start) [2, 3] --> TIFF es Time-To-First-Fix --> El dato "tiene_fix" indica si el módulo ha logrado sincronizarse con los satélites necesarios para calcular una posición geográfica válida
-//     char sistema_activo;      ///> GPS, GLONASS o Galileo (via firmware) [7, 8]
-// } data_raw_gps_t;
-
-
 /**
  * @struct data_raw_t
  * @brief Flujo crudo. Estructura que agrupa todos los datos crudos de los sensores.
@@ -87,34 +51,6 @@ typedef struct {
     uint64_t elapsed_time;  ///< Marca de tiempo de la lectura de los datos
 } data_raw_t;
 
-
-/**
- * @struct data_gse_t
- * @brief Estructura de datos para la Estación de Tierra (GSE).
- *
- * Contiene todos los datos procesados y validados de los sensores
- * listos para transmisión a la estación de control terrestre.
- *
- * @see data_all_t
- */
-typedef struct {
-    int16_t posicion_relativa;
-    int16_t velocidad;
-    int16_t momentum; // inercia
-    //estadoVuelo_t vuelo_estado_actual; // se va a ver como un integer
-
-    double latitud;           ///> Coordenadas en grados (NMEA ASCII o UBX Binario) [1]
-    double longitud;          ///> Coordenadas en grados (NMEA ASCII o UBX Binario) [1]
-    float altitud;            ///> Altitud en metros (Limite operativo: 50,000 m) [2, 3]
-
-    int nro_satelites;        ///> Numero de satelites (de un motor de 56 canales) [5, 6]
-    bool tiene_fix;           ///> Estado de posicionamiento (TTFF de 1s en Hot Start) [2, 3] --> TIFF es Time-To-First-Fix --> El dato "tiene_fix" indica si el módulo ha logrado sincronizarse con los satélites necesarios para calcular una posición geográfica válida
-    char sistema_activo;      ///> GPS, GLONASS o Galileo (via firmware) [7, 8]
-    // TODO: hay que considerar los datos procesados que se infieren de los crudos
-    // capaz alguno de los datos crudos no se envía a la GSE, o se envía solo un subconjunto de ellos, o se envían datos procesados derivados de los crudos.
-    // Eso depende del diseño de la telemetría y de las necesidades de la GSE.
-    uint64_t timestamp;  ///< Marca de tiempo de la lectura de los datos
-} data_gse_t;
 
 /**
  * @struct data_all_t
@@ -132,10 +68,7 @@ typedef struct {
  *  Elegimos un flujo de datos, en lugar de hacer que los sensores envíen eventos, ya que de todas formas tenemos al Flash (caja negra)
  *
  */
-
-
 typedef struct {
-    // data_raw_t data_raw;           // Flujo crudo original // TODO: Ver si hace falta.
 
     // --- CINEMÁTICA LINEAL (Eje Z absoluto calibrado al cielo) ---
     float altura_m;                   // Altura filtrada sobre el suelo
@@ -149,7 +82,7 @@ typedef struct {
     float vel_angular_x;              // Pitch rate (deg/s o rad/s)
     float vel_angular_y;              // Roll rate
     float vel_angular_z;              // Yaw rate
-    float vel_rotacional_rpm;         // Magnitud escalar del spin centrífugo
+    float vel_rotacional_rpm;            // Magnitud escalar del spin centrífugo
 
     // --- ORIENTACIÓN ESPACIAL (Filtro Complementario) ---
     float pitch_deg;
@@ -167,8 +100,51 @@ typedef struct {
 } data_all_t; ///< Todos los datos originados del ambiente a través de los sensores que YA ESTÁN SANITIZADOS Y FILTRADOS!
 
 
-// TODO: poner "printear_data" en un lugar mejor
 #include <Arduino.h>
+
+/**
+ * @brief Imprime por el puerto serie todos los valores de la estructura data_raw_t.
+ * * @param data Referencia constante a la estructura con los datos crudos.
+ */
+inline void print_data_raw(const data_raw_t *data) {
+    // Verificación de seguridad para evitar cuelgues si el puntero es nulo
+    if (data == NULL) {
+        Serial.printf("Error: Puntero de telemetría nulo.\n");
+        return;
+    }
+    // Encabezado con el tiempo (uint64_t usa %llu)
+    Serial.printf("\n=== Datos crudos de Sensores (Tiempo: %llu) ===\n", data->elapsed_time);
+
+    // --- Datos del BMP280 ---
+    // Usamos %d casteando a int para los int32_t (compatible con ESP32/ARM)
+    Serial.printf("[BMP280]  Presion: %d | Temp: %d\n",
+                  (int)data->bmp.presion,
+                  (int)data->bmp.temp);
+
+    // --- Datos del MPU6050 ---
+    // Usamos %d para los int16_t (se promueven automáticamente a int en C++)
+    Serial.printf("[MPU6050] Accel X: %d | Y: %d | Z: %d\n",
+                  data->mpc.accel_x, data->mpc.accel_y, data->mpc.accel_z);
+
+    Serial.printf("[MPU6050] Gyro  X: %d | Y: %d | Z: %d\n",
+                  data->mpc.gyro_x, data->mpc.gyro_y, data->mpc.gyro_z);
+
+    Serial.printf("[MPU6050] Temp: %d\n", data->mpc.temp);
+
+    // --- Datos del GPS (nav_pvt_t) ---
+    // NOTA: Como 'nav_pvt_t' no está definido en el snippet original,
+    // te dejo un ejemplo comentado de cómo imprimirías variables típicas de ese struct.
+    /*
+    Serial.printf("[GPS]     Latitud: %ld | Longitud: %ld | Satelites: %d\n",
+                  (long)data->gps.lat,
+                  (long)data->gps.lon,
+                  (int)data->gps.numSV);
+    */
+
+    Serial.printf("==========================================\n");
+}
+
+// TODO: poner "printear_data" en un lugar mejor
 inline void printear_data(const data_all_t *data) {
     // Verificación de seguridad para evitar cuelgues si el puntero es nulo
     if (data == NULL) {
@@ -176,7 +152,7 @@ inline void printear_data(const data_all_t *data) {
         return;
     }
 
-    Serial.printf("\n========= ESTADO DE VUELO COHETE =========\n");
+    Serial.printf("\n=============== DATA_ALL_T ===============\n");
 
     Serial.printf("--- CINEMÁTICA LINEAL ---\n");
     Serial.printf("Altura:             %.2f m\n", data->altura_m);

@@ -14,6 +14,7 @@
 #include "services/GSE.h"
 #include "services/Sensors.h"
 #include "config.h"
+#include "services/EmaFilter.h"
 
 
 constexpr size_t RBUF_SIZE = 1024; // bytes per ring buffer
@@ -36,6 +37,7 @@ void vTaskFlash(void *pvParameters); // la caja negra que persiste cada dato ent
 void vTaskLora(void *pvParameters); // maneja la comunicación LoRa, incluyendo el envío de datos y la gestión de la conexión con el GSE.
 
 mBuzzer buzzer(BUZZER_PIN);
+
 
 void setup() {
     Serial.begin(115200); // TODO: Para la Compu de vuelo no se usa Serial
@@ -86,7 +88,7 @@ void setup() {
 
     buzzer.playSuccess();
 
-    delay(100);
+    vTaskDelay(pdMS_TO_TICKS(100));
 }
 
 void loop(){
@@ -97,21 +99,18 @@ void loop(){
 void vTaskReadSensors(void *pvParameters) {
     while (true) {
         // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
-        // 1. Obtener datos crudos
-        const data_raw_t raw = Sensors::getRawData();
+        data_raw_t raw = Sensors::getRawData();
 
-        // 2. Procesar a través del filtro de Kalman/Complementario
-        // Esto genera all_data, el cual también guarda una copia de 'raw' en su interior
+        print_data_raw(&raw);
+
         const data_all_t all_data = DataFilter::process(raw);
 
-        // 3. Hacia MDE: Envía SOLAMENTE data_all_t
         if (xStateMachineRingbuf != NULL) {
             if (xRingbufferSend(xStateMachineRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(10)) != pdTRUE) {
                 SerialPrint::err("xRingbufferSend -> xStateMachineRingbuf failed (all_data)");
             }
         }
 
-        // 4. Hacia Flash: Envía data_raw_t y data_all_t
         if (xFlashRingbuf != NULL) {
             // if (xRingbufferSend(xFlashRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(10)) != pdTRUE) {
             //     SerialPrint::err("xRingbufferSend -> xFlashRingbuf failed (raw)");
@@ -121,7 +120,6 @@ void vTaskReadSensors(void *pvParameters) {
             }
         }
 
-        // 5. Hacia LoRa: Envía data_raw_t y data_all_t
         if (xLoraRingbuf != NULL) {
             // if (xRingbufferSend(xLoraRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(10)) != pdTRUE) {
             //     SerialPrint::err("xRingbufferSend -> xLoraRingbuf failed (raw)");

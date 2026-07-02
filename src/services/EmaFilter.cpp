@@ -27,7 +27,7 @@ void EmaFilter::inicializar(float muestraInicial)
     _estaInicializado = true;
 }
 
-float EmaFilter::actualizar(float muestra)
+float EmaFilter::filtrar(float muestra)
 {
 // Corrección de transitorio inicial (para evitar arrancar desde 0 si la señal empieza alta)
     if (!_estaInicializado) {

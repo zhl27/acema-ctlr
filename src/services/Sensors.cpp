@@ -38,7 +38,7 @@ data_raw_t Sensors::getRawData() {
 
     // TODO: Traer datos nav_pvt_t del módulo GPS
 
-    raw.elapsed_time = 0; // Needs a real timestamp implementation
+    raw.elapsed_time = micros(); // Needs a real timestamp implementation
 
     return raw;
 }

@@ -7,110 +7,135 @@
 #include <cmath>
 #include <esp_timer.h>
 
-// Instanciación de memoria estática
-float DataFilter::_h_est = 0.0f;
-float DataFilter::_v_est = 0.0f;
-float DataFilter::_pitch = 0.0f;
-float DataFilter::_roll = 0.0f;
-uint64_t DataFilter::_t_prev_us = 0;
-float DataFilter::_masa_kg = 1.0f;
-float DataFilter::_h_pad_offset = 0.0f;
-bool DataFilter::_iniciado = false;
+// --- Definición e inicialización de miembros estáticos ---
+float DataFilter::_masa_cohete_kg = 15.0f;
+float DataFilter::_altitud_cero_pad_m = 0.0f;
+float DataFilter::_ultima_altura_m = 0.0f;
+uint64_t DataFilter::_ultimo_tiempo_us = 0;
+bool DataFilter::_es_primer_ciclo = true;
 
-// TODO: Mover estos argumentos de init(...) hacia alguna config para mejor manejo.
+// Filtros para MPU6050 (puedes inicializarlos con un alfa específico si lo deseas, ej: EmaFilter(0.2f))
+EmaFilter DataFilter::filter_accel_x(0.5);
+EmaFilter DataFilter::filter_accel_y(0.5);
+EmaFilter DataFilter::filter_accel_z(0.5);
+EmaFilter DataFilter::filter_gyro_x(0.5);
+EmaFilter DataFilter::filter_gyro_y(0.5);
+EmaFilter DataFilter::filter_gyro_z(0.5);
+
+// Filtros para BMP280
+EmaFilter DataFilter::filter_bmp_presion(0.5);
+EmaFilter DataFilter::filter_bmp_temp(0.5);
+
 void DataFilter::init(float masa_cohete_kg, float altitud_cero_pad_m) {
-    _masa_kg = masa_cohete_kg;
-    _h_pad_offset = altitud_cero_pad_m;
-    _h_est = 0.0f;
-    _v_est = 0.0f;
-    _pitch = 0.0f;
-    _roll = 0.0f;
-    _t_prev_us = esp_timer_get_time(); // Reloj de hardware de alta resolución ESP32
-    _iniciado = true;
+    _masa_cohete_kg = masa_cohete_kg;
+    _altitud_cero_pad_m = altitud_cero_pad_m;
+    _es_primer_ciclo = true;
+    _ultima_altura_m = 0.0f;
+    _ultimo_tiempo_us = 0;
+
+    // Configuración opcional de coeficientes Alfa si no usas los constructores por defecto
+    filter_accel_x.setAlfa(0.2f);
+    filter_accel_y.setAlfa(0.2f);
+    filter_accel_z.setAlfa(0.2f);
+    filter_gyro_x.setAlfa(0.3f);
+    filter_gyro_y.setAlfa(0.3f);
+    filter_gyro_z.setAlfa(0.3f);
+
+    filter_bmp_presion.setAlfa(0.1f); // El barómetro suele requerir más filtrado (más suave)
+    filter_bmp_temp.setAlfa(0.05f);
 }
 
 data_all_t DataFilter::process(const data_raw_t& raw) {
-    // TODO: FALTA IMPLEMENTAR CORRECTAMENTE LA LÓGICA.
-
     data_all_t out;
 
-    // 1. CÁLCULO DE DELTA TIEMPO (dt)
-    uint64_t now_us = raw.elapsed_time;
-    float dt = (now_us - _t_prev_us) * 1e-6f; // Segundos
-    if (dt <= 0.0f || !_iniciado) {
-        dt = 0.0066f; // Fallback seguro a 150Hz nominal
+    // ==========================================
+    // STEP 1: FILTRADO DE DATOS CRUDOS (EMA)
+    // ==========================================
+    float raw_accel_x_f = filter_accel_x.filtrar((float)raw.mpc.accel_x);
+    float raw_accel_y_f = filter_accel_y.filtrar((float)raw.mpc.accel_y);
+    float raw_accel_z_f = filter_accel_z.filtrar((float)raw.mpc.accel_z);
+
+    // Filtrar giroscopio (Cinemática Angular directa)
+    out.vel_angular_x = filter_gyro_x.filtrar((float)raw.mpc.gyro_x);
+    out.vel_angular_y = filter_gyro_y.filtrar((float)raw.mpc.gyro_y);
+    out.vel_angular_z = filter_gyro_z.filtrar((float)raw.mpc.gyro_z);
+
+    // Filtrar BMP280
+    float presion_filtrada = filter_bmp_presion.filtrar((float)raw.bmp.presion);
+    float temp_filtrada_raw = filter_bmp_temp.filtrar((float)raw.bmp.temp);
+
+
+    // ==========================================
+    // STEP 2: CÁLCULOS AMBIENTALES PROCESADOS
+    // ==========================================
+    // 1. Temperatura Ambiente (°C): Conversión típica BMP280 (Ajustar según tu driver si ya viene escalada)
+    // Asumiendo que raw.bmp.temp requiere la conversión estándar, si tu driver ya la da en °C omitir división.
+    out.temperatura_amb_c = temp_filtrada_raw;
+
+    // 2. Densidad del Aire (kg/m3): Usando la Ley de Gases Ideales (P / (R * T))
+    // R del aire seco = 287.05 J/(kg·K). Temperatura en Kelvin = °C + 273.15
+    float temp_kelvin = out.temperatura_amb_c + 273.15f;
+    // Nota: Asegúrate de que 'presion_filtrada' esté en Pascales (Pa) para esta fórmula.
+    out.densidad_aire_kg_m3 = presion_filtrada / (287.05f * temp_kelvin);
+
+
+    // ==========================================
+    // STEP 3: CINEMÁTICA LINEAL Y DINÁMICA
+    // ==========================================
+    // 1. Altura (m): Conversión barométrica estándar desde presión (Pa) a metros
+    // P0 estándar = 101325 Pa (o puedes usar la presión medida en el Pad durante init())
+    float P0 = 101325.0f;
+    float altura_absoluta = 44330.0f * (1.0f - pow((presion_filtrada / P0), 0.1902949f));
+    out.altura_m = altura_absoluta - _altitud_cero_pad_m;
+
+    // Cálculo del diferencial de tiempo (dt) para derivadas
+    float dt = 0.0f;
+    if (!_es_primer_ciclo && raw.elapsed_time > _ultimo_tiempo_us) {
+        dt = (float)(raw.elapsed_time - _ultimo_tiempo_us) / 1000000.0f; // Convertir us a segundos
     }
-    _t_prev_us = now_us;
 
-    // 2. AMBIENTALES Y DENSIDAD DEL AIRE (Usando estrictamente BMP280)
-    out.temperatura_amb_c = raw.bmp.temp;
-    float temp_k = out.temperatura_amb_c + 273.15f;
-    float presion_pa = raw.bmp.presion; // Asumiendo pascales
-    out.densidad_aire_kg_m3 = presion_pa / (287.058f * temp_k);
+    // 2. Velocidad Vertical Z (m/s) y Aceleración Z (m/s2)
+    if (_es_primer_ciclo || dt <= 0.0f) {
+        out.velocidad_z_m_s = 0.0f;
+        out.aceleracion_z_m_s2 = 0.0f;
+        _es_primer_ciclo = false;
+    } else {
+        // Velocidad vertical estimada por la derivada de la altura barométrica
+        out.velocidad_z_m_s = (out.altura_m - _ultima_altura_m) / dt;
 
-    // 3. RECHAZO DE PICOS DE PRESIÓN (Anti-Glitches sónicos)
-    // Altitud barométrica calculada desde presión y temperatura BMP280.
-    // Modelo hipsométrico local: h = (R * T / g) * ln(P0 / P)
-    constexpr float R_AIRE_SECO_J_KG_K = 287.058f;
-    constexpr float GRAVEDAD_M_S2 = 9.80665f;
-    constexpr float PRESION_NIVEL_MAR_PA = 101325.0f;
-
-    float altitud = (R_AIRE_SECO_J_KG_K * temp_k / GRAVEDAD_M_S2) *
-                    std::log(PRESION_NIVEL_MAR_PA / presion_pa);
-
-    float h_baro_raw = altitud - _h_pad_offset; // Altura relativa al pad
-    float max_salto_posible = MAX_VELOCIDAD_FISICA_M_S * dt;
-
-    if (std::fabs(h_baro_raw - _h_est) > max_salto_posible) {
-        // El barómetro tiró un glitch espurio. Clampeamos al límite físico máximo:
-        h_baro_raw = _h_est + std::copysign(max_salto_posible, h_baro_raw - _h_est);
+        // Aceleración lineal absoluta en Z (puedes calcularla derivando la velocidad
+        // o usando el raw_accel_z_f restándole el componente de la gravedad según el pitch/roll)
+        out.aceleracion_z_m_s2 = raw_accel_z_f; // Reemplazar por tu ecuación de fusión / calibración al cielo
     }
 
-    // 4. FILTRO COMPLEMENTARIO DE ORIENTACIÓN
-    // Aceleración lineal respecto a la gravedad
-    float acc_pitch = atan2(raw.mpc.accel_y, raw.mpc.accel_z) * 57.2957795f;
-    float acc_roll  = atan2(-raw.mpc.accel_x, sqrt(raw.mpc.accel_y*raw.mpc.accel_y + raw.mpc.accel_z*raw.mpc.accel_z)) * 57.2957795f;
+    // Guardar estados para el próximo ciclo
+    _ultima_altura_m = out.altura_m;
+    _ultimo_tiempo_us = raw.elapsed_time;
 
-    _pitch = ALPHA_COMP * (_pitch + raw.mpc.gyro_x * dt) + (1.0f - ALPHA_COMP) * acc_pitch;
-    _roll  = ALPHA_COMP * (_roll  + raw.mpc.gyro_y * dt) + (1.0f - ALPHA_COMP) * acc_roll;
+    // 3. Momentum (P = m * v)
+    out.momentum_kg_m_s = _masa_cohete_kg * out.velocidad_z_m_s;
 
-    out.pitch_deg = _pitch;
-    out.roll_deg  = _roll;
 
-    // 5. FILTRO ALPHA-BETA CINEMÁTICO (Fusión Barómetro + Acel_Z)
-    // Proyección del vector aceleración hacia el vector cielo
-    float cos_tilt = cos(_pitch * 0.0174533f) * cos(_roll * 0.0174533f);
-    float az_cielo = (raw.mpc.accel_z * cos_tilt) - 9.81f; // Quitando gravedad terrestre
+    // ==========================================
+    // STEP 4: ORIENTACIÓN Y CINEMÁTICA ANGULAR
+    // ==========================================
+    // 1. Magnitud escalar del spin (RPM)
+    // Se calcula con la velocidad angular del eje de rotación (asumiendo Z como eje longitudinal del cohete)
+    // Convertir de deg/s a RPM -> (vel * 60) / 360 = vel / 6
+    out.vel_rotacional_rpm = out.vel_angular_z / 6.0f;
 
-    // Predicción cinemática pura
-    float h_pred = _h_est + (_v_est * dt) + (0.5f * az_cielo * dt * dt);
-    float v_pred = _v_est + (az_cielo * dt);
+    // 2. Pitch y Roll (Filtro Complementario / Estimación básica con acelerómetro)
+    // Nota: Esto es una estimación estática, idealmente se fusiona con el giroscopio usando el dt.
+    out.pitch_deg = atan2(-raw_accel_x_f, sqrt(raw_accel_y_f * raw_accel_y_f + raw_accel_z_f * raw_accel_z_f)) * 180.0f / M_PI;
+    out.roll_deg  = atan2(raw_accel_y_f, raw_accel_z_f) * 180.0f / M_PI;
 
-    // Innovación (Diferencia contra el sensor físico limpiado)
-    float residual = h_baro_raw - h_pred;
 
-    // Actualización de estado
-    _h_est = h_pred + (ALPHA_Z * residual);
-    _v_est = v_pred + ((BETA_Z / dt) * residual);
-
-    out.altura_m = _h_est;
-    out.velocidad_z_m_s = _v_est;
-    out.aceleracion_z_m_s2 = az_cielo;
-
-    // 6. DINÁMICA Y VECTORES ROTACIONALES
-    out.momentum_kg_m_s = _masa_kg * out.velocidad_z_m_s;
-    out.vel_angular_x = raw.mpc.gyro_x;
-    out.vel_angular_y = raw.mpc.gyro_y;
-    out.vel_angular_z = raw.mpc.gyro_z;
-
-    // Magnitud del vector omega (spin centrífugo en RPM)
-    float w_norma_deg_s = sqrt(raw.mpc.gyro_x*raw.mpc.gyro_x + raw.mpc.gyro_y*raw.mpc.gyro_y + raw.mpc.gyro_z*raw.mpc.gyro_z);
-    out.vel_rotacional_rpm = w_norma_deg_s * 0.166667f;
-
-    // 7. MAPEO A ENTEROS PARA TELEMETRÍA LORA
-    out.posicion_relativa = static_cast<int16_t>(std::round(_h_est));
-    out.velocidad         = static_cast<int16_t>(std::round(_v_est));
-    out.momentum          = static_cast<int16_t>(std::round(out.momentum_kg_m_s));
+    // ==========================================
+    // STEP 5: TELEMETRÍA EMPAQUETADA (Cast para LoRa)
+    // ==========================================
+    out.posicion_relativa = (int16_t)out.altura_m;
+    out.velocidad         = (int16_t)out.velocidad_z_m_s;
+    out.momentum          = (int16_t)out.momentum_kg_m_s;
 
     return out;
 }

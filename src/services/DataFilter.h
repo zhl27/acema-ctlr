@@ -5,19 +5,7 @@
 #ifndef ACEMA_CTLR_DATAFILTER_H
 #define ACEMA_CTLR_DATAFILTER_H
 #include "data.h"
-
-class IFilter {
-
-    /*valor de inicio */
-    void virtual inicializar(float) = 0;
-
-    /* Actualización */
-    float virtual actualizar(float) = 0; 
-
-    /* Reseteo */
-    void virtual resetear() = 0;
-};
-
+#include "EmaFilter.h"
 
 
 // TODO: por ahora lo modelamos como un util (static), pero idealmente debemos hacerlo clase, para permitir flexibilidad y desacople. Queremos poder pasarle filtros (sea Filtro complementario, sea filtro de kalman, etc.), y crear una instancia DataFilter con distintas combinaciones de estas.
@@ -30,25 +18,24 @@ public:
     static data_all_t process(const data_raw_t& raw);
 
 private:
-    // Ganancias cinemáticas Alpha-Beta (Ajustadas para ráfagas de 150Hz)
-    static constexpr float ALPHA_Z = 0.15f;  // Peso de la medición del barómetro
-    static constexpr float BETA_Z  = 0.005f; // Peso de la corrección de velocidad
+    // Variables de configuración de entorno (se setean en init)
+    static float _masa_cohete_kg;
+    static float _altitud_cero_pad_m;
+    static float _ultima_altura_m;
+    static uint64_t _ultimo_tiempo_us;
+    static bool _es_primer_ciclo;
 
-    // Ganancia del Filtro Complementario MPU6050
-    static constexpr float ALPHA_COMP = 0.98f;
+    // Instancias de filtrado EMA para las señales crudas del MPU6050
+    static EmaFilter filter_accel_x;
+    static EmaFilter filter_accel_y;
+    static EmaFilter filter_accel_z;
+    static EmaFilter filter_gyro_x;
+    static EmaFilter filter_gyro_y;
+    static EmaFilter filter_gyro_z;
 
-    // Límite sónico amateur para corte de picos de presión espurios
-    static constexpr float MAX_VELOCIDAD_FISICA_M_S = 343.0f; // Mach 1
-
-    // Memoria estática interna (Variables de estado del ciclo k-1)
-    static float _h_est;
-    static float _v_est;
-    static float _pitch;
-    static float _roll;
-    static uint64_t _t_prev_us;
-    static float _masa_kg;
-    static float _h_pad_offset;
-    static bool _iniciado;
+    // Instancias de filtrado EMA para las señales crudas del BMP280
+    static EmaFilter filter_bmp_presion;
+    static EmaFilter filter_bmp_temp;
 };
 
 #endif //ACEMA_CTLR_DATAFILTER_H
