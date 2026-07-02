@@ -9,9 +9,11 @@
 #include "core/mde_cohete/mde_cohete.h"
 #include "SerialPrint.h"
 #include "data.h"
+#include "mBuzzer.h"
 #include "services/DataFilter.h"
 #include "services/GSE.h"
 #include "services/Sensors.h"
+#include "config.h"
 
 
 constexpr size_t RBUF_SIZE = 1024; // bytes per ring buffer
@@ -33,6 +35,7 @@ void vTaskStateMachine(void *pvParameters); // la máquina de estados que orques
 void vTaskFlash(void *pvParameters); // la caja negra que persiste cada dato entrante.
 void vTaskLora(void *pvParameters); // maneja la comunicación LoRa, incluyendo el envío de datos y la gestión de la conexión con el GSE.
 
+mBuzzer buzzer(BUZZER_PIN);
 
 void setup() {
     Serial.begin(115200); // TODO: Para la Compu de vuelo no se usa Serial
@@ -41,6 +44,9 @@ void setup() {
         vTaskDelay(pdMS_TO_TICKS(1000));
 
     SerialPrint::msg("Comenzando el setup...");
+
+    buzzer.init();
+    buzzer.beep(500);
 
     // Initialize the kinematic filter (Adjust mass and pad offset as needed for your launch)
     // TODO: FALTA MODIFICAR DATAFILTER DE FORMA ACORDE A LOS REQUERIMIENTOS.
@@ -77,6 +83,8 @@ void setup() {
     xTaskCreate(vTaskLora, "Lora", 4096, NULL, 2, &xTaskLoraHandle);
 
     vTaskDelete(NULL); // NULL hace referenica al task default que maneja a "void loop()"
+
+    buzzer.playSuccess();
 
     delay(100);
 }

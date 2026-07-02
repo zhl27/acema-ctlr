@@ -30,20 +30,21 @@ void mBuzzer::toggle() {
     }
 }
 
+// TODO: BUZZER ES BLOQUEANTE, AHORA MISMO SOLAMENTE SOLAMENTE SE PUEDE USAR EN EL SETUP
 void mBuzzer::beep(uint32_t durationMs) {
     on();
-    delay(durationMs);
+    vTaskDelay(pdMS_TO_TICKS(durationMs));
     off();
 }
 
 void mBuzzer::playSuccess() {
     beep(100);
-    delay(50);
+    vTaskDelay(pdMS_TO_TICKS(50));
     beep(100);
 }
 
 void mBuzzer::playError() {
     beep(500);
-    delay(100);
+    vTaskDelay(pdMS_TO_TICKS(100));
     beep(500);
 }

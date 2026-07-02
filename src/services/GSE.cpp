@@ -7,16 +7,17 @@
 #include <esp32-hal.h>
 
 LoraWrapped GSE::_lora(LORA_CS, LORA_RST, LORA_DIO0, LORA_DIO1, SPI);
+GSE::RocketState GSE::_currentState = GSE::RocketState::ROCKET_INIT;             // Assuming an int or an enum
+unsigned long GSE::_previousMillis = 0; // Standard type for millis()
+int GSE::_cicloContador = 0;
+float GSE::_simuladorAltitud = 0.0f;
 
 GSE::RocketState GSE::estado_mde() {
-    return _currentState;
+    return GSE::_currentState;
 }
 
 void GSE::init() {
-    _currentState = GSE::ROCKET_INIT;
-    _previousMillis = 0;
-    _cicloContador = 0;
-    _simuladorAltitud = 0.0f;
+// de decoracion
 }
 
 void GSE::actualizar(data_all_t *data) {

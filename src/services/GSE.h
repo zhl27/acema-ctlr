@@ -49,8 +49,6 @@ public:
 
     static void actualizar(data_all_t *data);
 
-    static void _printear_struct_y_hex(data_all_t* datos);
-
     static RocketState estado_mde();
 };
 
