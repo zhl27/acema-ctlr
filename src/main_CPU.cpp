@@ -43,7 +43,7 @@ RocketState currentState = ROCKET_INIT;
 
 // Variables de control de tiempo y ciclos
 unsigned long previousMillis = 0;
-const long INTERVALO_TELEMETRIA = 5000; // 5s de frecuencia de envío
+const long INTERVALO_TELEMETRIA = 1; // 5s de frecuencia de envío
 
 int cicloContador = 0;
 float simuladorAltitud = 0.0f;
