@@ -57,21 +57,21 @@ void printPacketDebug(pkt_t* pkt) {
     
     // Imprimir de acuerdo al tipo de protocolo detectado
     
-    if(pkt->protocole == Protocolo::PING){
+    if(pkt->protocole == lora_protocol::PING){
         lora.send_pong();
     }
-    else if (pkt->protocole == Protocolo::C_PLOT) {
-        dataPlot_t* datos = (dataPlot_t*)pkt->payload;
+    else if (pkt->protocole == lora_protocol::C_PLOT) {
+        data_all_t* datos = (data_all_t*)pkt->payload;
 
-        CONTADOR = datos->datoX;
+        CONTADOR = datos->vel_angular_x;
 
         Serial.println(F("--- DATOS DE TELEMETRÍA (PLOT) ---"));
-        Serial.print(F("  DatoX:   ")); Serial.println(datos->datoX);
-        Serial.print(F("  GiroX:   ")); Serial.println(datos->giroX);
-        Serial.print(F("  GiroY:   ")); Serial.println(datos->giroY);
-        Serial.print(F("  Altitud: ")); Serial.println(datos->altitud);
+        Serial.print(F("  vel angular x:   ")); Serial.println(datos->vel_angular_x);
+        Serial.print(F("  vel angular y:   ")); Serial.println(datos->vel_angular_y);
+        Serial.print(F("  vel angular z:   ")); Serial.println(datos->vel_angular_z);
+        Serial.print(F("  temperatura amb c: ")); Serial.println(datos->temperatura_amb_c);
     } 
-    else if (pkt->protocole == Protocolo::C_MGS || pkt->protocole == Protocolo::C_ERR) {
+    else if (pkt->protocole == lora_protocol::C_MGS || pkt->protocole == lora_protocol::C_ERR) {
         Serial.print(F("  Mensaje String: ")); Serial.println((char*)pkt->payload);
     }
     
@@ -151,7 +151,7 @@ void loop() {
                 // es exponer un método público en tu fachada o usar una estructura dedicada.
                 // Dado que tu fachada lee automáticamente en base al búfer privado, implementamos la recepción:
             //}
-            if(lora.read_paquete(&paqueteRecibido)){
+            if(lora.read_packet(&paqueteRecibido)){
                 #ifndef DEBUG
                 sendBinaryToGUI(&paqueteRecibido); 
                 #endif
