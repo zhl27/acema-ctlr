@@ -60,11 +60,11 @@ bool EmaFilter::setAlfa(float nuevoAlfa)
 
 bool EmaFilter::setFrecuenciaCorte(float FS, float fc)
 {
-    if (fc <= 0.0 || FS <= 0.0) return;
+    if (fc <= 0.0 || FS <= 0.0) return false;
         
     // Ecuación de correspondencia temporal: alfaa = dt / (tau + dt)
     double dt = 1.0 / FS;
     double tau = 1.0 / (2.0 * M_PI * fc);
     _alfa = dt / (tau + dt);
-    return false;
+    return true;
 }
