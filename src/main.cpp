@@ -5,25 +5,14 @@
 #include <cstring>
 #include <cstdio>
 
-
 #include "LoraWrapped.h"
 #include "core/mde_cohete/mde_cohete.h"
 #include "SerialPrint.h"
 #include "data.h"
 #include "services/DataFilter.h"
+#include "services/GSE.h"
 #include "services/Sensors.h"
 
-
-// Pines asignados si compilas con: pio run -e CPU-esp32
-    #define LORA_SCK  18
-    #define LORA_MISO 19
-    #define LORA_MOSI 23
-    #define LORA_CS   5
-    #define LORA_RST  14
-    #define LORA_DIO0 2
-    #define LORA_DIO1 4
-// Instanciación única y genérica usando los alias de los macros
-LoraWrapped lora(LORA_CS, LORA_RST, LORA_DIO0, LORA_DIO1, SPI);
 
 constexpr size_t RBUF_SIZE = 1024; // bytes per ring buffer
 
@@ -46,7 +35,7 @@ void vTaskLora(void *pvParameters); // maneja la comunicación LoRa, incluyendo 
 
 
 void setup() {
-    Serial.begin(115200);
+    Serial.begin(115200); // TODO: Para la Compu de vuelo no se usa Serial
 
     while (!Serial)
         vTaskDelay(pdMS_TO_TICKS(1000));
@@ -57,7 +46,7 @@ void setup() {
     // TODO: FALTA MODIFICAR DATAFILTER DE FORMA ACORDE A LOS REQUERIMIENTOS.
     DataFilter::init(15.0f, 0.0f);
     Sensors::init();
-
+    GSE::init();
 
     // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
     xStateMachineRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
@@ -98,7 +87,7 @@ void loop(){
 
 // TODO: Pensar sobre este texto: "You need to gather large bursts of hardware data inside an Interrupt Service Routine (ISR) to be processed later by a task."
 void vTaskReadSensors(void *pvParameters) {
-    while (1) {
+    while (true) {
         // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
         // 1. Obtener datos crudos
         const data_raw_t raw = Sensors::getRawData();
@@ -142,7 +131,7 @@ void vTaskReadSensors(void *pvParameters) {
 // Mock implementation of the State Machine task: consumes sensor messages and forwards/acts on them
 void vTaskStateMachine(void *pvParameters) {
     (void)pvParameters;
-    for (;;) {
+    while (true) {
 
 #ifdef DEBUG_ESP32
         SerialPrint::plot("Core ID (StateMachine)", xPortGetCoreID());
@@ -179,7 +168,7 @@ void vTaskStateMachine(void *pvParameters) {
 // Mock implementation of the Flash task: consumes items from the Flash ringbuffer and "persists" them
 void vTaskFlash(void *pvParameters) {
     (void)pvParameters;
-    for (;;) {
+    while (true) {
 
 #ifdef DEBUG_ESP32
         SerialPrint::plot("Core ID (Flash)", xPortGetCoreID());
@@ -208,7 +197,7 @@ void vTaskFlash(void *pvParameters) {
 // Mock implementation of the Lora task: consumes items and "sends" them over LoRa
 void vTaskLora(void *pvParameters) {
     (void)pvParameters;
-    for (;;) {
+    while (true) {
 
 #ifdef DEBUG_ESP32
         SerialPrint::plot("Core ID (Lora)", xPortGetCoreID());
@@ -223,9 +212,9 @@ void vTaskLora(void *pvParameters) {
                 data_all_t *datos_sensores = static_cast<data_all_t *>(item);
 
                 // Print a specific member of the struct instead of %s
-                Serial.printf("[Lora] Sending (%d bytes). Time: %lu\n", static_cast<int>(item_size), micros());
+                // Serial.printf("[Lora] Sending (%d bytes). Time: %lu\n", static_cast<int>(item_size), micros());
+                GSE::actualizar_graficas(datos_sensores);
 
-                // TODO: Pass 'datos' to the LoraWrapped instance.
             }
             vRingbufferReturnItem(xLoraRingbuf, item);
         } else {

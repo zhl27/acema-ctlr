@@ -11,6 +11,7 @@
 #include "LoraConfig.h"
 #include <RadioLib.h>
 
+#include "data.h"
 
 
 #define DEFAULT_SPI_LORA SPI
@@ -18,7 +19,7 @@
 
 
 /* Estructuras provicionales*/
-typedef struct PAQUETE {
+typedef struct PACKET {
     uint8_t len;
     uint8_t protocole;
     void* payload;
@@ -31,14 +32,14 @@ typedef struct {
     float giroX;
     float giroY;
     float altitud;
-} dataPlot_t;
+} data_plot_t;
 
 union pay_u {
     char msg[SIZE_BUFFER_MSG];
-    dataPlot_t data;
+    data_plot_t data;
 };
 
-enum Protocolo: uint8_t {
+enum lora_protocol: uint8_t {
     // CPU --> GSE
     C_PLOT    = 0X01,
     C_MGS     = 0X02,
@@ -79,55 +80,53 @@ private:
     connSts_t _st;
 
     /* Funciones de bajo nivel, des/encriptación y envio*/
-    bool send_package(pkt_t *ptrPkt) const;
-    bool read_package(pkt_t *ptrPkt);
+    int _send_packet(pkt_t *ptrPkt) const;
+    int _read_packet(pkt_t *ptrPkt);
 
     /* Cifrado de un byte con el método XOR*/
-    inline char encrypt_byte(const char dat) const {return  ((char)dat)^_encryptWord ;};
+    inline char _encrypt_byte(const char dat) const {return static_cast<char>(dat)^_encryptWord ;};
     int _pinPacketReady; // Pin DIO0 o Busy de acuerdo a modelo
 public:
     LoraWrapped(uint32_t nss, uint32_t rst, uint32_t pin3, uint32_t pin4, SPIClass& spi = SPI);
     ~LoraWrapped();
-    bool begin(int sw = DEFAULT_SYNC_WORD, char ew = DEFAULT_ENCRY_WORD, float frequency = DEFAULT_FREC);
+    int begin(int sw = DEFAULT_SYNC_WORD, char ew = DEFAULT_ENCRY_WORD, float frequency = DEFAULT_FREC);
     
     /**
      * @brief Envia una petición de conexion del cohete al GSE
      */
-    bool c_connect_to_GSE() const;
+    int c_connect_to_GSE() const;
 
     /**
      * @brief Verifica la conexion estable con el GSE
      */
-    bool c_connection_accepted();   
+    int c_connection_accepted();
     
     /** 
      *   @brief Acepta la petición de conexion del cohete
      */
-    bool g_accept_connection();
-
-
+    int g_accept_connection();
 
     /**
      * @brief Envía datos de telemetría (struct dataPlot_t)
      */
-    bool send_datos(dataPlot_t dato) const;
+    int send_data(data_all_t dato) const;
 
     /**
      * @brief Envía un mensaje de texto genérico (MSG)
      */
-    bool send_mensaje(const char* texto) const;
+    int send_msg(const char* texto) const;
 
     /**
      * @brief Envía un mensaje de error (ERR)
      */
-    bool send_mensaje_error(const char* error) const;
+    int send_error(const char* error) const;
 
     /**
      * @brief Envía un PONG(ERR)
      */
-    bool send_pong();
+    int send_pong();
 
-    bool read_paquete(pkt_t* pPkt);
+    int read_packet(pkt_t* pPkt);
 };
 
 
