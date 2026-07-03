@@ -18,13 +18,13 @@
  * Contiene los datos sin procesar del acelerómetro y giroscopio.
  */
 typedef struct {
-    int16_t accel_x; // Aceleración X (Raw)
-    int16_t accel_y; // Aceleración Y (Raw)
-    int16_t accel_z; // Aceleración Z (Raw)
-    int16_t temp;    // Temperatura (Raw)
-    int16_t gyro_x;  // Velocidad angular X (Raw)
-    int16_t gyro_y;  // Velocidad angular Y (Raw)
-    int16_t gyro_z;  // Velocidad angular Z (Raw)
+    float accel_x; // Aceleración X (Raw) (TODO: Ver de obtener 16 bits)
+    float accel_y; // Aceleración Y (Raw)
+    float accel_z; // Aceleración Z (Raw)
+    float temp;    // Temperatura (Raw)
+    float gyro_x;  // Velocidad angular X (Raw)
+    float gyro_y;  // Velocidad angular Y (Raw)
+    float gyro_z;  // Velocidad angular Z (Raw)
 } data_raw_mpu_t;
 
 /**
@@ -34,8 +34,8 @@ typedef struct {
  * Contiene los datos sin procesar del sensor barométrico.
  */
 typedef struct {
-    int32_t presion; ///< Presión cruda (valor de 20 bits 'up') [5]
-    int32_t temp; ///< Temperatura cruda (valor de 20 bits 'ut') [6]
+    float presion; ///< Presión cruda (valor de 20 bits) --> en la libreria se usa float
+    float temp; ///< Temperatura cruda (valor de 20 bits)
 } data_raw_bmp_t;
 
 /**
@@ -46,9 +46,9 @@ typedef struct {
  */
 typedef struct {
     data_raw_bmp_t bmp;  ///< Datos crudos del BMP280
-    data_raw_mpu_t mpc;  ///< Datos crudos del MPU6050
+    data_raw_mpu_t mpu;  ///< Datos crudos del MPU6050
     nav_pvt_t gps;       ///< Datos crudos del GPS
-    uint64_t elapsed_time;  ///< Marca de tiempo de la lectura de los datos
+    uint64_t elapsed_time_micros;  ///< Marca de tiempo de la lectura de los datos
 } data_raw_t;
 
 
@@ -113,23 +113,23 @@ inline void print_data_raw(const data_raw_t *data) {
         return;
     }
     // Encabezado con el tiempo (uint64_t usa %llu)
-    Serial.printf("\n=== Datos crudos de Sensores (Tiempo: %llu) ===\n", data->elapsed_time);
+    Serial.printf("\n=== Datos crudos de Sensores (Tiempo: %llumicros) ===\n", data->elapsed_time_micros);
 
     // --- Datos del BMP280 ---
     // Usamos %d casteando a int para los int32_t (compatible con ESP32/ARM)
-    Serial.printf("[BMP280]  Presion: %d | Temp: %d\n",
-                  (int)data->bmp.presion,
-                  (int)data->bmp.temp);
+    Serial.printf("[BMP280]  Presion: %f | Temp: %f\n",
+                  data->bmp.presion,
+                  data->bmp.temp);
 
     // --- Datos del MPU6050 ---
     // Usamos %d para los int16_t (se promueven automáticamente a int en C++)
-    Serial.printf("[MPU6050] Accel X: %d | Y: %d | Z: %d\n",
-                  data->mpc.accel_x, data->mpc.accel_y, data->mpc.accel_z);
+    Serial.printf("[MPU6050] Accel X: %f | Y: %f | Z: %f\n",
+                  data->mpu.accel_x, data->mpu.accel_y, data->mpu.accel_z);
 
-    Serial.printf("[MPU6050] Gyro  X: %d | Y: %d | Z: %d\n",
-                  data->mpc.gyro_x, data->mpc.gyro_y, data->mpc.gyro_z);
+    Serial.printf("[MPU6050] Gyro  X: %f | Y: %f | Z: %f\n",
+                  data->mpu.gyro_x, data->mpu.gyro_y, data->mpu.gyro_z);
 
-    Serial.printf("[MPU6050] Temp: %d\n", data->mpc.temp);
+    Serial.printf("[MPU6050] Temp: %f\n", data->mpu.temp);
 
     // --- Datos del GPS (nav_pvt_t) ---
     // NOTA: Como 'nav_pvt_t' no está definido en el snippet original,
@@ -145,7 +145,7 @@ inline void print_data_raw(const data_raw_t *data) {
 }
 
 // TODO: poner "printear_data" en un lugar mejor
-inline void printear_data(const data_all_t *data) {
+inline void print_data(const data_all_t *data) {
     // Verificación de seguridad para evitar cuelgues si el puntero es nulo
     if (data == NULL) {
         Serial.printf("Error: Puntero de telemetría nulo.\n");

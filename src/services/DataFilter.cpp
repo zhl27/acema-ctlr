@@ -51,14 +51,14 @@ data_all_t DataFilter::process(const data_raw_t& raw) {
     // ==========================================
     // STEP 1: FILTRADO DE DATOS CRUDOS (EMA)
     // ==========================================
-    float raw_accel_x_f = filter_accel_x.filtrar((float)raw.mpc.accel_x);
-    float raw_accel_y_f = filter_accel_y.filtrar((float)raw.mpc.accel_y);
-    float raw_accel_z_f = filter_accel_z.filtrar((float)raw.mpc.accel_z);
+    float raw_accel_x_f = filter_accel_x.filtrar((float)raw.mpu.accel_x);
+    float raw_accel_y_f = filter_accel_y.filtrar((float)raw.mpu.accel_y);
+    float raw_accel_z_f = filter_accel_z.filtrar((float)raw.mpu.accel_z);
 
     // Filtrar giroscopio (Cinemática Angular directa)
-    out.vel_angular_x = filter_gyro_x.filtrar((float)raw.mpc.gyro_x);
-    out.vel_angular_y = filter_gyro_y.filtrar((float)raw.mpc.gyro_y);
-    out.vel_angular_z = filter_gyro_z.filtrar((float)raw.mpc.gyro_z);
+    out.vel_angular_x = filter_gyro_x.filtrar((float)raw.mpu.gyro_x);
+    out.vel_angular_y = filter_gyro_y.filtrar((float)raw.mpu.gyro_y);
+    out.vel_angular_z = filter_gyro_z.filtrar((float)raw.mpu.gyro_z);
 
     // Filtrar BMP280
     float presion_filtrada = filter_bmp_presion.filtrar((float)raw.bmp.presion);
@@ -90,8 +90,8 @@ data_all_t DataFilter::process(const data_raw_t& raw) {
 
     // Cálculo del diferencial de tiempo (dt) para derivadas
     float dt = 0.0f;
-    if (!_es_primer_ciclo && raw.elapsed_time > _ultimo_tiempo_us) {
-        dt = (float)(raw.elapsed_time - _ultimo_tiempo_us) / 1000000.0f; // Convertir us a segundos
+    if (!_es_primer_ciclo && raw.elapsed_time_micros > _ultimo_tiempo_us) {
+        dt = (float)(raw.elapsed_time_micros - _ultimo_tiempo_us) / 1000000.0f; // Convertir us a segundos
     }
 
     // 2. Velocidad Vertical Z (m/s) y Aceleración Z (m/s2)
@@ -110,7 +110,7 @@ data_all_t DataFilter::process(const data_raw_t& raw) {
 
     // Guardar estados para el próximo ciclo
     _ultima_altura_m = out.altura_m;
-    _ultimo_tiempo_us = raw.elapsed_time;
+    _ultimo_tiempo_us = raw.elapsed_time_micros;
 
     // 3. Momentum (P = m * v)
     out.momentum_kg_m_s = _masa_cohete_kg * out.velocidad_z_m_s;

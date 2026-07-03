@@ -49,44 +49,6 @@ int cicloContador = 0;
 float simuladorAltitud = 0.0f;
 
 // ============================================================================
-// FUNCIÓN DE IMPRESIÓN ESTRUCTURAL Y HEXADECIMAL (CRUDO)
-// ============================================================================
-void mostrarEstructuraYHex(dataPlot_t* datos) {
-    uint8_t longitudTotal = sizeof(dataPlot_t);
-    uint8_t protocolo = Protocolo::C_PLOT;
-
-    Serial.println(F("\n--------------------------------------------------"));
-    Serial.println(F("--- ESTRUCTURA VISUAL DEL PAQUETE A ENVIAR ---"));
-    Serial.print(F(" Longitud del Payload (len): ")); Serial.print(longitudTotal); Serial.println(F(" bytes"));
-    Serial.print(F(" Identificador Protocolo:     0x0")); Serial.println(protocolo, HEX);
-    Serial.println(F(" Datos Internos Estructura:"));
-    Serial.print(F("   Altitud: ")); Serial.println(datos->altitud);
-    Serial.print(F("   GiroX:   ")); Serial.println(datos->giroX);
-    Serial.print(F("   GiroY:   ")); Serial.println(datos->giroY);
-    Serial.print(F("   DatoX:   ")); Serial.println(datos->datoX);
-    
-    // Imprimir el paquete tal como viajará en crudo por el aire [len][proto][payload]
-    Serial.print(F("PAQUETE CRUDO (HEX): "));
-    
-    // 1. Byte de longitud
-    if (longitudTotal < 16) {
-        Serial.print("0"); Serial.print(longitudTotal, HEX); Serial.print(" ");
-    }
-    // 2. Byte de protocolo
-    if (protocolo < 16) {
-        Serial.print("0"); Serial.print(protocolo, HEX); Serial.print(" ");
-    }
-    // 3. Bytes del payload struct
-    uint8_t* bytePointer = (uint8_t*)datos;
-    for (size_t i = 0; i < longitudTotal; i++) {
-        if (bytePointer[i] < 16) Serial.print("0");
-        Serial.print(bytePointer[i], HEX);
-        Serial.print(" ");
-    }
-    Serial.println(F("\n--------------------------------------------------"));
-}
-
-// ============================================================================
 // CONFIGURACIÓN PRINCIPAL
 // ============================================================================
 void setup() {
@@ -95,7 +57,7 @@ void setup() {
     Serial.println(F("[COHETE] Sistema inicializado de telemetría."));
 
     buzzer.init();
-    buzzer.beep(500);
+    //buzzer.beep(500);
 
 // Inicialización del bus SPI condicional
     #if defined(MICRO_ESP32)

@@ -170,7 +170,8 @@ bool LoraWrapped::c_connection_accepted() {
 }
 
 
-
+// TODO: CAMBIAR data_all_t por una struct propia de la GSE.
+// TODO: datos debería ser data_all_t o data_all_t* ???
 bool LoraWrapped::send_data(data_all_t datos) const {
     pkt_t packet;
 

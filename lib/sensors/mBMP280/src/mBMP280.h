@@ -6,6 +6,7 @@
 #define ACEMA_CTLR_MBMP280_H
 
 #include "Adafruit_BMP280.h"
+#include "data.h"
 
 /**
  * @class mBMP280
@@ -17,14 +18,9 @@
 class mBMP280 {
 private:
     Adafruit_BMP280 bmp;
-    float last_temp;
-    float last_pres;
-    float last_alt;
-
-    // Thresholds to filter noise and detect significant changes/blows
-    const float TEMP_THRESHOLD = 0.2f;
-    const float PRES_THRESHOLD = 8.0f;
-    const float ALT_THRESHOLD  = 0.6f;
+    // float last_temp;
+    // float last_pres;
+    // float last_alt;
 
 public:
     mBMP280();
@@ -37,15 +33,12 @@ public:
      */
     bool init(uint8_t addr = 0x77, uint8_t chipid = BMP280_CHIPID);
 
-    /**
-     * @brief Performs readings, executes threshold change checks, and sends telemetries.
-     */
-    void update();
-
     // Getters for current sensor readings
-    float getTemperature() const { return last_temp; }
-    float getPressure() const { return last_pres; }
-    float getAltitude() const { return last_alt; }
+    float get_temperature() { return bmp.readTemperature(); }
+    float get_pressure() { return bmp.readPressure(); }
+    // float getAltitude() { return bmp.readAltitude(1013.25f); } // NO USAMOS EL VALOR CALCULADO POR EL SENSOR
+
+    data_raw_bmp_t get_raw_bmp();
 };
 
 

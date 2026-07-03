@@ -4,6 +4,9 @@
 
 #include "Sensors.h"
 
+#include "config.h"
+#include "SerialPrint.h"
+
 // ---------------------------------------------------------
 // You MUST define the static variables here so the linker
 // can allocate memory for them.
@@ -13,32 +16,37 @@ mGPS Sensors::_gps;
 mMPU6050 Sensors::_mpu6050;
 
 bool Sensors::init() {
-    bool success = true;
-    if (!_bmp280.init()) success = false;
-    _gps.init();
-    if (!_mpu6050.init()) success = false;
-    return success;
+    Wire.begin(WIRE_SDA_0, WIRE_SCL_0);
+    // _gps.init(); // TODO: Reemplazar por implementación de Joe
+
+    if (!_mpu6050.init(MPU_ADDR)) {
+        SerialPrint::err("Failed to find MPU6050 chip");
+        return false;
+    }
+    SerialPrint::msg("MPU6050 Found!");
+
+    if (!_bmp280.init(BMP280_ADDR, BMP280_CHIPID)) {
+        SerialPrint::err("Failed to find BMP280 chip");
+        return false;
+    }
+    SerialPrint::msg("BMP280 Found!");
+    return true;
 }
 
-data_raw_t Sensors::getRawData() {
+// TODO: VER SI ES NECESARIO
+// bool Sensors::update() {
+//     return true;
+// }
+
+data_raw_t Sensors::get_raw_data() {
     data_raw_t raw = {};
 
-    // Fill BMP280 raw data
-    raw.bmp.presion = static_cast<int32_t>(_bmp280.getPressure());
-    raw.bmp.temp = static_cast<int32_t>(_bmp280.getTemperature());
-
-    // Fill MPU6050 raw data
-    raw.mpc.accel_x = static_cast<int16_t>(_mpu6050.getAccelX());
-    raw.mpc.accel_y = static_cast<int16_t>(_mpu6050.getAccelY());
-    raw.mpc.accel_z = static_cast<int16_t>(_mpu6050.getAccelZ());
-    raw.mpc.gyro_x = static_cast<int16_t>(_mpu6050.getGyroX());
-    raw.mpc.gyro_y = static_cast<int16_t>(_mpu6050.getGyroY());
-    raw.mpc.gyro_z = static_cast<int16_t>(_mpu6050.getGyroZ());
-    raw.mpc.temp = static_cast<int16_t>(_mpu6050.getTemp());
+    raw.bmp = getBMP280().get_raw_bmp();
+    raw.mpu = getMPU6050().get_raw_mpu();
 
     // TODO: Traer datos nav_pvt_t del módulo GPS
 
-    raw.elapsed_time = micros(); // Needs a real timestamp implementation
+    raw.elapsed_time_micros = micros(); // Needs a real timestamp implementation
 
     return raw;
 }

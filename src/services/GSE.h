@@ -10,7 +10,7 @@
 #include "LoraConfig.h"
 #include "LoraWrapped.h"
 
-// TODO: DEBEMOS DECLARAR ESTAS MACROS DENTRO DE LoraWrapped
+// TODO: DEBEMOS DECLARAR ESTAS MACROS DENTRO DE LoraWrapped ?
 #define LORA_SCK  18
 #define LORA_MISO 19
 #define LORA_MOSI 23

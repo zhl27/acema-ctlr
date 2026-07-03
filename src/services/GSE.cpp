@@ -6,6 +6,8 @@
 
 #include <esp32-hal.h>
 
+#include "SerialPrint.h"
+
 LoraWrapped GSE::_lora(LORA_CS, LORA_RST, LORA_DIO0, LORA_DIO1, SPI);
 GSE::RocketState GSE::_currentState = GSE::RocketState::ROCKET_INIT;             // Assuming an int or an enum
 unsigned long GSE::_previousMillis = 0; // Standard type for millis()
@@ -17,7 +19,31 @@ GSE::RocketState GSE::estado_mde() {
 }
 
 void GSE::init() {
-// de decoracion
+#if defined(MICRO_ESP32)
+    // El ESP32 mapea el SPI por software en las patas elegidas
+    SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_CS);
+    Serial.println("Inicializando SPI en modo ESP32...");
+#elif defined(MICRO_NANO)
+    // El Nano usa sus pines fijos de hardware por defecto
+    // 1. Configurar Chip Select
+    pinMode(LORA_CS, OUTPUT);
+    digitalWrite(LORA_CS, HIGH);
+    // 2. Configurar el pin de Reset explícitamente desde el main para asegurar el arranque
+    pinMode(LORA_RST, OUTPUT);
+    digitalWrite(LORA_RST, LOW);    // Forzamos el reset físico (0V)
+    delay(20);                      // Mantenemos el reset 20ms
+    digitalWrite(LORA_RST, HIGH);   // Liberamos el reset (Sube a 3.2V)
+    delay(50);                      // CRUCIAL: Esperamos 50ms a que el SX1262 inicialice su firmware interno
+    // 3. Arrancar el SPI nativo a baja velocidad para los divisores
+    SPI.begin();
+    SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+    Serial.println("Inicializando SPI en modo Arduino Nano...");
+#endif
+    if(_lora.begin()) {
+        SerialPrint::msg("LoRa listo para el Cohete!");
+    } else {
+        SerialPrint::err("Falla crítica en hardware LoRa");
+    }
 }
 
 void GSE::actualizar(data_all_t *data) {
@@ -67,7 +93,7 @@ void GSE::actualizar(data_all_t *data) {
                     _simuladorAltitud = 0.0f; // Reseteo circular de 0 a 100
                 }
 
-                printear_data(data); // como es inline, no hay problemas con "Serial"
+                print_data(data); // como es inline, no hay problemas con "Serial"
 
                 if (actualizar_graficas(data)) {
                     Serial.print(F("[TX] Telemetría enviada correctamente. Muestra: "));

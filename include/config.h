@@ -11,8 +11,8 @@
 /*************************/
 
 #define BUZZER_PIN 25
-#define WIRE_SDA 21
-#define WIRE_SCL 22
+#define WIRE_SDA_0 21
+#define WIRE_SCL_0 22
 
 
 /*************************/

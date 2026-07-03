@@ -6,6 +6,7 @@
 #define ACEMA_CTLR_MMPU6050_H
 
 #include "Adafruit_MPU6050.h"
+#include "data.h"
 
 /**
  * @class mMPU6050
@@ -38,11 +39,6 @@ public:
      */
     bool init(uint8_t addr = 0x69);
 
-    /**
-     * @brief Updates internal sensor state. If motion interrupt is active, publishes plots.
-     */
-    void update();
-
     // Getters
     float getAccelX() const { return accelX; }
     float getAccelY() const { return accelY; }
@@ -51,6 +47,8 @@ public:
     float getGyroY() const { return gyroY; }
     float getGyroZ() const { return gyroZ; }
     float getTemp() const { return temp; }
+
+    data_raw_mpu_t get_raw_mpu();
 };
 
 
