@@ -97,14 +97,14 @@ void GSE::actualizar(data_all_t *data) {
     }
 }
 
-int GSE::enviar_error(const char* error) {
+bool GSE::enviar_error(const char* error) {
     return _lora.send_error(error);
 }
 
-int GSE::enviar_mensaje(const char* mensaje) {
+bool GSE::enviar_mensaje(const char* mensaje) {
     return _lora.send_msg(mensaje);
 }
 
-int GSE::actualizar_graficas(const data_all_t *data) {
+bool GSE::actualizar_graficas(const data_all_t *data) {
     return _lora.send_data(*data);
 }

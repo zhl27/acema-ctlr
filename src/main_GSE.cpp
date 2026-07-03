@@ -158,7 +158,7 @@ void loop() {
                 #ifdef DEBUG
                 printPacketDebug(&paqueteRecibido);
                 Serial.println("============================================");
-                Serial.print("MUESRA NUMERO :");
+                Serial.print("MUESTRA NUMERO :");
                 Serial.println(CONTADOR);
                 Serial.println("============================================");
                 #endif

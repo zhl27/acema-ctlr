@@ -23,7 +23,7 @@ LoraWrapped::~LoraWrapped()
     if (_mod)   delete _mod;
 }
 
-int LoraWrapped::begin(int sw, char ew, float frec){
+bool LoraWrapped::begin(int sw, char ew, float frec){
     this->_encryptWord = ew;
     this->_syncWord = sw;
 
@@ -34,14 +34,14 @@ int LoraWrapped::begin(int sw, char ew, float frec){
         
         // CRUCIAL: Poner el radio en modo escucha asíncrona permanente
         _radio->startReceive(); 
-        return state;
+        return true;
     }
-    return state;
+    return false;
 }
 
 
-int LoraWrapped::_send_packet(pkt_t *ptrPkt) const {
-    if (ptrPkt == nullptr) return RADIOLIB_ERR_UNKNOWN;
+bool LoraWrapped::_send_packet(pkt_t *ptrPkt) const {
+    if (ptrPkt == nullptr) return false;
 
     // Crea un búfer temporal para consolidar la trama completa
     uint8_t txBuffer[SIZE_BUFFER_MSG + 2];
@@ -59,12 +59,12 @@ int LoraWrapped::_send_packet(pkt_t *ptrPkt) const {
     // OBLIGATORIO: Volver a activar el modo escucha inmediatamente después de transmitir
     _radio->startReceive();
 
-    return state;
+    return (state == RADIOLIB_ERR_NONE);
 }
 
 
-int LoraWrapped::_read_packet(pkt_t *ptrPkt) {
-    if (ptrPkt == nullptr) return RADIOLIB_ERR_UNKNOWN; //TODO: PENSAR UN RETORNO DE ERROR MÁS REPRESENTATIVO PARA NUESTRO LORAWRAPPED
+bool LoraWrapped::_read_packet(pkt_t *ptrPkt) {
+    if (ptrPkt == nullptr) return false;
 
     // Consulta el pin físico de interrupción para saber si realmente hay un paquete en el aire
     #if defined(MODULE_SX1278)
@@ -73,7 +73,8 @@ int LoraWrapped::_read_packet(pkt_t *ptrPkt) {
         bool packetReady = (digitalRead(_pinPacketReady) == HIGH);
     #endif
 
-    if (!packetReady) return RADIOLIB_ERR_UNKNOWN;
+    if (!packetReady)
+        return false;
 
     // Lee la longitud del paquete recibido y vuelca los datos
     const size_t length = _radio->getPacketLength();
@@ -85,7 +86,7 @@ int LoraWrapped::_read_packet(pkt_t *ptrPkt) {
     _radio->startReceive();
 
     if (state != RADIOLIB_ERR_NONE || length < 2)
-        return state;
+        return false;
 
     // Desencripta encabezados primarios
     ptrPkt->len = _encrypt_byte(static_cast<char>(rxBuffer[0]));
@@ -107,138 +108,135 @@ int LoraWrapped::_read_packet(pkt_t *ptrPkt) {
         static_cast<uint8_t *>(ptrPkt->payload)[i] = _encrypt_byte(static_cast<char>(rxBuffer[2 + i]));
     }
 
-    return state; //TODO: revisar si este "state" es representativo del resultado de esta funcion ("_read_packet")
+    return true;
 }
 
-int LoraWrapped::c_connect_to_GSE() const {
-    pkt_t paquete;
+bool LoraWrapped::c_connect_to_GSE() const {
+    pkt_t packet;
     const char *msg = "PING_COHETE"; // TODO: redundante
     
     // Prepara el paquete
-    paquete.protocole = lora_protocol::PING;
-    paquete.payload = (void*)msg;
-    paquete.len = strlen(msg) + 1; // envía solo los bytes necesarios
+    packet.protocole = lora_protocol::PING;
+    packet.payload = (void*)msg;
+    packet.len = strlen(msg) + 1; // envía solo los bytes necesarios
 
-    return _send_packet(&paquete);
+    return _send_packet(&packet);
 }
 
 
-int LoraWrapped::g_accept_connection(){
-    pkt_t paqueteRecibido;
-    pkt_t paqueteRespuesta;
+bool LoraWrapped::g_accept_connection(){
+    pkt_t rx_packet;
+    pkt_t tx_packet;
     // mensaje de respuesta(PONG)
+    const char* respuesta = "CONEXION_ACEPTADA";
 
     // Intenta leer un paquete siguiendo la lógica de la fachada
-    int16_t res = _read_packet(&paqueteRecibido);
-    if (!res) { // si hay error, retornar código de error
-        return res;
+    if (!read_packet(&rx_packet)) {
+        return false;
     }
-    
-    if( paqueteRecibido.protocole == lora_protocol::PING){
-        const char* respuesta = "CONEXION_ACEPTADA";
+
+    if( rx_packet.protocole == lora_protocol::PING){
         // Verifica la integridad del mensaje // TODO: redundante. se puede simplificar el ping pong usando solamente C_PING y C_PONG.
-        if(strcmp((char*)paqueteRecibido.payload, "PING_COHETE") != 0){
-            return RADIOLIB_ERR_UNKNOWN;
+        if(strcmp((char*)rx_packet.payload, "PING_COHETE") != 0){
+            return false;
         } 
 
         // Prepara la respuesta
-        paqueteRespuesta.protocole = lora_protocol::PONG;
-        paqueteRespuesta.payload = (void*)respuesta;
-        paqueteRespuesta.len = strlen(respuesta) + 1;
+        tx_packet.protocole = lora_protocol::PONG;
+        tx_packet.payload = (void*)respuesta;
+        tx_packet.len = strlen(respuesta) + 1;
 
         // Envia la confirmación
         _st = CONNECTION_STATUS::CONNECTED;
-        return _send_packet(&paqueteRespuesta);
+        return _send_packet(&tx_packet);
     }
-    return RADIOLIB_ERR_UNKNOWN;
+    return false;
 }
 
 
-int LoraWrapped::c_connection_accepted() {
-    pkt_t paquete;
+bool LoraWrapped::c_connection_accepted() {
+    pkt_t packet;
     
     // Verificamos si llegó algo
-    if (_read_packet(&paquete)) {
+    if (_read_packet(&packet)) {
         // El cohete espera un PONG para confirmar la conexión
-        if (paquete.protocole == lora_protocol::PONG) {
+        if (packet.protocole == lora_protocol::PONG) {
             // un flag de "ENLACE COMPLETADO"
             _st = CONNECTION_STATUS::CONNECTED;
-            return _st; //TODO: REVISAR QUE NO SE SOLAPE CON ENUMS DE RADIOLIB
+            return true;
         }
     }
-    return RADIOLIB_ERR_UNKNOWN;
+    return false;
 }
 
 
-// TODO: CAMBIAR data_all_t por una struct propia de la GSE.
-// TODO: datos debería ser data_all_t o data_all_t*
-int LoraWrapped::send_data(data_all_t datos) const {
-    pkt_t paquete;
+
+bool LoraWrapped::send_data(data_all_t datos) const {
+    pkt_t packet;
 
     // Verifica conexion
-    if(_st != CONNECTION_STATUS::CONNECTED)
-        return _st;
+    if(_st !=CONNECTION_STATUS::CONNECTED)
+        return false;
     
     // Prepara el paquete
-    paquete.protocole = lora_protocol::C_PLOT;
-    paquete.payload = &datos;
-    paquete.len = sizeof(datos);
+    packet.protocole = lora_protocol::C_PLOT;
+    packet.payload = &datos;
+    packet.len = sizeof(datos);
 
     // Envia el paquete
-    return _send_packet(&paquete);
+    return _send_packet(&packet);
 }
 
 
-int LoraWrapped::send_msg(const char* texto) const {
-    pkt_t paquete;
+bool LoraWrapped::send_msg(const char* texto) const {
+    pkt_t packet;
 
     // verifica la conexion o si existe el mensaje
     if (texto == nullptr || _st !=CONNECTION_STATUS::CONNECTED)
-        return _st;
-
+        return false;
 
 
     // Configura el paquete de mensaje
-    paquete.protocole = lora_protocol::C_MGS;
-    paquete.payload = (void*)texto;
-    paquete.len = strlen(texto) + 1; // +1 para incluir el '\0'
+    packet.protocole = lora_protocol::C_MGS;
+    packet.payload = (void*)texto;
+    packet.len = strlen(texto) + 1; // +1 para incluir el '\0'
 
-    return _send_packet(&paquete);
+    return _send_packet(&packet);
 }
 
 
-int LoraWrapped::send_error(const char* error) const {
-    pkt_t paquete;
+bool LoraWrapped::send_error(const char* error) const {
+    pkt_t packet;
 
     if (error == nullptr || _st !=CONNECTION_STATUS::CONNECTED)
-        return _st;
+        return false;
 
     // Configuramos el paquete como error
-    paquete.protocole = lora_protocol::C_ERR;
-    paquete.payload = (void*)error;
-    paquete.len = strlen(error) + 1;
+    packet.protocole = lora_protocol::C_ERR;
+    packet.payload = (void*)error;
+    packet.len = strlen(error) + 1;
 
-    return _send_packet(&paquete);
+    return _send_packet(&packet);
 }
 
-int LoraWrapped::send_pong() {
-    pkt_t paqueteRespuesta;
+bool LoraWrapped::send_pong() {
+    pkt_t rx_packet;
     // mensaje de respuesta(PONG)
     const char* respuesta = "CONEXION_ACEPTADA";
     // Prepara la respuesta
-    paqueteRespuesta.protocole = lora_protocol::PONG;
-    paqueteRespuesta.payload = (void*)respuesta;
-    paqueteRespuesta.len = strlen(respuesta) + 1;
+    rx_packet.protocole = lora_protocol::PONG;
+    rx_packet.payload = (void*)respuesta;
+    rx_packet.len = strlen(respuesta) + 1;
 
     // Envia la confirmación
     _st = CONNECTION_STATUS::CONNECTED;
-    return _send_packet(&paqueteRespuesta);
+    return _send_packet(&rx_packet);
 }
 
-int LoraWrapped::read_packet(pkt_t *pPkt) {
-    if(pPkt == nullptr /*||_st != CONNECTION_STATUS::CONNECTED*/){
+bool LoraWrapped::read_packet(pkt_t *pPkt) {
+    if(pPkt == nullptr /*||_st != CONNECTION_STATUS::CONNECTED*/)
         return false;
-    }
+
 
     return _read_packet(pPkt);
 }

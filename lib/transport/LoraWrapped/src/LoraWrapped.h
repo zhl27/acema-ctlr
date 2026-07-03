@@ -71,8 +71,8 @@ private:
     connSts_t _st;
 
     /* Funciones de bajo nivel, des/encriptación y envio*/
-    int _send_packet(pkt_t *ptrPkt) const;
-    int _read_packet(pkt_t *ptrPkt);
+    bool _send_packet(pkt_t *ptrPkt) const;
+    bool _read_packet(pkt_t *ptrPkt);
 
     /* Cifrado de un byte con el método XOR*/
     inline char _encrypt_byte(const char dat) const {return static_cast<char>(dat)^_encryptWord ;};
@@ -80,44 +80,44 @@ private:
 public:
     LoraWrapped(uint32_t nss, uint32_t rst, uint32_t pin3, uint32_t pin4, SPIClass& spi = SPI);
     ~LoraWrapped();
-    int begin(int sw = DEFAULT_SYNC_WORD, char ew = DEFAULT_ENCRY_WORD, float frequency = DEFAULT_FREC);
+    bool begin(int sw = DEFAULT_SYNC_WORD, char ew = DEFAULT_ENCRY_WORD, float frequency = DEFAULT_FREC);
     
     /**
      * @brief Envia una petición de conexion del cohete al GSE
      */
-    int c_connect_to_GSE() const;
+    bool c_connect_to_GSE() const;
 
     /**
      * @brief Verifica la conexion estable con el GSE
      */
-    int c_connection_accepted();
+    bool c_connection_accepted();
     
     /** 
      *   @brief Acepta la petición de conexion del cohete
      */
-    int g_accept_connection();
+    bool g_accept_connection();
 
     /**
      * @brief Envía datos de telemetría (struct dataPlot_t)
      */
-    int send_data(data_all_t dato) const;
+    bool send_data(data_all_t dato) const;
 
     /**
      * @brief Envía un mensaje de texto genérico (MSG)
      */
-    int send_msg(const char* texto) const;
+    bool send_msg(const char* texto) const;
 
     /**
      * @brief Envía un mensaje de error (ERR)
      */
-    int send_error(const char* error) const;
+    bool send_error(const char* error) const;
 
     /**
      * @brief Envía un PONG(ERR)
      */
-    int send_pong();
+    bool send_pong();
 
-    int read_packet(pkt_t* pPkt);
+    bool read_packet(pkt_t* pPkt);
 };
 
 

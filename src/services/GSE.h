@@ -43,9 +43,9 @@ public:
     GSE() = default; // TODO: Revisar constructor de GSE
     static void init();
 
-    static int actualizar_graficas(const data_all_t *data);
-    static int enviar_mensaje(const char* mensaje);
-    static int enviar_error(const char* error);
+    static bool actualizar_graficas(const data_all_t *data);
+    static bool enviar_mensaje(const char* mensaje);
+    static bool enviar_error(const char* error);
 
     static void actualizar(data_all_t *data);
 
