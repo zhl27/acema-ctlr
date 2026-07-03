@@ -38,6 +38,12 @@ void vTaskLora(void *pvParameters); // maneja la comunicación LoRa, incluyendo 
 
 mBuzzer buzzer(BUZZER_PIN);
 
+int contadorMde = 0;
+int contadorFlash = 0;
+int contadorSensores = 0;
+int contadorLora = 0;
+
+// int muestreo_datos_crudos_ms = 500; // cada 0,5 segundos
 
 void setup() {
     Serial.begin(115200); // TODO: Para la Compu de vuelo no se usa Serial
@@ -48,7 +54,7 @@ void setup() {
     SerialPrint::msg("Comenzando el setup...");
 
     buzzer.init();
-    buzzer.beep(500);
+    // buzzer.beep(500);
 
     // Initialize the kinematic filter (Adjust mass and pad offset as needed for your launch)
     // TODO: FALTA MODIFICAR DATAFILTER DE FORMA ACORDE A LOS REQUERIMIENTOS.
@@ -57,12 +63,12 @@ void setup() {
     GSE::init();
 
     // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
-    xStateMachineRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
-    if (xStateMachineRingbuf == NULL) {
-        SerialPrint::err("Error al crear xStateMachineRingbuf");
-    } else {
-        SerialPrint::msg("xStateMachineRingbuf creado");
-    }
+    // xStateMachineRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
+    // if (xStateMachineRingbuf == NULL) {
+    //     SerialPrint::err("Error al crear xStateMachineRingbuf");
+    // } else {
+    //     SerialPrint::msg("xStateMachineRingbuf creado");
+    // }
 
     xLoraRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
     if (xLoraRingbuf == NULL) {
@@ -71,18 +77,18 @@ void setup() {
         SerialPrint::msg("xLoraRingbuf creado");
     }
 
-    xFlashRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
-    if (xFlashRingbuf == NULL) {
-        SerialPrint::err("Error al crear xFlashRingbuf");
-    } else {
-        SerialPrint::msg("xFlashRingbuf creado");
-    }
+    // xFlashRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
+    // if (xFlashRingbuf == NULL) {
+    //     SerialPrint::err("Error al crear xFlashRingbuf");
+    // } else {
+    //     SerialPrint::msg("xFlashRingbuf creado");
+    // }
 
     // Create tasks with priority hierarchy
     xTaskCreate(vTaskReadSensors, "ReadSensors", 4096, NULL, 4, &xTaskReadSensorsHandle); // TODO: Hacer un Profile. Ver si es overkill usar 4096 WORDs para esto. Ojo: WORD = 4 bits en la esp32. "You can use uxTaskGetStackHighWaterMark() to monitor unused stack space"
-    xTaskCreate(vTaskStateMachine, "StateMachine", 4096, NULL, 3, &xTaskStateMachineHandle);
-    xTaskCreate(vTaskFlash, "Flash", 4096, NULL, 3, &xTaskFlashHandle);
-    xTaskCreate(vTaskLora, "Lora", 4096, NULL, 2, &xTaskLoraHandle);
+    // xTaskCreate(vTaskStateMachine, "StateMachine", 4096, NULL, 3, &xTaskStateMachineHandle);
+    // xTaskCreate(vTaskFlash, "Flash", 4096, NULL, 3, &xTaskFlashHandle);
+    xTaskCreate(vTaskLora, "Lora", 4096, NULL, 3, &xTaskLoraHandle);
 
     vTaskDelete(NULL); // NULL hace referenica al task default que maneja a "void loop()"
 
@@ -99,26 +105,28 @@ void loop(){
 void vTaskReadSensors(void *pvParameters) {
     while (true) {
         // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
-        data_raw_t raw = Sensors::getRawData();
+        data_raw_t raw = Sensors::get_raw_data();
 
-        print_data_raw(&raw);
+        Serial.printf("raw.mpu.accel_y=%f", raw.mpu.accel_y);
+
+        // print_data_raw(&raw);
 
         const data_all_t all_data = DataFilter::process(raw);
 
-        if (xStateMachineRingbuf != NULL) {
-            if (xRingbufferSend(xStateMachineRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(10)) != pdTRUE) {
-                SerialPrint::err("xRingbufferSend -> xStateMachineRingbuf failed (all_data)");
-            }
-        }
+        // if (xStateMachineRingbuf != NULL) {
+        //     if (xRingbufferSend(xStateMachineRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(10)) != pdTRUE) {
+        //         SerialPrint::err("xRingbufferSend -> xStateMachineRingbuf failed (all_data)");
+        //     }
+        // }
 
-        if (xFlashRingbuf != NULL) {
-            // if (xRingbufferSend(xFlashRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(10)) != pdTRUE) {
-            //     SerialPrint::err("xRingbufferSend -> xFlashRingbuf failed (raw)");
-            // }
-            if (xRingbufferSend(xFlashRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(10)) != pdTRUE) {
-                SerialPrint::err("xRingbufferSend -> xFlashRingbuf failed (all_data)");
-            }
-        }
+        // if (xFlashRingbuf != NULL) {
+        //     // if (xRingbufferSend(xFlashRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(10)) != pdTRUE) {
+        //     //     SerialPrint::err("xRingbufferSend -> xFlashRingbuf failed (raw)");
+        //     // }
+        //     if (xRingbufferSend(xFlashRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(10)) != pdTRUE) {
+        //         SerialPrint::err("xRingbufferSend -> xFlashRingbuf failed (all_data)");
+        //     }
+        // }
 
         if (xLoraRingbuf != NULL) {
             // if (xRingbufferSend(xLoraRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(10)) != pdTRUE) {
@@ -129,8 +137,11 @@ void vTaskReadSensors(void *pvParameters) {
             }
         }
 
+        // SerialPrint::plot("contadorSensores", contadorSensores);
+        // contadorSensores++;
+
         // Simulate a 1 second sampling interval
-        vTaskDelay(pdMS_TO_TICKS(1000)); // it yields CPU to lower priorities for 1s
+        // vTaskDelay(pdMS_TO_TICKS(1000)); // it yields CPU to lower priorities for 1s
     }
 }
 
@@ -157,7 +168,8 @@ void vTaskStateMachine(void *pvParameters) {
 
                 // NOTA: Asegúrate de que mde_cohete_actualizar acepte un puntero a data_raw_t
                 // mde_cohete_actualizar(datos_sensores);
-
+                // SerialPrint::plot("contadorMde", contadorMde);
+                // contadorMde++;
             } else {
                 // SerialPrint::msg("[StateMachine] ERROR: Tamaño de item no coincide con data_all_t");
             }
@@ -168,7 +180,12 @@ void vTaskStateMachine(void *pvParameters) {
         } else {
             // SerialPrint::msg("[StateMachine] No messages (timeout)");
         }
+
+
+
+        // vTaskDelay(pdMS_TO_TICKS(1000));
     }
+
 }
 
 // Mock implementation of the Flash task: consumes items from the Flash ringbuffer and "persists" them
@@ -190,13 +207,17 @@ void vTaskFlash(void *pvParameters) {
 
                 // Print a specific member of the struct (like elapsed_time) instead of %s
                 // Serial.printf("[Flash] Persisting (%d bytes). Time: %lu\n", static_cast<int>(item_size), micros());
-
+                // SerialPrint::plot("contadorFlash", contadorFlash);
+                // contadorFlash++;
                 // TODO: In a real implementation, write 'datos' to SD/flash.
             }
             vRingbufferReturnItem(xFlashRingbuf, item);
         } else {
             // SerialPrint::msg("[Flash] No items to persist (timeout)");
         }
+
+
+        // vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 
@@ -220,11 +241,16 @@ void vTaskLora(void *pvParameters) {
                 // Print a specific member of the struct instead of %s
                 // Serial.printf("[Lora] Sending (%d bytes). Time: %lu\n", static_cast<int>(item_size), micros());
                 GSE::actualizar(datos_sensores);
-
+                // SerialPrint::plot("contadorLora", contadorLora);
+                // contadorLora++;
             }
             vRingbufferReturnItem(xLoraRingbuf, item);
         } else {
             SerialPrint::msg("[Lora] No messages to send (timeout)");
         }
+
+
+
+        // vTaskDelay(pdMS_TO_TICKS(1000)); // importante ceder tiempo si hay task priorities diferentes para que no se produzca inanicion en otras tasks
     }
 }
