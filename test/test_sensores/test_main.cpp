@@ -32,6 +32,8 @@ mBMP280 bmp;
 mGPS gps;
 mBuzzer buzzer(BUZZER_PIN);
 
+// TODO: TEST_SENSORES DESACTUALIZADOSSSS
+
 // Runs before every single test case
 void setUp(void) {
     // Add any setup required before each test runs (optional)

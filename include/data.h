@@ -8,8 +8,8 @@
 
 #include <cstdint>
 #include "UbxProtocols.h"
-#include <stdio.h>
-#include <stdint.h>
+#include <cstdio>
+#include <cstdint>
 
 /**
  * @struct data_raw_mpu_t

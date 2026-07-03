@@ -16,8 +16,11 @@
 #include "config.h"
 #include "services/EmaFilter.h"
 
+#include <SPI.h>
+#include "LoraWrapped.h"
 
-constexpr size_t RBUF_SIZE = 1024; // bytes per ring buffer
+
+constexpr size_t RBUF_SIZE = 4096; // bytes per ring buffer
 
 // Ring buffer handles
 RingbufHandle_t xStateMachineRingbuf;
@@ -62,6 +65,7 @@ void setup() {
     Sensors::init();
     GSE::init();
 
+    // MDE
     // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
     // xStateMachineRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
     // if (xStateMachineRingbuf == NULL) {
@@ -70,6 +74,7 @@ void setup() {
     //     SerialPrint::msg("xStateMachineRingbuf creado");
     // }
 
+    // LORA
     xLoraRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
     if (xLoraRingbuf == NULL) {
         SerialPrint::err("Error al crear xLoraRingbuf");
@@ -77,6 +82,7 @@ void setup() {
         SerialPrint::msg("xLoraRingbuf creado");
     }
 
+    // FLASH
     // xFlashRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
     // if (xFlashRingbuf == NULL) {
     //     SerialPrint::err("Error al crear xFlashRingbuf");
@@ -84,11 +90,11 @@ void setup() {
     //     SerialPrint::msg("xFlashRingbuf creado");
     // }
 
-    // Create tasks with priority hierarchy
-    xTaskCreate(vTaskReadSensors, "ReadSensors", 4096, NULL, 4, &xTaskReadSensorsHandle); // TODO: Hacer un Profile. Ver si es overkill usar 4096 WORDs para esto. Ojo: WORD = 4 bits en la esp32. "You can use uxTaskGetStackHighWaterMark() to monitor unused stack space"
+    // TODO: Hacer un Profile. Ver si es overkill usar 4096 WORDs para esto. Ojo: WORD = 4 bits en la esp32. "You can use uxTaskGetStackHighWaterMark() to monitor unused stack space"
+    xTaskCreate(vTaskReadSensors, "ReadSensors", 4096, NULL, 4, &xTaskReadSensorsHandle);
     // xTaskCreate(vTaskStateMachine, "StateMachine", 4096, NULL, 3, &xTaskStateMachineHandle);
     // xTaskCreate(vTaskFlash, "Flash", 4096, NULL, 3, &xTaskFlashHandle);
-    xTaskCreate(vTaskLora, "Lora", 4096, NULL, 3, &xTaskLoraHandle);
+    xTaskCreate(vTaskLora, "Lora", 4096, NULL, 4, &xTaskLoraHandle);
 
     vTaskDelete(NULL); // NULL hace referenica al task default que maneja a "void loop()"
 
@@ -107,11 +113,11 @@ void vTaskReadSensors(void *pvParameters) {
         // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
         data_raw_t raw = Sensors::get_raw_data();
 
-        Serial.printf("raw.mpu.accel_y=%f", raw.mpu.accel_y);
+        Serial.printf("raw.mpu.accel_y=%f\n", raw.mpu.accel_y);
 
         // print_data_raw(&raw);
 
-        const data_all_t all_data = DataFilter::process(raw);
+        data_all_t all_data = DataFilter::process(raw);
 
         // if (xStateMachineRingbuf != NULL) {
         //     if (xRingbufferSend(xStateMachineRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(10)) != pdTRUE) {
@@ -132,8 +138,10 @@ void vTaskReadSensors(void *pvParameters) {
             // if (xRingbufferSend(xLoraRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(10)) != pdTRUE) {
             //     SerialPrint::err("xRingbufferSend -> xLoraRingbuf failed (raw)");
             // }
-            if (xRingbufferSend(xLoraRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(10)) != pdTRUE) {
-                SerialPrint::err("xRingbufferSend -> xLoraRingbuf failed (all_data)");
+
+            BaseType_t  res = xRingbufferSend(xLoraRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(50));
+            if (res != pdTRUE) {
+                Serial.printf("xRingbufferSend (xLoraRingbuf) ha fallado (all_data). Codigo de error:%d\n", res);
             }
         }
 
@@ -171,7 +179,7 @@ void vTaskStateMachine(void *pvParameters) {
                 // SerialPrint::plot("contadorMde", contadorMde);
                 // contadorMde++;
             } else {
-                // SerialPrint::msg("[StateMachine] ERROR: Tamaño de item no coincide con data_all_t");
+                SerialPrint::err("[StateMachine] Tamaño de item no coincide con data_all_t");
             }
 
             // 4. Free the memory

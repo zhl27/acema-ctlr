@@ -1,6 +1,8 @@
 #include <Arduino.h>
+#include <SPI.h>
+#include "LoraWrapped.h"
 #include <unity.h>
-// Asegúrate de incluir el path correcto a tu header. 
+// Asegúrate de incluir el path correcto a tu header.
 // Dependiendo de tu estructura, puede ser algo como "../include/data.h"
 #include "data.h" 
 
