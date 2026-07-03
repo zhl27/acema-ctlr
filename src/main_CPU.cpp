@@ -147,17 +147,17 @@ void loop() {
                     simuladorAltitud = 0.0f; // Reseteo circular de 0 a 100
                 }
 
-                dataPlot_t paqueteTelemetria;
-                paqueteTelemetria.altitud = simuladorAltitud;
-                paqueteTelemetria.giroX   = analogRead(A0) * (5.0f / 1023.0f); // Conversión ADC a Voltaje
-                paqueteTelemetria.giroY   = 0.0f;  // Variables estáticas de relleno
-                paqueteTelemetria.datoX   = cicloContador;
+                data_all_t paqueteTelemetria;
+                paqueteTelemetria.altura_m = simuladorAltitud;
+                paqueteTelemetria.vel_angular_x = analogRead(A0) * (5.0f / 1023.0f); // Conversión ADC a Voltaje
+                paqueteTelemetria.vel_angular_x = 0.0f;  // Variables estáticas de relleno
+                paqueteTelemetria.vel_angular_x = cicloContador;
 
                 // 2. Impresión visual estructurada y cruda antes del envío
-                mostrarEstructuraYHex(&paqueteTelemetria);
+                print_data(&paqueteTelemetria);
 
                 // 3. Envío mediante método de alto nivel de la fachada
-                if (lora.send_datos(paqueteTelemetria)) {
+                if (lora.send_data(paqueteTelemetria)) {
                     Serial.print(F("[TX] Telemetría enviada correctamente. Muestra: "));
                     Serial.println(cicloContador + 1);
                     cicloContador++;
@@ -170,12 +170,12 @@ void loop() {
                     Serial.println(F("\n[EVENTO] Alcanzadas las 50 muestras. Enviando ráfaga de mensajes críticos..."));
 
                     // Envío de mensaje string común
-                    if (lora.send_mensaje("HOLA DESDE LA ESTRATOSFERA")) {
+                    if (lora.send_msg("HOLA DESDE LA ESTRATOSFERA")) {
                         Serial.println(F("[TX STRING] Mensaje enviado: 'HOLA DESDE LA ESTRATOSFERA'"));
                     }
 
                     // Envío inmediato de mensaje string de error crítico
-                    if (lora.send_mensaje_error("Houston, tenemos un problema")) {
+                    if (lora.send_error("Houston, tenemos un problema")) {
                         Serial.println(F("[TX ERROR] Mensaje crítico enviado: 'Houston, tenemos un problema'"));
                     }
 

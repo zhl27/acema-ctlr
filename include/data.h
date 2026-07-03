@@ -92,10 +92,10 @@ typedef struct {
     float temperatura_amb_c;          // Tomada estrictamente del BMP280
     float densidad_aire_kg_m3;        // Calculada por ley de gases ideales
 
-    // --- TELEMETRÍA EMPAQUETADA (Tus requerimientos originales) ---
-    int16_t posicion_relativa;        // Altura casteada para ahorrar ancho de banda LoRa
-    int16_t velocidad;                // Velocidad vertical casteada
-    int16_t momentum;                 // Momentum casteado
+
+    float posicion_relativa;        // Altura casteada para ahorrar ancho de banda LoRa
+    float velocidad;                // Velocidad vertical casteada
+    float momentum;                 // Momentum casteado
 
 } data_all_t; ///< Todos los datos originados del ambiente a través de los sensores que YA ESTÁN SANITIZADOS Y FILTRADOS!
 
@@ -177,9 +177,9 @@ inline void print_data(const data_all_t *data) {
 
     Serial.printf("--- TELEMETRÍA EMPAQUETADA (LoRa) ---\n");
     // Los int16_t se imprimen con %d ya que se promueven implícitamente a int
-    Serial.printf("Posición Relativa:  %d\n", data->posicion_relativa);
-    Serial.printf("Velocidad:          %d\n", data->velocidad);
-    Serial.printf("Momentum:           %d\n", data->momentum);
+    Serial.printf("Posición Relativa:  %f\n", data->posicion_relativa);
+    Serial.printf("Velocidad:          %f\n", data->velocidad);
+    Serial.printf("Momentum:           %f\n", data->momentum);
 
     Serial.printf("==========================================\n\n");
 }

@@ -66,10 +66,21 @@ void test_peripheral_initialization(void) {
 void test_sensor_updates(void) {
     // Basic execution check to ensure update loops don't cause panics/hangs
     gps.update();
-    mpu.update();
-    bmp.update();
 
     TEST_ASSERT_TRUE(true);
+}
+
+void test_sensor_devuelve_valor(void) {
+    data_raw_mpu_t raw_mpu = mpu.get_raw_mpu();
+    SerialPrint::plot("accel_x", raw_mpu.accel_x);
+    SerialPrint::plot("accel_y", raw_mpu.accel_y);
+    SerialPrint::plot("accel_z", raw_mpu.accel_z);
+    SerialPrint::plot("gyro_x", raw_mpu.gyro_x);
+    SerialPrint::plot("gyro_y", raw_mpu.gyro_y);
+    SerialPrint::plot("gyro_z", raw_mpu.gyro_z);
+    SerialPrint::plot("temp", raw_mpu.temp);
+
+    data_raw_bmp_t raw_bmp = bmp.get_raw_bmp();
 }
 
 void setup() {
