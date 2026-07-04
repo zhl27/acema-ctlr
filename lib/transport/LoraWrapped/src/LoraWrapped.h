@@ -21,7 +21,7 @@
 /* Estructuras provicionales*/
 typedef struct PACKET {
     uint8_t len;
-    uint8_t protocole;
+    uint8_t protocol;
     void* payload;
 } pkt_t;
 

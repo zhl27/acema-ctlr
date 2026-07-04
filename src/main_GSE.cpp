@@ -37,7 +37,7 @@ GseState currentState = GSE_INIT;
 void sendBinaryToGUI(pkt_t* pkt) {
     Serial.write('$');
     Serial.write(pkt->len);
-    Serial.write(pkt->protocole);
+    Serial.write(pkt->protocol);
     for (int i = 0; i < pkt->len; i++) {
         Serial.write(((uint8_t*)pkt->payload)[i]);
     }
@@ -53,14 +53,14 @@ int CONTADOR = 1;
 void printPacketDebug(pkt_t* pkt) {
     Serial.println(F("\n=================================================="));
     Serial.print(F("[INFO] Paquete Recibido | Len: ")); Serial.print(pkt->len);
-    Serial.print(F(" | Protocolo: 0x")); Serial.println(pkt->protocole, HEX);
+    Serial.print(F(" | Protocolo: 0x")); Serial.println(pkt->protocol, HEX);
     
     // Imprimir de acuerdo al tipo de protocolo detectado
     
-    if(pkt->protocole == lora_protocol::PING){
+    if(pkt->protocol == lora_protocol::PING){
         lora.send_pong();
     }
-    else if (pkt->protocole == lora_protocol::C_PLOT) {
+    else if (pkt->protocol == lora_protocol::C_PLOT) {
         data_all_t* datos = (data_all_t*)pkt->payload;
 
         CONTADOR = datos->vel_angular_x;
@@ -71,14 +71,14 @@ void printPacketDebug(pkt_t* pkt) {
         Serial.print(F("  vel angular z:   ")); Serial.println(datos->vel_angular_z);
         Serial.print(F("  temperatura amb c: ")); Serial.println(datos->temperatura_amb_c);
     } 
-    else if (pkt->protocole == lora_protocol::C_MGS || pkt->protocole == lora_protocol::C_ERR) {
+    else if (pkt->protocol == lora_protocol::C_MGS || pkt->protocol == lora_protocol::C_ERR) {
         Serial.print(F("  Mensaje String: ")); Serial.println((char*)pkt->payload);
     }
     
     // Volcado Hexadecimal del crudo (len, protocolo y payload)
     Serial.print(F("Crudo HEX: "));
     if (pkt->len < 16) Serial.print("0"); Serial.print(pkt->len, HEX); Serial.print(" ");
-    if (pkt->protocole < 16) Serial.print("0"); Serial.print(pkt->protocole, HEX); Serial.print(" ");
+    if (pkt->protocol < 16) Serial.print("0"); Serial.print(pkt->protocol, HEX); Serial.print(" ");
     
     for (int i = 0; i < pkt->len; i++) {
         uint8_t b = ((uint8_t*)pkt->payload)[i];

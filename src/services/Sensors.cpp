@@ -17,6 +17,7 @@ mMPU6050 Sensors::_mpu6050;
 
 bool Sensors::init() {
     Wire.begin(WIRE_SDA_0, WIRE_SCL_0);
+    // Wire.setClock(400000); // Set I2C clock to 400kHz Fast Mode
     // _gps.init(); // TODO: Reemplazar por implementación de Joe
 
     if (!_mpu6050.init(MPU_ADDR)) {

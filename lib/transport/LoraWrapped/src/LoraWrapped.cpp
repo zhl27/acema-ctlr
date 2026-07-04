@@ -46,7 +46,7 @@ bool LoraWrapped::_send_packet(pkt_t *ptrPkt) const {
     // Crea un búfer temporal para consolidar la trama completa
     uint8_t txBuffer[SIZE_BUFFER_MSG + 2];
     txBuffer[0] = _encrypt_byte(ptrPkt->len);
-    txBuffer[1] = _encrypt_byte(ptrPkt->protocole);
+    txBuffer[1] = _encrypt_byte(ptrPkt->protocol);
 
     // Encriptación
     for (int i = 0; i < ptrPkt->len; i++) {
@@ -90,12 +90,12 @@ bool LoraWrapped::_read_packet(pkt_t *ptrPkt) {
 
     // Desencripta encabezados primarios
     ptrPkt->len = _encrypt_byte(static_cast<char>(rxBuffer[0]));
-    ptrPkt->protocole = _encrypt_byte(static_cast<char>(rxBuffer[1]));
+    ptrPkt->protocol = _encrypt_byte(static_cast<char>(rxBuffer[1]));
 
     if (ptrPkt->len > SIZE_BUFFER_MSG) return false;
 
     // Asigna el puntero de la unión según el protocolo 
-    if (ptrPkt->protocole == lora_protocol::C_PLOT) {
+    if (ptrPkt->protocol == lora_protocol::C_PLOT) {
         memset((void*)&_internalPayload_rx.data, 0, sizeof(data_all_t));
         ptrPkt->payload = (data_all_t*)&_internalPayload_rx.data;
     } else {
@@ -116,7 +116,7 @@ bool LoraWrapped::c_connect_to_GSE() const {
     const char *msg = "PING_COHETE"; // TODO: redundante
     
     // Prepara el paquete
-    packet.protocole = lora_protocol::PING;
+    packet.protocol = lora_protocol::PING;
     packet.payload = (void*)msg;
     packet.len = strlen(msg) + 1; // envía solo los bytes necesarios
 
@@ -135,14 +135,14 @@ bool LoraWrapped::g_accept_connection(){
         return false;
     }
 
-    if( rx_packet.protocole == lora_protocol::PING){
+    if( rx_packet.protocol == lora_protocol::PING){
         // Verifica la integridad del mensaje // TODO: redundante. se puede simplificar el ping pong usando solamente C_PING y C_PONG.
         if(strcmp((char*)rx_packet.payload, "PING_COHETE") != 0){
             return false;
         } 
 
         // Prepara la respuesta
-        tx_packet.protocole = lora_protocol::PONG;
+        tx_packet.protocol = lora_protocol::PONG;
         tx_packet.payload = (void*)respuesta;
         tx_packet.len = strlen(respuesta) + 1;
 
@@ -160,7 +160,7 @@ bool LoraWrapped::c_connection_accepted() {
     // Verificamos si llegó algo
     if (_read_packet(&packet)) {
         // El cohete espera un PONG para confirmar la conexión
-        if (packet.protocole == lora_protocol::PONG) {
+        if (packet.protocol == lora_protocol::PONG) {
             // un flag de "ENLACE COMPLETADO"
             _st = CONNECTION_STATUS::CONNECTED;
             return true;
@@ -180,7 +180,7 @@ bool LoraWrapped::send_data(data_all_t datos) const {
         return false;
     
     // Prepara el paquete
-    packet.protocole = lora_protocol::C_PLOT;
+    packet.protocol = lora_protocol::C_PLOT;
     packet.payload = &datos;
     packet.len = sizeof(datos);
 
@@ -198,7 +198,7 @@ bool LoraWrapped::send_msg(const char* texto) const {
 
 
     // Configura el paquete de mensaje
-    packet.protocole = lora_protocol::C_MGS;
+    packet.protocol = lora_protocol::C_MGS;
     packet.payload = (void*)texto;
     packet.len = strlen(texto) + 1; // +1 para incluir el '\0'
 
@@ -213,7 +213,7 @@ bool LoraWrapped::send_error(const char* error) const {
         return false;
 
     // Configuramos el paquete como error
-    packet.protocole = lora_protocol::C_ERR;
+    packet.protocol = lora_protocol::C_ERR;
     packet.payload = (void*)error;
     packet.len = strlen(error) + 1;
 
@@ -225,7 +225,7 @@ bool LoraWrapped::send_pong() {
     // mensaje de respuesta(PONG)
     const char* respuesta = "CONEXION_ACEPTADA";
     // Prepara la respuesta
-    rx_packet.protocole = lora_protocol::PONG;
+    rx_packet.protocol = lora_protocol::PONG;
     rx_packet.payload = (void*)respuesta;
     rx_packet.len = strlen(respuesta) + 1;
 

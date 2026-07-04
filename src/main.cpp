@@ -113,9 +113,8 @@ void vTaskReadSensors(void *pvParameters) {
         // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
         data_raw_t raw = Sensors::get_raw_data();
 
-        Serial.printf("raw.mpu.accel_y=%f\n", raw.mpu.accel_y);
-
-        // print_data_raw(&raw);
+        // Serial.printf("raw.mpu.accel_y=%f\n", raw.mpu.accel_y);
+        print_data_raw(&raw);
 
         data_all_t all_data = DataFilter::process(raw);
 

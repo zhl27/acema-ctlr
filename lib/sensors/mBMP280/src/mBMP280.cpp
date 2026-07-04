@@ -20,11 +20,11 @@ bool mBMP280::init(uint8_t addr, uint8_t chipid) {
     }
 
     // Set configuration for high filter rate and 500ms delay to capture blowing fluctuations
-    bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,
-                    Adafruit_BMP280::SAMPLING_X2,
-                    Adafruit_BMP280::SAMPLING_X16,
-                    Adafruit_BMP280::FILTER_X16,
-                    Adafruit_BMP280::STANDBY_MS_500);
+    bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     // Modo Normal (medición continua)
+                Adafruit_BMP280::SAMPLING_X1,     // Sobremuestreo de Temp (Ultra low power)
+                Adafruit_BMP280::SAMPLING_X1,     // Sobremuestreo de Presión (Ultra low power)
+                Adafruit_BMP280::FILTER_OFF,      // Filtro desactivado para mayor respuesta
+                Adafruit_BMP280::STANDBY_MS_1);   // Tiempo de espera entre lecturas al mínimo (0.5 ms)
 
     // // Initial readings to establish a baseline
     // last_temp = get_temperature();
