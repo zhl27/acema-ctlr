@@ -14,31 +14,26 @@
 
 class Actuators {
     private:
-        mBuzzer _buzzer;
-        mPyro _pyro;
-        mServo _servo;
+        Actuators() = delete;
+
+        static mBuzzer _buzzer;
+        static mServo _servo;
+        static mPyro _pyro_pcaidas_drogue;
+        static mPyro _pyro_pcaidas_ppal;
 
     public:
-        Actuators();
 
         /**
          * @brief Initializes all actuator drivers.
          * @return true if all initialized successfully, false otherwise.
          */
-        bool init();
+        static bool init();
 
         // Getters
-        mBuzzer& getBuzzer() { return _buzzer; }
-        mPyro& getPyro() { return _pyro; }
-        mServo& getServo() { return _servo; }
-
-        // Declarative high-level accessors
-        // Buzzer
-        void beepBuzzer(uint32_t durationMs) { _buzzer.beep(durationMs); }
-        void buzzerOn() { _buzzer.on(); }
-        void buzzerOff() { _buzzer.off(); }
-        void playSuccessSound() { _buzzer.playSuccess(); }
-        void playErrorSound() { _buzzer.playError(); }
+        static mBuzzer& getBuzzer() { return _buzzer; }
+        static mServo& getServo() { return _servo; }
+        static mPyro& getPyroDrogue() { return _pyro_pcaidas_drogue; }
+        static mPyro& getPyroPpal() { return _pyro_pcaidas_ppal; }
 };
 
 
