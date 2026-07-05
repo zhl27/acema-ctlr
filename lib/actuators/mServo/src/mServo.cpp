@@ -7,7 +7,7 @@
 #include <math.h>
 
 mServo::mServo(mServoConfig_t* cfg)
-  : cfg(cfg),
+  : _cfg(cfg),
     angActual(0.0f),
     angTarget(0.0f),
     intervaloPaso(0),
@@ -16,10 +16,15 @@ mServo::mServo(mServoConfig_t* cfg)
     tieneError(false),
     ID(0)
 {
-  if (cfg == nullptr) return;
+
+}
+
+bool mServo::init() {
+
+  if (_cfg == nullptr) return false;
 
   // Attach del servo
-  servo.attach(cfg->pinServo);
+  _servo.attach(_cfg->pinServo);
 
   // Inicialización encapsulada: leer ángulo bruto y establecer estado
   const float raw = leerAnguloBruto();
@@ -29,26 +34,28 @@ mServo::mServo(mServoConfig_t* cfg)
   ultimoPasoMicros = micros();
   estaMoviendo = false;
   tieneError = false;
-  ID = cfg->id;
+  ID = _cfg->id;
 
   // Posicionar el servo a la posición inicial calculada
-  const uint16_t pulse = static_cast<uint16_t>(round(cfg->minPulse +
-                                               (cfg->maxPulse - cfg->minPulse) * (angActual / 180.0f)));
-  servo.writeMicroseconds(pulse);
+  const uint16_t pulse = static_cast<uint16_t>(round(_cfg->minPulse +
+                                               (_cfg->maxPulse - _cfg->minPulse) * (angActual / 180.0f)));
+  _servo.writeMicroseconds(pulse);
+
+  return true;
 }
 
 float mServo::leerAnguloBruto() const {
   // Lectura del potenciómetro (0..4095 en ESP32 típicamente)
-  float adcVal = analogRead(cfg->pinPot);
-  return cfg->pendiente * adcVal;
+  float adcVal = analogRead(_cfg->pinPot);
+  return _cfg->pendiente * adcVal;
 }
 
 float mServo::leerAngulo() {
-  if (cfg == nullptr) return angActual;
+  if (_cfg == nullptr) return angActual;
 
   // Lectura y filtro EMA
   float nuevoAngulo = leerAnguloBruto();
-  angActual = (cfg->alpha * nuevoAngulo) + ((1.0f - cfg->alpha) * angActual);
+  angActual = (_cfg->alpha * nuevoAngulo) + ((1.0f - _cfg->alpha) * angActual);
 
   // Asegurar límites
   if (angActual < 0.0f) angActual = 0.0f;
@@ -57,10 +64,10 @@ float mServo::leerAngulo() {
 }
 
 void mServo::setAngulo(float ang, uint16_t degPerSec) {
-  if (cfg == nullptr) return;
+  if (_cfg == nullptr) return;
 
   // Evita cambios triviales y velocidades no razonables
-  if (fabs(ang - angActual) < cfg->deadband) return;
+  if (fabs(ang - angActual) < _cfg->deadband) return;
   if (degPerSec < 1) degPerSec = 1;
 
   angTarget = constrain(ang, 0.0f, 180.0f);
@@ -68,8 +75,8 @@ void mServo::setAngulo(float ang, uint16_t degPerSec) {
 }
 
 bool mServo::enAnguloTarget() const {
-  if (cfg == nullptr) return true;
-  return (fabs(angTarget - angActual) < cfg->deadband);
+  if (_cfg == nullptr) return true;
+  return (fabs(angTarget - angActual) < _cfg->deadband);
 }
 
 void mServo::step(const bool autoActualizacion) {
@@ -91,19 +98,19 @@ void mServo::step(const bool autoActualizacion) {
     if (angActual < 0.0f)   angActual = 0.0f;
 
     // Actualizar pulso del servo
-    const uint16_t pulse = static_cast<uint16_t>(round(cfg->minPulse +
-                                                       (cfg->maxPulse - cfg->minPulse) * (angActual / 180.0f)));
-    servo.writeMicroseconds(pulse);
+    const uint16_t pulse = static_cast<uint16_t>(round(_cfg->minPulse +
+                                                       (_cfg->maxPulse - _cfg->minPulse) * (angActual / 180.0f)));
+    _servo.writeMicroseconds(pulse);
 
     if (autoActualizacion) {
       angActual = leerAngulo();
-      const uint16_t pulse2 = static_cast<uint16_t>(round(cfg->minPulse +
-                                                    (cfg->maxPulse - cfg->minPulse) * (angActual / 180.0f)));
-      servo.writeMicroseconds(pulse2);
+      const uint16_t pulse2 = static_cast<uint16_t>(round(_cfg->minPulse +
+                                                    (_cfg->maxPulse - _cfg->minPulse) * (angActual / 180.0f)));
+      _servo.writeMicroseconds(pulse2);
     }
   }
 }
 
 bool mServo::enAngulo(float pos) const {
-  return fabs(pos - angActual) < cfg->deadband;
+  return fabs(pos - angActual) < _cfg->deadband;
 }

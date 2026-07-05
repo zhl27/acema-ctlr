@@ -27,7 +27,7 @@ public:
     // Constructor que encapsula la inicialización
     explicit mServo(mServoConfig_t* cfg);
 
-    mServo();
+    bool init();
 
     // API de control (sin inicialización externa)
     float leerAngulo();
@@ -37,8 +37,8 @@ public:
     bool enAngulo(float pos) const;
 
 private:
-    mServoConfig_t* cfg;
-    Servo servo;
+    mServoConfig_t* _cfg;
+    Servo _servo;
     float angActual;
     float angTarget;
     uint32_t intervaloPaso;

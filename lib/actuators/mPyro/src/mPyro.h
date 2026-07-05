@@ -29,7 +29,7 @@ public:
     /**
      * @brief Configura los modos de los pines. Debe llamarse dentro del setup().
      */
-    void begin() {
+    void init() {
         pinMode(_pinActivar, OUTPUT);
         digitalWrite(_pinActivar, LOW); // Forzar estado seguro apagado al arrancar
 
@@ -67,7 +67,7 @@ public:
         if (_pinContinuidad == 255) return false;
 
         // Lee el valor del ADC asignado al pin S_PyRO_X
-        int lectura = analogRead(_pinContinuidad);
+        const int lectura = analogRead(_pinContinuidad);
 
         // Si la lectura supera el umbral, significa que pasa corriente desde VBAT
         return (lectura > _umbralVoltaje);
@@ -78,18 +78,20 @@ public:
      * @param duracionMs Tiempo en milisegundos que el MOSFET permanecerá activo.
      * @return true si el disparo se ejecutó, false si fue rechazado por estar desarmado.
      */
-    bool disparar(uint32_t duracionMs = 1500) {
+    bool disparar(uint32_t duracionMs = 1500) { // OJO: ACCIÓN BLOQUEANTE --> DUERME LA TASK QUE LA CONTIENE
         if (!_armado) {
             return false; // Rechazar disparo por seguridad si no está armado
         }
 
         digitalWrite(_pinActivar, HIGH); // Envía 3.3V al Gate del MOSFET (Cierra circuito)
-        delay(duracionMs);
+        vTaskDelay(pdMS_TO_TICKS(duracionMs)); // OJO, DELAY BLOQUEANTE,
         digitalWrite(_pinActivar, LOW);  // Vuelve a poner el Gate a GND (Abre circuito)
 
-        _armado = false; // Auto-desarmado inmediato tras la ignición
+        _armado = false; // Autodesarmado inmediato tras la ignición
         return true;
     }
+
+
 };
 
 
