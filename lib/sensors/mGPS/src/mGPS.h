@@ -4,54 +4,69 @@
 
 #ifndef ACEMA_CTLR_MGPS_H
 #define ACEMA_CTLR_MGPS_H
-#include <cstdint>
 
-#include "TinyGPS++.h"
+#include <Arduino.h>
+#include "driver/uart.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+#include "UbxDispatcher.h"
+#include "UbxConfigurator.h"
 
-/**
- * @class mGPS
- * @brief Digital Twin for the TinyGPSPlus GPS receiver module.
- *
- * Encapsulates the serial communication, parser encoding, and outputs coordinate
- * and satellite counts to telemetry whenever changes are detected.
- */
 class mGPS {
-private:
-    TinyGPSPlus gps;
-    HardwareSerial serialGPS;
-    int rxPin;
-    int txPin;
-    uint32_t baudRate;
-
 public:
-    /**
-     * @brief Constructs mGPS with configuration for ESP32 HardwareSerial.
-     * @param uartNum Hardware UART index (default 2)
-     * @param rx Rx pin (default 16)
-     * @param tx Tx pin (default 17)
-     * @param baud Baud rate (default 9600)
-     */
+    // Constructor con los parámetros por defecto solicitados
     mGPS(int uartNum = 2, int rx = 16, int tx = 17, uint32_t baud = 9600);
+    ~mGPS();
 
-    /**
-     * @brief Initializes Serial connection.
-     */
+    // Métodos principales
     void init();
-
-    /**
-     * @brief Reads incoming serial data, feeds the GPS decoder, and publishes updates when new data is available.
-     */
-    void update();
+    void update() const;
 
     // Getters
-    uint32_t getSatellites() { return gps.satellites.value(); }
-    double getLatitude() { return gps.location.lat(); }
-    double getLongitude() { return gps.location.lng(); }
-    bool isLocationValid() const { return gps.location.isValid(); }
+    uint32_t getSatellites() const;
+    double getLatitude() const;
+    double getLongitude() const;
+    bool is3dFixed() const;
+    nav_pvt_t get_gps_data() const;
 
-    // Direct access to the parser object
-    TinyGPSPlus& getRawGPS() { return gps; }
+private:
+    // Parámetros de hardware
+    int _uartNum;
+    int _rxPin;
+    int _txPin;
+    uint32_t _baud;
+
+    // Almacenamiento de datos
+    nav_pvt_t _pvt_data_rx; // Buffer crudo para el Dispatcher
+    nav_pvt_t _pvt_data;    // Buffer seguro para el usuario (Getters)
+
+    // Sincronización
+    SemaphoreHandle_t _ackSemaphore;
+    SemaphoreHandle_t _dataMutex; // Para evitar lectura/escritura concurrente de datos
+
+    // Instancias de u-blox
+    UbxDispatcher* _dispatcher;
+    UbxConfigurator* _configurator;
+
+    // Tablas de enrutamiento
+    UbxRegMsg_t _regPvt;
+    UbxRegMsg_t _regAck;
+    const UbxRegMsg_t* _tablaRegistros[2];
+
+    // --- MANEJO DE CALLBACKS (Puente C a C++) ---
+    static mGPS* _instance;
+
+    static void _onPvtReceivedStatic(void* data);
+    static void _onAckReceivedStatic(void* data);
+    static void _uartTxStatic(const uint8_t* data, size_t len);
+    static bool _waitAckStatic(uint8_t cls, uint8_t id, uint32_t timeoutMs);
+
+    void _onPvtReceived(void* data);
+    void _onAckReceived(void* data);
+    void _uartTx(const uint8_t* data, size_t len);
+    bool _waitAck(uint8_t cls, uint8_t id, uint32_t timeoutMs);
 };
+
 
 
 
