@@ -12,15 +12,15 @@
 class DataFilter {
 public:
     // Settear en el setup() ANTES de despegar
-    static void init(float masa_cohete_kg = 15.0f, float altitud_cero_pad_m = 0.0f);
+    static void init();
 
     // Función principal de transformación estática
     static data_all_t process(const data_raw_t& raw);
 
 private:
     // Variables de configuración de entorno (se setean en init)
-    static float _masa_cohete_kg;
-    static float _altitud_cero_pad_m;
+    // static float _masa_cohete_kg;
+    // static float _altitud_cero_pad_m;
     static float _ultima_altura_m;
     static uint64_t _ultimo_tiempo_us;
     static bool _es_primer_ciclo;
