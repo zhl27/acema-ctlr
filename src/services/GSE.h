@@ -19,17 +19,17 @@
 #define LORA_DIO0 2
 #define LORA_DIO1 4
 
+enum EstadoConexionGSE : std::uint8_t {
+    ROCKET_INIT,
+    ROCKET_DISCONNECTED,
+    ROCKET_WAITING_PONG,
+    ROCKET_CONNECTED
+};
+
 class GSE {
     static constexpr long INTERVALO_TELEMETRIA = 1; // 5s de frecuencia de envío
 
-    enum RocketState : std::uint8_t {
-        ROCKET_INIT,
-        ROCKET_DISCONNECTED,
-        ROCKET_WAITING_PONG,
-        ROCKET_CONNECTED
-    };
-
-    static RocketState _currentState;
+    static EstadoConexionGSE _currentState;
 
     static unsigned long _previousMillis;
 
@@ -49,7 +49,9 @@ public:
 
     static void actualizar(data_all_t *data);
 
-    static RocketState estado_mde();
+    static EstadoConexionGSE estado_conexion_gse() {
+        return GSE::_currentState;
+    }
 };
 
 

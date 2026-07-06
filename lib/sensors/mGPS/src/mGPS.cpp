@@ -113,23 +113,23 @@ void mGPS::update() const {
 // Getters de la clase (Thread-Safe)
 // ==========================================
 uint32_t mGPS::getSatellites() const {
-    return get_gps_data().numSV;
+    return get_gps_raw_data().numSV;
 }
 
 double mGPS::getLatitude() const {
-    return get_gps_data().lat * 1e-7;
+    return get_gps_raw_data().lat * 1e-7;
 }
 
 double mGPS::getLongitude() const {
-    return get_gps_data().lon * 1e-7;
+    return get_gps_raw_data().lon * 1e-7;
 }
 
 bool mGPS::is3dFixed() const {
-    nav_pvt_t data = get_gps_data();
+    nav_pvt_t data = get_gps_raw_data();
     return (data.fixType == 3 || data.fixType == 4); // 3=3D Fix, 4=GNSS+Dead Reckoning
 }
 
-nav_pvt_t mGPS::get_gps_data() const {
+nav_pvt_t mGPS::get_gps_raw_data() const {
     nav_pvt_t copy;
     xSemaphoreTake((SemaphoreHandle_t)_dataMutex, portMAX_DELAY);
     copy = _pvt_data; // Copia segura

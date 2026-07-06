@@ -15,22 +15,22 @@ mMPU6050::mMPU6050()
       gyroX(0.0f), gyroY(0.0f), gyroZ(0.0f), temp(0.0f) {}
 
 bool mMPU6050::init(uint8_t addr) {
-    if (!mpu.begin(addr)) {
+    if (!_mpu.begin(addr)) {
         return false;
     }
 
     // 1. Maximize Sensitivity
-    mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
-    mpu.setGyroRange(MPU6050_RANGE_250_DEG);
+    _mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
+    _mpu.setGyroRange(MPU6050_RANGE_250_DEG);
 
     // 2. Maximize Speed (1kHz internal sampling)
-    mpu.setFilterBandwidth(MPU6050_BAND_184_HZ); // Sets DLPF to ~188Hz base
-    mpu.setSampleRateDivisor(0);                 // Keeps the sample rate at 1kHz
+    _mpu.setFilterBandwidth(MPU6050_BAND_184_HZ); // Sets DLPF to ~188Hz base
+    _mpu.setSampleRateDivisor(0);                 // Keeps the sample rate at 1kHz
 
     // 3. Configure the Interrupt Pin Behavior
-    mpu.setInterruptPinPolarity(false);          // Active High pulse
-    mpu.setInterruptPinLatch(false);             // 50us pulse instead of latching
-    mpu.setMotionInterrupt(false);               // Disable motion gating
+    _mpu.setInterruptPinPolarity(false);          // Active High pulse
+    _mpu.setInterruptPinLatch(false);             // 50us pulse instead of latching
+    _mpu.setMotionInterrupt(false);               // Disable motion gating
 
     // 4. Manually Enable the Data Ready Interrupt
     // (Because the Adafruit library doesn't have a native method for this specific register)
@@ -42,7 +42,7 @@ bool mMPU6050::init(uint8_t addr) {
     return true;
 }
 
-data_raw_mpu_t mMPU6050::get_raw_mpu() {
+data_raw_mpu_t mMPU6050::get_mpu_raw_data() {
 
     data_raw_mpu_t raw_mpu = {};
 
@@ -50,7 +50,7 @@ data_raw_mpu_t mMPU6050::get_raw_mpu() {
     // if (mpu.getMotionInterruptStatus())
     // {
     sensors_event_t a, g, t;
-    mpu.getEvent(&a, &g, &t);
+    _mpu.getEvent(&a, &g, &t);
 
     raw_mpu.accel_x = a.acceleration.x;
     raw_mpu.accel_y = a.acceleration.y;
@@ -58,8 +58,13 @@ data_raw_mpu_t mMPU6050::get_raw_mpu() {
     raw_mpu.gyro_x  = g.gyro.x;
     raw_mpu.gyro_y  = g.gyro.y;
     raw_mpu.gyro_z  = g.gyro.z;
-    raw_mpu.temp    = t.temperature;
+    // raw_mpu.temp    = t.temperature;
     // }
 
     return raw_mpu;
+}
+
+int calibrar() {
+    // TODO: CALIBRAR MPU6050
+    return 0;
 }

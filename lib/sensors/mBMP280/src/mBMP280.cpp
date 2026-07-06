@@ -15,12 +15,12 @@ mBMP280::mBMP280()
 {}
 
 bool mBMP280::init(uint8_t addr, uint8_t chipid) {
-    if (!bmp.begin(addr, chipid)) {
+    if (!_bmp.begin(addr, chipid)) {
         return false;
     }
 
     // Set configuration for high filter rate and 500ms delay to capture blowing fluctuations
-    bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     // Modo Normal (medición continua)
+    _bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     // Modo Normal (medición continua)
                 Adafruit_BMP280::SAMPLING_X1,     // Sobremuestreo de Temp (Ultra low power)
                 Adafruit_BMP280::SAMPLING_X1,     // Sobremuestreo de Presión (Ultra low power)
                 Adafruit_BMP280::FILTER_OFF,      // Filtro desactivado para mayor respuesta
@@ -33,7 +33,7 @@ bool mBMP280::init(uint8_t addr, uint8_t chipid) {
     return true;
 }
 
-data_raw_bmp_t mBMP280::get_raw_bmp() {
+data_raw_bmp_t mBMP280::get_bmp_raw_data() {
     data_raw_bmp_t raw_bmp = {};
 
     raw_bmp.presion = get_pressure();

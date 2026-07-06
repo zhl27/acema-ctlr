@@ -4,7 +4,10 @@
 
 #include "mBuzzer.h"
 
-mBuzzer::mBuzzer(int pin) : buzzerPin(pin), state(false) {}
+mBuzzer::mBuzzer(int pin) :
+    buzzerPin(pin),
+    state(false)
+{}
 
 void mBuzzer::init() {
     pinMode(buzzerPin, OUTPUT);

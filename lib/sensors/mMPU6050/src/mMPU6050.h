@@ -17,7 +17,7 @@
  */
 class mMPU6050 {
 private:
-    Adafruit_MPU6050 mpu;
+    Adafruit_MPU6050 _mpu;
 
     float accelX;
     float accelY;
@@ -48,7 +48,9 @@ public:
     float getGyroZ() const { return gyroZ; }
     float getTemp() const { return temp; }
 
-    data_raw_mpu_t get_raw_mpu();
+    data_raw_mpu_t get_mpu_raw_data();
+
+    int calibrar(); // TODO: IMPLEMENTAR CALIBRACION DE MPU6050
 };
 
 

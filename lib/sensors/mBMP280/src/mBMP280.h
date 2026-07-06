@@ -17,7 +17,7 @@
  */
 class mBMP280 {
 private:
-    Adafruit_BMP280 bmp;
+    Adafruit_BMP280 _bmp;
     // float last_temp;
     // float last_pres;
     // float last_alt;
@@ -34,11 +34,11 @@ public:
     bool init(uint8_t addr = 0x77, uint8_t chipid = BMP280_CHIPID);
 
     // Getters for current sensor readings
-    float get_temperature() { return bmp.readTemperature(); }
-    float get_pressure() { return bmp.readPressure(); }
+    float get_temperature() { return _bmp.readTemperature(); }
+    float get_pressure() { return _bmp.readPressure(); }
     // float getAltitude() { return bmp.readAltitude(1013.25f); } // NO USAMOS EL VALOR CALCULADO POR EL SENSOR
 
-    data_raw_bmp_t get_raw_bmp();
+    data_raw_bmp_t get_bmp_raw_data();
 };
 
 

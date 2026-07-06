@@ -27,7 +27,7 @@ public:
     double getLatitude() const;
     double getLongitude() const;
     bool is3dFixed() const;
-    nav_pvt_t get_gps_data() const;
+    nav_pvt_t get_gps_raw_data() const;
 
 private:
     // Parámetros de hardware

@@ -42,8 +42,8 @@ bool Sensors::init() {
 data_raw_t Sensors::get_raw_data() {
     data_raw_t raw = {};
 
-    raw.bmp = getBMP280().get_raw_bmp();
-    raw.mpu = getMPU6050().get_raw_mpu();
+    raw.bmp = getBMP280().get_bmp_raw_data();
+    raw.mpu = getMPU6050().get_mpu_raw_data();
 
     // TODO: Traer datos nav_pvt_t del módulo GPS
 

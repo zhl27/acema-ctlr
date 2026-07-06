@@ -9,14 +9,11 @@
 #include "SerialPrint.h"
 
 LoraWrapped GSE::_lora(LORA_CS, LORA_RST, LORA_DIO0, LORA_DIO1, SPI);
-GSE::RocketState GSE::_currentState = GSE::RocketState::ROCKET_INIT;             // Assuming an int or an enum
+EstadoConexionGSE GSE::_currentState = EstadoConexionGSE::ROCKET_INIT;             // Assuming an int or an enum
 unsigned long GSE::_previousMillis = 0; // Standard type for millis()
 int GSE::_cicloContador = 0;
 float GSE::_simuladorAltitud = 0.0f;
 
-GSE::RocketState GSE::estado_mde() {
-    return GSE::_currentState;
-}
 
 void GSE::init() {
 #if defined(MICRO_ESP32)
