@@ -112,8 +112,8 @@ typedef struct NAV_PVT {
     uint8_t  numSV;         // Byte Offset: 23 - Número de satelites usados
     int32_t  lon;           // Byte Offset: 24 - Longitud (Escala: 1e-7 grados)
     int32_t  lat;           // Byte Offset: 28 - Latitud (Escala: 1e-7 grados)
-    int32_t  height;        // Byte Offset: 32 - Altura sobre el elipsoide (mm)
-    int32_t  hMSL;          // Byte Offset: 36 - Altura sobre el nivel medio del mar (mm)
+    int32_t  height;        // Byte Offset: 32 - Altura sobre el elipsoide (mm) 
+    int32_t  hMSL;          // Byte Offset: 36 - Altura sobre el nivel medio del mar (mm) = altura ortométrica
     uint32_t hAcc;          // Byte Offset: 40 - Estimación de precisión horizontal (mm)
     uint32_t vAcc;          // Byte Offset: 44 - Estimación de precisión vertical (mm)
     int32_t  velN;          // Byte Offset: 48 - Velocidad norte NED (mm/s)

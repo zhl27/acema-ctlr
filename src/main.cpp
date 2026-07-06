@@ -117,6 +117,8 @@ void vTaskReadSensors(void *pvParameters) {
         print_data_raw(&raw);
 
         data_all_t all_data = DataFilter::process(raw);
+        
+        print_data(&all_data);
 
         // if (xStateMachineRingbuf != NULL) {
         //     if (xRingbufferSend(xStateMachineRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(10)) != pdTRUE) {
@@ -170,11 +172,9 @@ void vTaskStateMachine(void *pvParameters) {
 
                 data_all_t *datos_sensores = static_cast<data_all_t *>(item);
 
-                // (Opcional) Guardar una copia por si hay que evaluar la MDE sin datos nuevos
-                // memcpy(&ultimos_datos, datos_sensores, sizeof(data_raw_t));
+                // NOTA: Asegurarse de que mde_cohete_actualizar acepte un puntero a data_raw_t
+                mde_cohete_actualizar(datos_sensores);
 
-                // NOTA: Asegúrate de que mde_cohete_actualizar acepte un puntero a data_raw_t
-                // mde_cohete_actualizar(datos_sensores);
                 // SerialPrint::plot("contadorMde", contadorMde);
                 // contadorMde++;
             } else {
@@ -185,10 +185,8 @@ void vTaskStateMachine(void *pvParameters) {
             vRingbufferReturnItem(xStateMachineRingbuf, item);
 
         } else {
-            // SerialPrint::msg("[StateMachine] No messages (timeout)");
+            SerialPrint::msg("[StateMachine] No messages (timeout)");
         }
-
-
 
         // vTaskDelay(pdMS_TO_TICKS(1000));
     }
@@ -220,9 +218,8 @@ void vTaskFlash(void *pvParameters) {
             }
             vRingbufferReturnItem(xFlashRingbuf, item);
         } else {
-            // SerialPrint::msg("[Flash] No items to persist (timeout)");
+            SerialPrint::msg("[Flash] No items to persist (timeout)");
         }
-
 
         // vTaskDelay(pdMS_TO_TICKS(1000));
     }
@@ -255,8 +252,6 @@ void vTaskLora(void *pvParameters) {
         } else {
             SerialPrint::msg("[Lora] No messages to send (timeout)");
         }
-
-
 
         // vTaskDelay(pdMS_TO_TICKS(1000)); // importante ceder tiempo si hay task priorities diferentes para que no se produzca inanicion en otras tasks
     }

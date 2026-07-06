@@ -36,7 +36,7 @@ public:
     static uint32_t getSatellites() { return _gps.getSatellites(); }
     static double getLatitude() { return _gps.getLatitude(); }
     static double getLongitude() { return _gps.getLongitude(); }
-    static bool isLocationValid() { return _gps.isLocationValid(); }
+    static bool is3dFixed() { return _gps.is3dFixed(); }
 
     // MPU6050
     static float getAccelX() { return _mpu6050.getAccelX(); }

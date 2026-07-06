@@ -119,23 +119,19 @@ data_all_t DataFilter::process(const data_raw_t& raw) {
     // ==========================================
     // STEP 4: ORIENTACIÓN Y CINEMÁTICA ANGULAR
     // ==========================================
-    // 1. Magnitud escalar del spin (RPM)
-    // Se calcula con la velocidad angular del eje de rotación (asumiendo Z como eje longitudinal del cohete)
-    // Convertir de deg/s a RPM -> (vel * 60) / 360 = vel / 6
-    out.vel_rotacional_rpm = out.vel_angular_z / 6.0f;
 
     // 2. Pitch y Roll (Filtro Complementario / Estimación básica con acelerómetro)
     // Nota: Esto es una estimación estática, idealmente se fusiona con el giroscopio usando el dt.
-    out.pitch_deg = atan2(-raw_accel_x_f, sqrt(raw_accel_y_f * raw_accel_y_f + raw_accel_z_f * raw_accel_z_f)) * 180.0f / M_PI;
-    out.roll_deg  = atan2(raw_accel_y_f, raw_accel_z_f) * 180.0f / M_PI;
+    // out.pitch_deg = atan2(-raw_accel_x_f, sqrt(raw_accel_y_f * raw_accel_y_f + raw_accel_z_f * raw_accel_z_f)) * 180.0f / M_PI;
+    // out.roll_deg  = atan2(raw_accel_y_f, raw_accel_z_f) * 180.0f / M_PI;
 
 
-    // ==========================================
-    // STEP 5: TELEMETRÍA EMPAQUETADA (Cast para LoRa)
-    // ==========================================
-    out.posicion_relativa = (int16_t)out.altura_m;
-    out.velocidad         = (int16_t)out.velocidad_z_m_s;
-    out.momentum          = (int16_t)out.momentum_kg_m_s;
+    // // ==========================================
+    // // STEP 5: TELEMETRÍA EMPAQUETADA (Cast para LoRa)
+    // // ==========================================
+    // out.posicion_relativa = out.altura_m;
+    // out.velocidad         = out.velocidad_z_m_s;
+    // out.momentum          = out.momentum_kg_m_s;
 
     return out;
 }
