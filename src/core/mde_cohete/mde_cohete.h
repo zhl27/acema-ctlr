@@ -45,11 +45,11 @@
  */
 typedef enum {
     ST_INIT = 0, //
-    ST_WARMUP_MPU,             // Calentamiento térmico obligatorio de 5 min
-    ST_BUSCANDO_CONEXION_GSE,  // Intento de enlace GSE (No bloqueante, con timeout)
-    ST_ESPERA_GPS_FIX,         // Esperando 3D Fix
-    ST_ESPERA_DESPEGUE,        // En rampa. Ignición externa. Esperando trigger cinemático
-    ST_PROPULSION,             // Impulso detectado (>= 2g x 150ms + 4m)
+    // ST_WARMUP_MPU,             // Calentamiento térmico obligatorio de 5 min
+    ST_ESPERA_CONEXION_GSE,    // Intento de enlace GSE (No bloqueante, con timeout) --> queremos volar aún sin conexion con GSE
+    ST_ESPERA_GPS_PRECISO,         // Esperando 3D Fix
+    ST_ESPERA_IGNICION,        // En rampa. Ignición externa. Esperando trigger cinemático
+    ST_BOOST,                  // Impulso detectado (>= 2g x 150ms + 4m)
     ST_FASE_BALISTICA,         // Inercia ascendente. Activa rutina de frenado aerodinámico
     ST_APOGEO,                 // Derivada de altura nula. Disparo Drogue + Corte cámara
     ST_DESCENSO_EVALUACION,    // Ventana de 3 segundos post-drogue para testear salud
@@ -80,44 +80,41 @@ typedef enum {
     ERR_GPS_TIMEOUT,             // Por si queremos forzar el lanzamiento sin GPS (override)
     ERR_MPU_CALIBRACION_FALLIDA, // El sensor no logró estabilizar offsets
     ERR_DESPEGUE_FALSO_ZARANDEO, // Se detectó un pico de Gs pero sin delta de altura
+    ERR_DESPEGUE_PROHIBIDO,      // Se realizo despegue a pesar de no estar en condiciones
     ERR_TRAYECTORIA_NO_VERTICAL, // El vector de actitud se inclinó peligrosamente
     ERR_DROGUE_DESGARRO,         // Aceleración anómala detectada durante los 3s de drogue
     ERR_FRENADO_AERO_ATASCADO,   // Actuador de frenado aerodinámico no responde
-    ERR_SD_COMPUTADORA_MUERTA    // Falló SD principal, derivando a UART_Camara
+    ERR_ESTADO_INVALIDO,         // cuando un estado_vuelo_t es mayor que ST_NULL
 } cod_error_t;
 
 
 typedef struct {
     estado_vuelo_t estado;
     cod_error_t error;
-
-    // Flags de configuración de misión
-    bool vuelo_en_silencio_radio; ///< True si GSE dio timeout y lanzamos igual
-    bool usar_uart_camara_como_sd; ///< True si la SD principal falló
+    bool entrando_estado;
+    // bool es_estado_salida;
 
     // Tracking de integradores temporales (Filtros anti-ruido)
-    uint64_t timestamp_entrada_estado;
-    uint64_t timestamp_inicio_pico_g;  ///< Mide los 150ms continuos de >= 2G
-    uint64_t timestamp_apertura_drogue;
+    uint64_t timestamp_micros_entrada_estado;
+    uint64_t timestamp_micros_inicio_pico_g;  ///< Mide los 150ms continuos de >= 2G
+    uint64_t timestamp_micros_apertura_drogue;
 
     struct {
         // Datos Barométricos puros (BMP280)
-        float cota_suelo_rampa;     ///< Altura de tara inicial (~3m)
-        float altura_actual_filtrada;
+        float cota_suelo_rampa;         ///< Altura de tara inicial (~3m)
+        float altura_actual;
         float altura_max_historica;
-        float temperatura_ambiente; ///< Usada exclusivamente para densidad
-        float densidad_aire;
 
         // Datos Inerciales transformados al sistema Suelo (MPU6050 + Filtro)
-        Vector3D<float> acel_world; ///< Ya restada la gravedad (-1g en Y)
-        Vector3D<float> vel_world;
-        Vector3D<float> pos_world;
+        Vector3D<float> acel_global;    ///< Ya restada la gravedad (-1g en Y)
+        Vector3D<float> vel_global;
+        Vector3D<float> pos_global;
 
         // Cuaternión de transformación de coordenadas (Cuerpo -> Suelo)
-        float cuaternion_actitud[4];
-        bool gps_3d_fix_obtenido;
-        int satelites_visibles;
-        float gps_hdop;
+        float cuaternion_actitud[4]; // esto sirve para conocer posicion respecto al punto de origen a todo momento.  // TODO: chequear
+        // bool gps_3d_fix_obtenido;
+        // int satelites_visibles;
+        // float gps_hdop;
     } contexto_fisico;
 
 } system_data_t;
@@ -125,10 +122,14 @@ typedef struct {
 // DEFINICIÓN DE LA INSTANCIA GLOBAL DE VUELO
 extern system_data_t COHETE;
 
+bool es_entrada_a_estado();
+void transicionar_hacia(estado_vuelo_t nuevo_estado);
+
 /** @brief Tabla de punteros a función estrictamente mapeada a estado_vuelo_t */
 extern const f_st_t MDE_COHETE[];
 
 void mde_cohete_actualizar(data_all_t* datos_sensores);
-void manejar_error(data_all_t* datos_sensores);
+void transicion_error(const cod_error_t &error, data_all_t* datos_sensores);
+
 
 #endif //ACEMA_CTLR_MDE_COHETE_H

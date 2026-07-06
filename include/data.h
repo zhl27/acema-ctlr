@@ -21,7 +21,7 @@ typedef struct {
     float accel_x; // Aceleración X (Raw) (TODO: Ver de obtener 16 bits)
     float accel_y; // Aceleración Y (Raw)
     float accel_z; // Aceleración Z (Raw)
-    float temp;    // Temperatura (Raw)
+    // float temp;    // Temperatura (Raw) --> No usamos el dato temp (temperatura) de la mpu5060 (mpu) porque es del chip y no del ambiente. La mpu usa la temp porque afecta a sus mediciones.
     float gyro_x;  // Velocidad angular X (Raw)
     float gyro_y;  // Velocidad angular Y (Raw)
     float gyro_z;  // Velocidad angular Z (Raw)
@@ -71,33 +71,86 @@ typedef struct {
 typedef struct {
 
     // --- CINEMÁTICA LINEAL (Eje Z absoluto calibrado al cielo) ---
-    float altura_m;                   // Altura filtrada sobre el suelo
+    float altura_m;                   // Altura filtrada sobre el suelo --
     float velocidad_z_m_s;            // Velocidad vertical real
     float aceleracion_z_m_s2;         // Aceleración lineal absoluta (sin gravedad)
 
-    // --- DINÁMICA ---
     float momentum_kg_m_s;            // Cantidad de movimiento (P = m * v)
 
-    // --- CINEMÁTICA ANGULAR ---
-    float vel_angular_x;              // Pitch rate (deg/s o rad/s)
-    float vel_angular_y;              // Roll rate
     float vel_angular_z;              // Yaw rate
-    float vel_rotacional_rpm;            // Magnitud escalar del spin centrífugo
+    float vel_angular_y;              // Roll rate
+    float vel_angular_x;              // Pitch rate (deg/s o rad/s)
 
-    // --- ORIENTACIÓN ESPACIAL (Filtro Complementario) ---
-    float pitch_deg;
-    float roll_deg;
+    float angulo_respecto_z;
 
-    // --- AMBIENTALES PROCESADOS ---
     float temperatura_amb_c;          // Tomada estrictamente del BMP280
     float densidad_aire_kg_m3;        // Calculada por ley de gases ideales
 
+    // float posicion_relativa;          // Altura casteada para ahorrar ancho de banda LoRa
+    // float velocidad;                  // Velocidad vertical casteada
+    // float momentum;                   // Momentum casteado
 
-    float posicion_relativa;        // Altura casteada para ahorrar ancho de banda LoRa
-    float velocidad;                // Velocidad vertical casteada
-    float momentum;                 // Momentum casteado
+    uint32_t gps_nro_satelites;
+    uint32_t gps_fix_type;
+    bool gps_gnss_fix_ok;
+    float gps_pdop;
 
-} data_all_t; ///< Todos los datos originados del ambiente a través de los sensores que YA ESTÁN SANITIZADOS Y FILTRADOS!
+    float latitud;
+    float longitud;
+
+} data_all_t; ///< Información de utilidad obtenida del ambiente a través de los sensores que YA ESTÁN SANITIZADOS Y FILTRADOS!
+
+
+
+
+
+// - Altitud Baro,
+// - Altitud MPU,
+// - Velocidad baro,  --> preguntar
+// - Velocidad MPU,
+// - Aceleración MPU,
+// - Ángulo respecto a la vertical,
+// - Continuidad de pirotecnicos,
+// - Lat y Long,
+// - Satelites,
+// - Estado Actual de la MdE,
+// - Ángulo Freno,
+// - Código de error
+typedef struct {
+
+    float altura_bmp;
+    float altura_mpu;
+
+    float vel_z_bmp;
+    float vel_y_bmp;
+    float vel_x_bmp;
+
+    float vel_z_mpu;
+    float vel_y_mpu;
+    float vel_x_mpu;
+
+    float acel_z_mpu;
+
+    float angulo_respecto_z;
+
+    bool gps_3d_fijado;
+    float latitud;
+    float longitud;
+    int32_t nro_satelites;
+
+
+    float angulo_airbrake;
+
+    bool hay_continuidad_pyro_pcaidas_ppal;
+    bool hay_continuidad_pyro_pcaidas_drogue;
+
+    int32_t codigo_error;
+
+} data_gse_t;
+
+
+
+
 
 
 #include <Arduino.h>
@@ -129,16 +182,11 @@ inline void print_data_raw(const data_raw_t *data) {
     Serial.printf("[MPU6050] Gyro  X: %f | Y: %f | Z: %f\n",
                   data->mpu.gyro_x, data->mpu.gyro_y, data->mpu.gyro_z);
 
-    Serial.printf("[MPU6050] Temp: %f\n", data->mpu.temp);
-
     // --- Datos del GPS (nav_pvt_t) ---
-    // NOTA: 'nav_pvt_t' no está definido en el snippet original
-    /*
     Serial.printf("[GPS]     Latitud: %ld | Longitud: %ld | Satelites: %d\n",
                   (long)data->gps.lat,
                   (long)data->gps.lon,
                   (int)data->gps.numSV);
-    */
 
     Serial.printf("==========================================\n");
 }
@@ -151,7 +199,7 @@ inline void print_data(const data_all_t *data) {
         return;
     }
 
-    Serial.printf("\n=============== DATA_ALL_T ===============\n");
+    Serial.printf("\n=============== DATA_ALL_T (micros=%lu) ===============\n", micros());
 
     Serial.printf("--- CINEMÁTICA LINEAL ---\n");
     Serial.printf("Altura:             %.2f m\n", data->altura_m);
@@ -165,23 +213,12 @@ inline void print_data(const data_all_t *data) {
     Serial.printf("Vel Angular X:      %.2f °/s (Pitch)\n", data->vel_angular_x);
     Serial.printf("Vel Angular Y:      %.2f °/s (Roll)\n", data->vel_angular_y);
     Serial.printf("Vel Angular Z:      %.2f °/s (Yaw)\n", data->vel_angular_z);
-    Serial.printf("Vel Rotacional:     %.2f RPM\n", data->vel_rotacional_rpm);
-
-    Serial.printf("--- ORIENTACIÓN ESPACIAL ---\n");
-    Serial.printf("Pitch:              %.2f °\n", data->pitch_deg);
-    Serial.printf("Roll:               %.2f °\n", data->roll_deg);
 
     Serial.printf("--- AMBIENTALES PROCESADOS ---\n");
     Serial.printf("Temperatura Amb:    %.2f °C\n", data->temperatura_amb_c);
     Serial.printf("Densidad Aire:      %.4f kg/m^3\n", data->densidad_aire_kg_m3);
 
-    Serial.printf("--- TELEMETRÍA EMPAQUETADA (LoRa) ---\n");
-    // Los int16_t se imprimen con %d ya que se promueven implícitamente a int
-    Serial.printf("Posición Relativa:  %f\n", data->posicion_relativa);
-    Serial.printf("Velocidad:          %f\n", data->velocidad);
-    Serial.printf("Momentum:           %f\n", data->momentum);
-
-    Serial.printf("==========================================\n\n");
+    Serial.printf("======================================================\n\n");
 }
 
 #endif //ACEMA_CTLR_DATA_H
