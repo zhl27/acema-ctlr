@@ -17,9 +17,8 @@ namespace Cohete {
      */
     typedef enum {
         ST_INIT = 0, //
-        // ST_WARMUP_MPU,             // Calentamiento térmico obligatorio de 5 min
         ST_ESPERA_CONEXION_GSE,    // Intento de enlace GSE (No bloqueante, con timeout) --> queremos volar aún sin conexion con GSE
-        ST_ESPERA_GPS_PRECISO,         // Esperando 3D Fix
+        ST_ESPERA_GPS_PRECISO,     // Esperando 3D Fix
         ST_ESPERA_IGNICION,        // En rampa. Ignición externa. Esperando trigger cinemático
         ST_BOOST,                  // Impulso detectado (>= 2g x 150ms + 4m)
         ST_FASE_BALISTICA,         // Inercia ascendente. Activa rutina de frenado aerodinámico
@@ -57,14 +56,22 @@ namespace Cohete {
         ERR_DROGUE_DESGARRO,         // Aceleración anómala detectada durante los 3s de drogue
         ERR_FRENADO_AERO_ATASCADO,   // Actuador de frenado aerodinámico no responde
         ERR_ESTADO_INVALIDO,         // cuando un estado_vuelo_t es mayor que ST_NULL
+        ERR_DESCONOCIDO
     } cod_error_t;
 
 
     typedef struct {
         estado_t estado;
-        cod_error_t error;
+        cod_error_t error; // contiene el ultimo error que se dio
         bool entrando_estado;
         // bool es_estado_salida;
+
+        struct {
+            TaskHandle_t xTaskReadSensorsHandle;
+            TaskHandle_t xTaskStateMachineHandle;
+            TaskHandle_t xTaskFlashHandle;
+            TaskHandle_t xTaskLoraHandle;
+        } procesos;
 
         float masa_cohete_kg;
         float altitud_cero_pad_m;

@@ -9,7 +9,6 @@
 #include "data.h"
 #include "funciones_de_estado.h"
 #include "include.h"
-#include "Vector3D.h"
 
 /* =========================================================================
  * CONSULTAS DE DISEÑO / INCERTIDUMBRES (Para revisar con el equipo)
@@ -40,17 +39,16 @@
  * ========================================================================= */
 
 namespace Cohete {
-    // DEFINICIÓN DE LA INSTANCIA GLOBAL DE VUELO
-    extern Cohete::system_data_t SYSTEM;
 
     bool es_entrada_a_estado();
-    void transicionar_hacia(Cohete::estado_t nuevo_estado);
+    void transicionar_hacia(estado_t nuevo_estado);
 
     /** @brief Tabla de punteros a función estrictamente mapeada a estado_vuelo_t */
     extern const f_st_t MDE_COHETE[];
+    extern const char* estado_vuelo_string[];
 
     void mde_cohete_actualizar(data_all_t* datos_sensores);
-    void transicion_error(const Cohete::cod_error_t &error, data_all_t* datos_sensores);
+    void transicion_error(cod_error_t error, data_all_t* datos_sensores);
 
 }
 

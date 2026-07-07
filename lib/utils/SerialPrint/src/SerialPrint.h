@@ -24,6 +24,8 @@ char* concat(int num, ...);
 
 class SerialPrint {
     static bool safe_print(const char *format, ...);
+    // static bool safe_print(size_t buffer_size, const char *format, ...);
+
 public:
     static void init(int baudrate);
     // Datos que queremos graficar

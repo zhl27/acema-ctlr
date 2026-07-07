@@ -13,7 +13,6 @@ void SerialPrint::init(int baudrate) {
 }
 
 
-// TODO: tener en cuenta los riesgos de usar variadic functions --> no afecta a nuestro caso de uso
 bool SerialPrint::safe_print(const char *format, ...) {
     char buffer[BUFFER_SIZE];
     const unsigned long t_time = micros();
@@ -23,7 +22,6 @@ bool SerialPrint::safe_print(const char *format, ...) {
     char* str[20]; // 2 ^ 63 = 9223372036854775808 --> tiene 19 dígitos decimales --> en string son 19 chars --> 20 chars en total máximo (contando null terminator)
     res += vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
-    res += snprintf(buffer, sizeof(buffer), "%s%ct_time%c%lumicros", buffer, DATA_SEPARATOR, KEYVALUE_SEPARATOR, t_time);
 
     if (res < 0) {
         Serial.println("ERR$format_error");
@@ -32,12 +30,70 @@ bool SerialPrint::safe_print(const char *format, ...) {
 
     if (res >= sizeof(buffer)) {
         Serial.println("ERR$buffer_overflow");
+        // SE DEBE REINTENTAR PRINTEAR PERO CON UN BUFFER MAS GRANDE.
+        // va_start(args, format);
+        // safe_print(format, args);
+        // va_end(args);
         return false;
     }
 
-    Serial.println(buffer);
+    Serial.printf("%s%ct_time%c%lumicros\n", buffer, DATA_SEPARATOR, KEYVALUE_SEPARATOR, t_time);
     return true;
 }
+
+// TODO: tener en cuenta los riesgos de usar variadic functions --> no afecta a nuestro caso de uso
+// bool SerialPrint::safe_print(const char *format, ...) {
+//     char buffer[BUFFER_SIZE];
+//     const unsigned long t_time = micros();
+//     int res = 0;
+//     va_list args;
+//     va_start(args, format);
+//     char* str[20]; // 2 ^ 63 = 9223372036854775808 --> tiene 19 dígitos decimales --> en string son 19 chars --> 20 chars en total máximo (contando null terminator)
+//     res += vsnprintf(buffer, sizeof(buffer), format, args);
+//     va_end(args);
+//     res += snprintf(buffer, sizeof(buffer), "%s%ct_time%c%lumicros", buffer, DATA_SEPARATOR, KEYVALUE_SEPARATOR, t_time);
+//
+//     if (res < 0) {
+//         Serial.println("ERR$format_error");
+//         return false;
+//     }
+//
+//     if (res >= sizeof(buffer)) {
+//         Serial.println("ERR$buffer_overflow");
+//         // SE DEBE REINTENTAR PRINTEAR PERO CON UN BUFFER MAS GRANDE.
+//         va_start(args, format);
+//         safe_print(format, args);
+//         va_end(args);
+//         return false;
+//     }
+//
+//     Serial.println(buffer);
+//     return true;
+// }
+// bool SerialPrint::safe_print(size_t buffer_size, const char *format, ...) {
+//     char buffer[buffer_size];
+//     const unsigned long t_time = micros();
+//     int res = 0;
+//     va_list args;
+//     va_start(args, format);
+//     char* str[20]; // 2 ^ 63 = 9223372036854775808 --> tiene 19 dígitos decimales --> en string son 19 chars --> 20 chars en total máximo (contando null terminator)
+//     res += vsnprintf(buffer, sizeof(buffer), format, args);
+//     va_end(args);
+//     res += snprintf(buffer, sizeof(buffer), "%s%ct_time%c%lumicros", buffer, DATA_SEPARATOR, KEYVALUE_SEPARATOR, t_time);
+//
+//     if (res < 0) {
+//         Serial.println("ERR$format_error");
+//         return false;
+//     }
+//
+//     if (res >= sizeof(buffer)) {
+//         Serial.println("ERR$buffer_overflow");
+//         return false;
+//     }
+//
+//     Serial.println(buffer); // printea finalmente todo
+//     return true;
+// }
 
 
 // void SerialPrint::plot(const char key[], const float value) { // TODO: impl defectuosa

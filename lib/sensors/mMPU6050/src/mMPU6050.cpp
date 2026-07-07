@@ -64,7 +64,7 @@ data_raw_mpu_t mMPU6050::get_mpu_raw_data() {
     return raw_mpu;
 }
 
-int calibrar() {
+int mMPU6050::calibrar() {
     // TODO: CALIBRAR MPU6050
     return 0;
 }

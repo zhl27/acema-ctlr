@@ -20,6 +20,7 @@
 #include "LoraWrapped.h"
 
 
+// constexpr size_t RBUF_SIZE = 8192; // bytes per ring buffer
 constexpr size_t RBUF_SIZE = 4096; // bytes per ring buffer
 
 // Ring buffer handles
@@ -27,11 +28,11 @@ RingbufHandle_t xStateMachineRingbuf;
 RingbufHandle_t xLoraRingbuf;
 RingbufHandle_t xFlashRingbuf;
 
-// Task Handles
-TaskHandle_t xTaskReadSensorsHandle = NULL;
-TaskHandle_t xTaskStateMachineHandle = NULL;
-TaskHandle_t xTaskFlashHandle = NULL;
-TaskHandle_t xTaskLoraHandle = NULL;
+// // Task Handles
+// TaskHandle_t xTaskReadSensorsHandle = NULL;
+// TaskHandle_t xTaskStateMachineHandle = NULL;
+// TaskHandle_t xTaskFlashHandle = NULL;
+// TaskHandle_t xTaskLoraHandle = NULL;
 
 // Task Function Prototypes
 void vTaskReadSensors(void *pvParameters); // la tarea que lee los sensores y envía los datos a la cola --> Productor
@@ -56,23 +57,23 @@ void setup() {
 
     SerialPrint::msg("Comenzando el setup...");
 
-    buzzer.init();
+    // buzzer.init();
     // buzzer.beep(500);
 
     // Initialize the kinematic filter (Adjust mass and pad offset as needed for your launch)
     // TODO: FALTA MODIFICAR DATAFILTER DE FORMA ACORDE A LOS REQUERIMIENTOS.
-    DataFilter::init(15.0f, 0.0f);
+    DataFilter::init();
     Sensors::init();
     GSE::init();
 
     // MDE
     // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
-    // xStateMachineRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
-    // if (xStateMachineRingbuf == NULL) {
-    //     SerialPrint::err("Error al crear xStateMachineRingbuf");
-    // } else {
-    //     SerialPrint::msg("xStateMachineRingbuf creado");
-    // }
+    xStateMachineRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
+    if (xStateMachineRingbuf == NULL) {
+        SerialPrint::err("Error al crear xStateMachineRingbuf");
+    } else {
+        SerialPrint::msg("xStateMachineRingbuf creado");
+    }
 
     // LORA
     xLoraRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
@@ -91,14 +92,14 @@ void setup() {
     // }
 
     // TODO: Hacer un Profile. Ver si es overkill usar 4096 WORDs para esto. Ojo: WORD = 4 bits en la esp32. "You can use uxTaskGetStackHighWaterMark() to monitor unused stack space"
-    xTaskCreate(vTaskReadSensors, "ReadSensors", 4096, NULL, 4, &xTaskReadSensorsHandle);
-    // xTaskCreate(vTaskStateMachine, "StateMachine", 4096, NULL, 3, &xTaskStateMachineHandle);
+    xTaskCreate(vTaskReadSensors, "ReadSensors", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskReadSensorsHandle));
+    xTaskCreate(vTaskStateMachine, "StateMachine", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskStateMachineHandle));
     // xTaskCreate(vTaskFlash, "Flash", 4096, NULL, 3, &xTaskFlashHandle);
-    xTaskCreate(vTaskLora, "Lora", 4096, NULL, 4, &xTaskLoraHandle);
+    xTaskCreate(vTaskLora, "Lora", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskLoraHandle));
 
     vTaskDelete(NULL); // NULL hace referenica al task default que maneja a "void loop()"
 
-    buzzer.playSuccess();
+    // buzzer.playSuccess();
 
     vTaskDelay(pdMS_TO_TICKS(100));
 }
@@ -109,23 +110,29 @@ void loop(){
 
 // TODO: Pensar sobre este texto: "You need to gather large bursts of hardware data inside an Interrupt Service Routine (ISR) to be processed later by a task."
 void vTaskReadSensors(void *pvParameters) {
+    (void)pvParameters;
     while (true) {
+
+#ifdef DEBUG_ESP32
+        SerialPrint::plot("Core ID (ReadSensors)", xPortGetCoreID());
+#endif
         // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
         data_raw_t raw = Sensors::get_raw_data();
 
-        // Serial.printf("raw.mpu.accel_y=%f\n", raw.mpu.accel_y);
-        print_data_raw(&raw);
+        // print_data_raw(&raw);
 
         data_all_t all_data = DataFilter::process(raw);
         
-        print_data(&all_data);
+        // print_data(&all_data);
 
-        // if (xStateMachineRingbuf != NULL) {
-        //     if (xRingbufferSend(xStateMachineRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(10)) != pdTRUE) {
-        //         SerialPrint::err("xRingbufferSend -> xStateMachineRingbuf failed (all_data)");
-        //     }
-        // }
+        // MDE
+        if (xStateMachineRingbuf != NULL) {
+            if (xRingbufferSend(xStateMachineRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(10)) != pdTRUE) {
+                SerialPrint::err("xRingbufferSend -> xStateMachineRingbuf failed (all_data)");
+            }
+        }
 
+        // FLASH
         // if (xFlashRingbuf != NULL) {
         //     // if (xRingbufferSend(xFlashRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(10)) != pdTRUE) {
         //     //     SerialPrint::err("xRingbufferSend -> xFlashRingbuf failed (raw)");
@@ -139,8 +146,7 @@ void vTaskReadSensors(void *pvParameters) {
             // if (xRingbufferSend(xLoraRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(10)) != pdTRUE) {
             //     SerialPrint::err("xRingbufferSend -> xLoraRingbuf failed (raw)");
             // }
-
-            BaseType_t  res = xRingbufferSend(xLoraRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(50));
+            BaseType_t res = xRingbufferSend(xLoraRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(70));
             if (res != pdTRUE) {
                 Serial.printf("xRingbufferSend (xLoraRingbuf) ha fallado (all_data). Codigo de error:%d\n", res);
             }
@@ -173,7 +179,7 @@ void vTaskStateMachine(void *pvParameters) {
                 data_all_t *datos_sensores = static_cast<data_all_t *>(item);
 
                 // NOTA: Asegurarse de que mde_cohete_actualizar acepte un puntero a data_raw_t
-                mde_cohete_actualizar(datos_sensores);
+                Cohete::mde_cohete_actualizar(datos_sensores);
 
                 // SerialPrint::plot("contadorMde", contadorMde);
                 // contadorMde++;
