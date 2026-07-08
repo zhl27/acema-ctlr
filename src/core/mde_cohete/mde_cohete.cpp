@@ -102,7 +102,7 @@ namespace Cohete {
                 // matamos el proceso GSE asi no nos gasta recursos del cohete, o bajamos su frecuencia.
                 vTaskSuspend(SYSTEM.procesos.xTaskLoraHandle);
                 SYSTEM.procesos.flujos.Sensors_a_Lora_enabled = false;
-                SerialPrint::msg("Suspendido el Task Lora con éxito !");
+                SerialPrint::msg("Suspendido el Task Lora.");
                 // continuamos con la siguiente etapa.
                 transicionar_hacia(ST_ESPERA_GPS_PRECISO);
                 return;

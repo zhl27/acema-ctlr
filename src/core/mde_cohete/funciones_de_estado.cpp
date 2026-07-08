@@ -12,9 +12,10 @@
 
 constexpr float A_GRAV = 9.81;
 constexpr float PESO_KG_COMBUSTIBLE = 5; // TODO: COMPLETAR CON EL DATO REAL
-constexpr uint64_t CONEXION_GSE_TIMEOUT_MILLIS = 1000*5;
+constexpr uint32_t CONEXION_GSE_TIMEOUT_MILLIS = 1000*5;
 constexpr float ALTURA_M_MAX = 1000;
-constexpr uint64_t GPS_TIMEOUT_MILLIS = 1000*5;
+constexpr uint32_t GPS_TIMEOUT_MILLIS = 1000*5;
+constexpr uint32_t TIEMPO_MILLIS_ESPERA_WARMUP_MPU = 1000*60*5;
 
 
 namespace Cohete {
@@ -26,6 +27,7 @@ namespace Cohete {
     void calibrar_mpu_callback(TimerHandle_t xTimer) {
         Sensors::getMPU6050().calibrar();
         flag_timerRecalibrarMPU_disparado = true;
+        SerialPrint::msg("Temporizador xTimerRecalibrarMPU disparado!");
     }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,13 +68,14 @@ namespace Cohete {
         xTimerRecalibrarMPU =
             xTimerCreate(
                 "Recalibrar",
-                pdMS_TO_TICKS(1000*60*5),
+                pdMS_TO_TICKS(TIEMPO_MILLIS_ESPERA_WARMUP_MPU),
                 pdFALSE, // one shot timer
                 nullptr,
                 calibrar_mpu_callback
             );
         if( xTimerRecalibrarMPU != NULL ) {
             /* Iniciamos el temporizador con un tiempo de bloqueo (block time) de 0 */
+            SerialPrint::msg(" -> [INIT] Temporizador xTimerRecalibrarMPU creado. Se disparará en 5 minutos"); // TODO: mejorar sistema de logging
             xTimerStart( xTimerRecalibrarMPU, 0 );
         }
 
@@ -115,11 +118,11 @@ namespace Cohete {
             transicion_error(ERR_GPS_TIMEOUT, datos_sensores);
         }
         if (datos_sensores->gps_nro_satelites < 4) {
-            Serial.printf("[GPS] Esperando satélites. Visibles: %d", datos_sensores->gps_nro_satelites);
+            if (millis() % 200 == 0)
+                Serial.printf("[GPS] Esperando satélites. Visibles: %d\n", datos_sensores->gps_nro_satelites);
         }
         else if (Evento::gps_es_preciso(datos_sensores)) {
-            SerialPrint::msg(" -> [GPS] Precisión de GPS asegurado.");
-
+            SerialPrint::msg(" [GPS] Precisión de GPS asegurado!");
             transicionar_hacia(ST_ESPERA_IGNICION);
         }
     }
@@ -137,6 +140,11 @@ namespace Cohete {
 
         if(Evento::en_codiciones_para_volar(datos_sensores)) {
             // if led no encendido: encenderlo para señalizar que ya podemos volar.
+            if (millis() % 1000 == 0) {
+                SerialPrint::msg("[ESPERA IGNICION] Cohete en condiciones para volar!");
+            }
+
+
             if (Evento::hay_boost(datos_sensores)) {
                 SYSTEM.timestamp_micros_inicio_pico_g = micros();
                 transicionar_hacia(ST_BOOST);
