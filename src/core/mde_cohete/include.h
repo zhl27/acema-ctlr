@@ -71,6 +71,11 @@ namespace Cohete {
             TaskHandle_t xTaskStateMachineHandle;
             TaskHandle_t xTaskFlashHandle;
             TaskHandle_t xTaskLoraHandle;
+            struct {
+                bool Sensors_a_StateMachine_enabled;
+                bool Sensors_a_Flash_enabled;
+                bool Sensors_a_Lora_enabled;
+            } flujos;
         } procesos;
 
         float masa_cohete_kg;

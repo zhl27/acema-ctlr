@@ -142,11 +142,13 @@ void vTaskReadSensors(void *pvParameters) {
         //     }
         // }
 
-        if (xLoraRingbuf != NULL) {
+
+
+        if (xLoraRingbuf != NULL && Cohete::SYSTEM.procesos.flujos.Sensors_a_Lora_enabled) {
             // if (xRingbufferSend(xLoraRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(10)) != pdTRUE) {
             //     SerialPrint::err("xRingbufferSend -> xLoraRingbuf failed (raw)");
             // }
-            BaseType_t res = xRingbufferSend(xLoraRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(70));
+            BaseType_t res = xRingbufferSend(xLoraRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(50));
             if (res != pdTRUE) {
                 Serial.printf("xRingbufferSend (xLoraRingbuf) ha fallado (all_data). Codigo de error:%d\n", res);
             }

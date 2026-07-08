@@ -14,11 +14,16 @@ namespace Cohete {
         .entrando_estado = false,
         // .es_estado_salida = false,
 
-        .procesos = {
+        .procesos ={
             .xTaskReadSensorsHandle = NULL,
             .xTaskStateMachineHandle = NULL,
             .xTaskFlashHandle = NULL,
-            .xTaskLoraHandle = NULL
+            .xTaskLoraHandle = NULL,
+            .flujos = {
+                .Sensors_a_StateMachine_enabled = true,
+                .Sensors_a_Flash_enabled = true,
+                .Sensors_a_Lora_enabled = true
+            }
         },
 
         .timestamp_micros_entrada_estado = 0,
@@ -84,6 +89,11 @@ namespace Cohete {
         MDE_COHETE[SYSTEM.estado](datos_sensores); // Ejecuta la función que corresponde al estado actual
     }
 
+    // void pausar_proceso(TaskHandle_t proceso) {
+    //     vTaskSuspend(proceso);
+    //     SYSTEM.procesos.flujos.Sensors_a_Lora_enabled = false; // TODO: PENSAR SOLUCION MEJOR PARA MANEJAR LOS FLUJOS. QUIZAS UNA LISTA INDEXADA.
+    // }
+
     void transicion_error(const cod_error_t error, data_all_t *datos_sensores) {
         SYSTEM.error=error;
 
@@ -91,12 +101,15 @@ namespace Cohete {
             case ERR_TIMEOUT_CONEXION_GSE:
                 // matamos el proceso GSE asi no nos gasta recursos del cohete, o bajamos su frecuencia.
                 vTaskSuspend(SYSTEM.procesos.xTaskLoraHandle);
+                SYSTEM.procesos.flujos.Sensors_a_Lora_enabled = false;
                 SerialPrint::msg("Suspendido el Task Lora con éxito !");
                 // continuamos con la siguiente etapa.
                 transicionar_hacia(ST_ESPERA_GPS_PRECISO);
                 return;
             case ERR_GPS_TIMEOUT:
                 // TODO: QUÉ HACEMOS SI SE DA EL TIMEOUT DEL GPS ?
+                SerialPrint::msg("Timeout de GPS !!!");
+                SerialPrint::msg("Seguimos con el siguiente estado de la MdE.");
                 transicionar_hacia(ST_ESPERA_IGNICION);
                 return;
             case ERR_NINGUNO:
