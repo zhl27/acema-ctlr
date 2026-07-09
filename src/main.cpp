@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/ringbuf.h"
+#include "esp_log.h"
 
 #include <cstring>
 #include <cstdio>
@@ -24,23 +25,23 @@
 constexpr size_t RBUF_SIZE = 4096; // bytes per ring buffer
 
 // Ring buffer handles
-RingbufHandle_t xDataDistributorRingbuf;
+RingbufHandle_t xDataFilterRingbuf;
 RingbufHandle_t xStateMachineRingbuf;
 RingbufHandle_t xLoraRingbuf;
 RingbufHandle_t xFlashRingbuf;
 
-// // Task Handles
-// TaskHandle_t xTaskReadSensorsHandle = NULL;
-// TaskHandle_t xTaskStateMachineHandle = NULL;
-// TaskHandle_t xTaskFlashHandle = NULL;
-// TaskHandle_t xTaskLoraHandle = NULL;
-
 // Task Function Prototypes
 void vTaskReadSensors(void *pvParameters); // la tarea que lee los sensores y envía los datos a la cola de datos crudos
-void vTaskDataDistributor(void *pvParameters); // agarra los datos crudos de los sensores, los procesa y los distribuye
+void vTaskDataFilter(void *pvParameters); // agarra los datos crudos de los sensores, los procesa y los distribuye
 void vTaskStateMachine(void *pvParameters); // la máquina de estados que orquesta la lógica principal del cohete, incluyendo la gestión de estados de conexión, envío de telemetría, etc.
 void vTaskFlash(void *pvParameters); // la caja negra que persiste cada dato entrante.
 void vTaskLora(void *pvParameters); // maneja la comunicación LoRa, incluyendo el envío de datos y la gestión de la conexión con el GSE.
+
+static const char *TAG_SENSORS = "SENSORS";
+static const char *TAG_DATA_FILTER = "DATA FILTER";
+static const char *TAG_STATE_MACHINE = "STATE MACHINE";
+static const char *TAG_FLASH = "FLASH";
+static const char *TAG_LORA = "LORA";
 
 mBuzzer buzzer(BUZZER_PIN);
 
@@ -57,6 +58,10 @@ void setup() {
     while (!Serial)
         delay(1000);
 
+    ESP_LOGI("SETUP", "Comenzando SETUP.");
+#ifdef DEBUG_ESP32
+    esp_log_level_set("*", ESP_LOG_DEBUG);
+#endif
     // buzzer.init();
     // buzzer.beep(500);
 
@@ -67,8 +72,8 @@ void setup() {
     GSE::init();
 
     // DATA DISTRIBUTOR
-    xDataDistributorRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
-    if (xDataDistributorRingbuf == NULL) {
+    xDataFilterRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
+    if (xDataFilterRingbuf == NULL) {
         SerialPrint::err("Error al crear xDataDistributorRingbuf");
     } else {
         SerialPrint::msg("xDataDistributorRingbuf creado");
@@ -104,7 +109,7 @@ void setup() {
     xTaskCreate(vTaskStateMachine, "StateMachine", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskStateMachineHandle));
     // xTaskCreate(vTaskFlash, "Flash", 4096, NULL, 3, &xTaskFlashHandle);
     xTaskCreate(vTaskLora, "Lora", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskLoraHandle));
-    xTaskCreate(vTaskDataDistributor, "DataDistributor", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskDataDistributorHandle));
+    xTaskCreate(vTaskDataFilter, "DataFilter", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskDataFilterHandle));
 
     vTaskDelete(NULL); // NULL hace referenica al task default que maneja a "void loop()"
 
@@ -130,8 +135,8 @@ void vTaskReadSensors(void *pvParameters) {
 
         // print_data_raw(&raw);
 
-        if (xDataDistributorRingbuf != NULL) {
-            if (xRingbufferSend(xDataDistributorRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(10)) != pdTRUE) {
+        if (xDataFilterRingbuf != NULL) {
+            if (xRingbufferSend(xDataFilterRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(10)) != pdTRUE) {
                 SerialPrint::err("xRingbufferSend -> xDataDistributorRingbuf failed (raw)");
             }
         }
@@ -144,11 +149,11 @@ void vTaskReadSensors(void *pvParameters) {
     }
 }
 
-void vTaskDataDistributor(void *pvParameters) {
+void vTaskDataFilter(void *pvParameters) {
     (void)pvParameters;
     while (true) {
         size_t item_size = 0;
-        void *item = xRingbufferReceive(xDataDistributorRingbuf, &item_size, pdMS_TO_TICKS(2000));
+        void *item = xRingbufferReceive(xDataFilterRingbuf, &item_size, pdMS_TO_TICKS(2000));
 
         if (item != NULL) {
             if (item_size == sizeof(data_raw_t)) {
@@ -188,7 +193,7 @@ void vTaskDataDistributor(void *pvParameters) {
             } else {
                 SerialPrint::err("[DataDistributor] Tamaño de item no coincide con data_raw_t");
             }
-            vRingbufferReturnItem(xDataDistributorRingbuf, item);
+            vRingbufferReturnItem(xDataFilterRingbuf, item);
         } else {
             SerialPrint::msg("[DataDistributor] No messages (timeout)");
         }

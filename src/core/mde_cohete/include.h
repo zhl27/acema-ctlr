@@ -71,7 +71,7 @@ namespace Cohete {
             TaskHandle_t xTaskStateMachineHandle;
             TaskHandle_t xTaskFlashHandle;
             TaskHandle_t xTaskLoraHandle;
-            TaskHandle_t xTaskDataDistributorHandle;
+            TaskHandle_t xTaskDataFilterHandle;
             struct {
                 bool Sensors_a_StateMachine_enabled;
                 bool Sensors_a_Flash_enabled;
