@@ -5,7 +5,7 @@
 #ifndef ACEMA_CTLR_INCLUDE_H
 #define ACEMA_CTLR_INCLUDE_H
 
-#include <stdint.h>
+#include <cstdint>
 #include "Vector3D.h"
 
 
@@ -71,6 +71,7 @@ namespace Cohete {
             TaskHandle_t xTaskStateMachineHandle;
             TaskHandle_t xTaskFlashHandle;
             TaskHandle_t xTaskLoraHandle;
+            TaskHandle_t xTaskDataDistributorHandle;
             struct {
                 bool Sensors_a_StateMachine_enabled;
                 bool Sensors_a_Flash_enabled;

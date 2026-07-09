@@ -19,6 +19,7 @@ namespace Cohete {
             .xTaskStateMachineHandle = NULL,
             .xTaskFlashHandle = NULL,
             .xTaskLoraHandle = NULL,
+            .xTaskDataDistributorHandle = NULL,
             .flujos = {
                 .Sensors_a_StateMachine_enabled = true,
                 .Sensors_a_Flash_enabled = true,

@@ -24,6 +24,7 @@
 constexpr size_t RBUF_SIZE = 4096; // bytes per ring buffer
 
 // Ring buffer handles
+RingbufHandle_t xDataDistributorRingbuf;
 RingbufHandle_t xStateMachineRingbuf;
 RingbufHandle_t xLoraRingbuf;
 RingbufHandle_t xFlashRingbuf;
@@ -35,7 +36,8 @@ RingbufHandle_t xFlashRingbuf;
 // TaskHandle_t xTaskLoraHandle = NULL;
 
 // Task Function Prototypes
-void vTaskReadSensors(void *pvParameters); // la tarea que lee los sensores y envía los datos a la cola --> Productor
+void vTaskReadSensors(void *pvParameters); // la tarea que lee los sensores y envía los datos a la cola de datos crudos
+void vTaskDataDistributor(void *pvParameters); // agarra los datos crudos de los sensores, los procesa y los distribuye
 void vTaskStateMachine(void *pvParameters); // la máquina de estados que orquesta la lógica principal del cohete, incluyendo la gestión de estados de conexión, envío de telemetría, etc.
 void vTaskFlash(void *pvParameters); // la caja negra que persiste cada dato entrante.
 void vTaskLora(void *pvParameters); // maneja la comunicación LoRa, incluyendo el envío de datos y la gestión de la conexión con el GSE.
@@ -53,9 +55,7 @@ void setup() {
     Serial.begin(115200); // TODO: Para la Compu de vuelo no se usa Serial
 
     while (!Serial)
-        vTaskDelay(pdMS_TO_TICKS(1000));
-
-    SerialPrint::msg("Comenzando el setup...");
+        delay(1000);
 
     // buzzer.init();
     // buzzer.beep(500);
@@ -65,6 +65,14 @@ void setup() {
     DataFilter::init();
     Sensors::init();
     GSE::init();
+
+    // DATA DISTRIBUTOR
+    xDataDistributorRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
+    if (xDataDistributorRingbuf == NULL) {
+        SerialPrint::err("Error al crear xDataDistributorRingbuf");
+    } else {
+        SerialPrint::msg("xDataDistributorRingbuf creado");
+    }
 
     // MDE
     // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
@@ -96,12 +104,13 @@ void setup() {
     xTaskCreate(vTaskStateMachine, "StateMachine", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskStateMachineHandle));
     // xTaskCreate(vTaskFlash, "Flash", 4096, NULL, 3, &xTaskFlashHandle);
     xTaskCreate(vTaskLora, "Lora", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskLoraHandle));
+    xTaskCreate(vTaskDataDistributor, "DataDistributor", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskDataDistributorHandle));
 
     vTaskDelete(NULL); // NULL hace referenica al task default que maneja a "void loop()"
 
     // buzzer.playSuccess();
 
-    vTaskDelay(pdMS_TO_TICKS(100));
+    delay(100);
 }
 
 void loop(){
@@ -121,36 +130,9 @@ void vTaskReadSensors(void *pvParameters) {
 
         // print_data_raw(&raw);
 
-        data_all_t all_data = DataFilter::process(raw);
-        
-        // print_data(&all_data);
-
-        // MDE
-        if (xStateMachineRingbuf != NULL) {
-            if (xRingbufferSend(xStateMachineRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(10)) != pdTRUE) {
-                SerialPrint::err("xRingbufferSend -> xStateMachineRingbuf failed (all_data)");
-            }
-        }
-
-        // FLASH
-        // if (xFlashRingbuf != NULL) {
-        //     // if (xRingbufferSend(xFlashRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(10)) != pdTRUE) {
-        //     //     SerialPrint::err("xRingbufferSend -> xFlashRingbuf failed (raw)");
-        //     // }
-        //     if (xRingbufferSend(xFlashRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(10)) != pdTRUE) {
-        //         SerialPrint::err("xRingbufferSend -> xFlashRingbuf failed (all_data)");
-        //     }
-        // }
-
-
-
-        if (xLoraRingbuf != NULL && Cohete::SYSTEM.procesos.flujos.Sensors_a_Lora_enabled) {
-            // if (xRingbufferSend(xLoraRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(10)) != pdTRUE) {
-            //     SerialPrint::err("xRingbufferSend -> xLoraRingbuf failed (raw)");
-            // }
-            BaseType_t res = xRingbufferSend(xLoraRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(50));
-            if (res != pdTRUE) {
-                Serial.printf("xRingbufferSend (xLoraRingbuf) ha fallado (all_data). Codigo de error:%d\n", res);
+        if (xDataDistributorRingbuf != NULL) {
+            if (xRingbufferSend(xDataDistributorRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(10)) != pdTRUE) {
+                SerialPrint::err("xRingbufferSend -> xDataDistributorRingbuf failed (raw)");
             }
         }
 
@@ -161,6 +143,58 @@ void vTaskReadSensors(void *pvParameters) {
         // vTaskDelay(pdMS_TO_TICKS(1000)); // it yields CPU to lower priorities for 1s
     }
 }
+
+void vTaskDataDistributor(void *pvParameters) {
+    (void)pvParameters;
+    while (true) {
+        size_t item_size = 0;
+        void *item = xRingbufferReceive(xDataDistributorRingbuf, &item_size, pdMS_TO_TICKS(2000));
+
+        if (item != NULL) {
+            if (item_size == sizeof(data_raw_t)) {
+
+                data_raw_t *raw_ptr = static_cast<data_raw_t *>(item);
+                data_all_t all_data = DataFilter::process(*raw_ptr);
+                print_data(&all_data);
+
+                // MDE
+                if (xStateMachineRingbuf != NULL) {
+                    if (xRingbufferSend(xStateMachineRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(10)) != pdTRUE) {
+                        SerialPrint::err("xRingbufferSend -> xStateMachineRingbuf failed (all_data)");
+                    }
+                }
+
+                // FLASH
+                // if (xFlashRingbuf != NULL) {
+                //     // if (xRingbufferSend(xFlashRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(10)) != pdTRUE) {
+                //     //     SerialPrint::err("xRingbufferSend -> xFlashRingbuf failed (raw)");
+                //     // }
+                //     if (xRingbufferSend(xFlashRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(10)) != pdTRUE) {
+                //         SerialPrint::err("xRingbufferSend -> xFlashRingbuf failed (all_data)");
+                //     }
+                // }
+
+                // LORA
+                if (xLoraRingbuf != NULL && Cohete::SYSTEM.procesos.flujos.Sensors_a_Lora_enabled) {
+                    // if (xRingbufferSend(xLoraRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(10)) != pdTRUE) {
+                    //     SerialPrint::err("xRingbufferSend -> xLoraRingbuf failed (raw)");
+                    // }
+                    BaseType_t res = xRingbufferSend(xLoraRingbuf, (void *)&all_data, sizeof(data_all_t), pdMS_TO_TICKS(50));
+                    if (res != pdTRUE) {
+                        Serial.printf("xRingbufferSend (xLoraRingbuf) ha fallado (all_data). Codigo de error:%d\n", res);
+                    }
+                }
+
+            } else {
+                SerialPrint::err("[DataDistributor] Tamaño de item no coincide con data_raw_t");
+            }
+            vRingbufferReturnItem(xDataDistributorRingbuf, item);
+        } else {
+            SerialPrint::msg("[DataDistributor] No messages (timeout)");
+        }
+    }
+}
+
 
 // Mock implementation of the State Machine task: consumes sensor messages and forwards/acts on them
 void vTaskStateMachine(void *pvParameters) {
@@ -180,7 +214,7 @@ void vTaskStateMachine(void *pvParameters) {
 
                 data_all_t *datos_sensores = static_cast<data_all_t *>(item);
 
-                // NOTA: Asegurarse de que mde_cohete_actualizar acepte un puntero a data_raw_t
+                // NOTA: Asegurarse de que mde_cohete_actualizar acepte un puntero a data_all_t
                 Cohete::mde_cohete_actualizar(datos_sensores);
 
                 // SerialPrint::plot("contadorMde", contadorMde);
