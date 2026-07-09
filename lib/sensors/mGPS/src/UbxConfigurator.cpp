@@ -5,11 +5,12 @@
 // ==========================================
 // Constructor
 // ==========================================
-UbxConfigurator::UbxConfigurator(TxCallback txFunc, WaitAckCallback waitFunc) : 
+UbxConfigurator::UbxConfigurator(const TxCallback txFunc, const WaitAckCallback waitFunc) :
     _txFunc(txFunc), 
     _waitFunc(waitFunc) 
 {
     // Las funciones de callback se inyectan en el momento de crear la instancia
+    assert (_txFunc && _waitFunc); // ¡SÍ O SÍ!
 }
 
 // ==========================================
@@ -34,7 +35,7 @@ bool UbxConfigurator::setPortUart(uint32_t baudrate) {
     payload.outProtoMask.outProtoMask = 0x0001; 
 
     // Clase 0x06 (CFG), ID 0x00 (PRT) [cite: 617, 622]
-    return buildAndSend(UBX_CLASS::CFG, static_cast<uint8_t>(UBX_ID_CFG::PRT), (uint8_t*)&payload, sizeof(cfg_prt_uart_t));
+    return _buildAndSend(UBX_CLASS::CFG, static_cast<uint8_t>(UBX_ID_CFG::PRT), (uint8_t*)&payload, sizeof(cfg_prt_uart_t));
 }
 
 bool UbxConfigurator::setNavigationRate(uint8_t rateHz) {
@@ -51,7 +52,7 @@ bool UbxConfigurator::setNavigationRate(uint8_t rateHz) {
     payload.timeRef = 1; // 1 = Alineado a tiempo GPS (0 = UTC) [cite: 631]
 
     // Clase 0x06 (CFG), ID 0x08 (RATE) [cite: 631]
-    return buildAndSend(UBX_CLASS::CFG, static_cast<uint8_t>(UBX_ID_CFG::RATE), (uint8_t*)&payload, sizeof(cfg_rate_t));
+    return _buildAndSend(UBX_CLASS::CFG, static_cast<uint8_t>(UBX_ID_CFG::RATE), (uint8_t*)&payload, sizeof(cfg_rate_t));
 }
 
 bool UbxConfigurator::setDynamicModel(nav_dyn_model_e model) {
@@ -63,7 +64,7 @@ bool UbxConfigurator::setDynamicModel(nav_dyn_model_e model) {
     payload.dynModel = static_cast<uint8_t>(model);
 
     // Clase 0x06 (CFG), ID 0x24 (NAV5) [cite: 611]
-    return buildAndSend(UBX_CLASS::CFG, static_cast<uint8_t>(UBX_ID_CFG::NAV5), (uint8_t*)&payload, sizeof(cfg_nav5_t));
+    return _buildAndSend(UBX_CLASS::CFG, static_cast<uint8_t>(UBX_ID_CFG::NAV5), (uint8_t*)&payload, sizeof(cfg_nav5_t));
 }
 
 
@@ -85,7 +86,7 @@ bool UbxConfigurator::enableRegisteredMessages(const UbxRegMsg_t **ptrTablaMsg, 
         msgPayload.rate = 1; // Enviar en cada ciclo
 
         // Enviamos el comando UBX-CFG-MSG (0x06 0x01)
-        bool success = buildAndSend(UBX_CLASS::CFG, static_cast<uint8_t>(UBX_ID_CFG::MSG), (uint8_t*)&msgPayload, sizeof(cfg_msg_t));
+        bool success = _buildAndSend(UBX_CLASS::CFG, static_cast<uint8_t>(UBX_ID_CFG::MSG), (uint8_t*)&msgPayload, sizeof(cfg_msg_t));
         
         if (!success) {
             allSuccess = false; // Registramos si falló alguno
@@ -99,9 +100,9 @@ bool UbxConfigurator::enableRegisteredMessages(const UbxRegMsg_t **ptrTablaMsg, 
 // Ensamblador y Motor de Sincronización
 // ==========================================
 
-bool UbxConfigurator::buildAndSend(ubx_class_e msgClass, uint8_t msgID, const uint8_t* payload, size_t payloadSize) {
+bool UbxConfigurator::_buildAndSend(ubx_class_e msgClass, uint8_t msgID, const uint8_t* payload, size_t payloadSize) const {
     const size_t MAX_PACKET_SIZE = 128;
-    size_t packetSize; 
+    size_t packetSize;
     uint8_t buffer[MAX_PACKET_SIZE];
     uint8_t ckA = 0, ckB = 0;
     

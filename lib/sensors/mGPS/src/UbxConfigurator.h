@@ -48,7 +48,7 @@ public:
      * @param ptrTablaMsg Puntero a la tabla usada en UbxDispatcher.
      * @param tamanioTabla Cantidad de elementos.
      */
-    bool enableRegisteredMessages(const UbxRegMsg_t **ptrTablaMsg, const size_t tamanioTabla);
+    bool enableRegisteredMessages(const UbxRegMsg_t **ptrTablaMsg, size_t tamanioTabla);
 
 
 private:
@@ -59,7 +59,7 @@ private:
      * @brief Método interno genérico. 
      * Arma el paquete completo (Header + Payload + Checksum) y lo envía.
      */
-    bool buildAndSend(ubx_class_e msgClass, uint8_t msgID, const uint8_t* payload, size_t payloadSize);
+    bool _buildAndSend(ubx_class_e msgClass, uint8_t msgID, const uint8_t* payload, size_t payloadSize) const;
 };
 
 #endif

@@ -14,7 +14,7 @@ mGPS::mGPS(int uartNum, int rx, int tx, uint32_t baud) :
     _uartNum(uartNum), _rxPin(rx), _txPin(tx), _baud(baud),
     _dispatcher(nullptr), _configurator(nullptr)
 {
-    _instance = this; // Guardar referencia para callbacks estáticos
+    _instance = this; // Guardar referencia para callbacks estáticos --> esto asume que solo tenemos una instancia de la clase mGPS en runtime. TODO: Ojo con instanciar más de 1.
 
     // Limpiar buffers
     memset(&_pvt_data_rx, 0, sizeof(nav_pvt_t));
@@ -25,29 +25,43 @@ mGPS::mGPS(int uartNum, int rx, int tx, uint32_t baud) :
     _dataMutex = xSemaphoreCreateMutex();
 
     // Armar las rutas de los mensajes UBX
-    _regPvt.msgClass = static_cast<uint8_t>(UBX_CLASS::NAV);
-    _regPvt.msgID    = static_cast<uint8_t>(UBX_ID_NAV::PVT);
-    _regPvt.payloadBuffer = (uint8_t*)&_pvt_data_rx;
-    _regPvt.length   = sizeof(nav_pvt_t);
-    _regPvt.onReceive = _onPvtReceivedStatic;
+    // _regPvt.msgClass = static_cast<uint8_t>(UBX_CLASS::NAV);
+    // _regPvt.msgID    = static_cast<uint8_t>(UBX_ID_NAV::PVT);
+    // _regPvt.payloadBuffer = (uint8_t*)&_pvt_data_rx;
+    // _regPvt.length   = sizeof(nav_pvt_t);
+    // _regPvt.onReceive = _onPvtReceivedStatic;
+    _regPvt = {
+        static_cast<uint8_t>(UBX_CLASS::NAV),
+        static_cast<uint8_t>(UBX_ID_NAV::PVT),
+        (uint8_t*)&_pvt_data_rx,
+        sizeof(nav_pvt_t),
+        _onPvtReceivedStatic
+    };
 
-    _regAck.msgClass = static_cast<uint8_t>(UBX_CLASS::ACK);
-    _regAck.msgID    = 0x01; // ACK-ACK
-    _regAck.payloadBuffer = nullptr;
-    _regAck.length   = 0;
-    _regAck.onReceive = _onAckReceivedStatic;
+    // _regAck.msgClass = static_cast<uint8_t>(UBX_CLASS::ACK);
+    // _regAck.msgID    = 0x01; // ACK-ACK
+    // _regAck.payloadBuffer = nullptr;
+    // _regAck.length   = 0;
+    // _regAck.onReceive = _onAckReceivedStatic;
+    _regAck = {
+        static_cast<uint8_t>(UBX_CLASS::ACK),
+        0x01, // ACK-ACK
+        nullptr,
+        0,
+        _onAckReceivedStatic
+    };
 
     _tablaRegistros[0] = &_regPvt;
     _tablaRegistros[1] = &_regAck;
 
     // Inyectamos todo en el sistema
-    _dispatcher = new UbxDispatcher(_tablaRegistros, 2);
+    _dispatcher = new UbxDispatcher(_tablaRegistros, 2);  // TODO: pasar estas instanciaciones de tipo heap a tipo stack
     _configurator = new UbxConfigurator(_uartTxStatic, _waitAckStatic);
 }
 
 mGPS::~mGPS() {
-    if (_dispatcher) delete _dispatcher;
-    if (_configurator) delete _configurator;
+    delete _dispatcher;
+    delete _configurator;
     vSemaphoreDelete(_ackSemaphore);
     vSemaphoreDelete(_dataMutex);
 }
@@ -59,8 +73,8 @@ void mGPS::init() {
     Serial.println("[GPS] Inicializando UART...");
 
     // 1. Configuración de UART en ESP-IDF
-    uart_config_t uart_config = {
-        .baud_rate = (int)_baud, // Arrancamos a 9600 por defecto
+    const uart_config_t uart_config = {
+        .baud_rate = static_cast<int>(_baud), // Arrancamos a 9600 por defecto
         .data_bits = UART_DATA_8_BITS,
         .parity    = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
@@ -68,7 +82,7 @@ void mGPS::init() {
         .source_clk = UART_SCLK_APB,
     };
 
-    uart_port_t port = (uart_port_t)_uartNum;
+    const uart_port_t port = _uartNum;
     ESP_ERROR_CHECK(uart_param_config(port, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(port, _txPin, _rxPin, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     ESP_ERROR_CHECK(uart_driver_install(port, 1024 * 2, 0, 0, NULL, 0));
@@ -133,7 +147,7 @@ nav_pvt_t mGPS::get_gps_raw_data() const {
     nav_pvt_t copy;
     xSemaphoreTake((SemaphoreHandle_t)_dataMutex, portMAX_DELAY);
     copy = _pvt_data; // Copia segura
-    xSemaphoreGive((SemaphoreHandle_t)_dataMutex);
+    xSemaphoreGive(static_cast<SemaphoreHandle_t>(_dataMutex));
     return copy;
 }
 
@@ -148,7 +162,7 @@ void mGPS::_onAckReceivedStatic(void* data) {
     if (_instance) _instance->_onAckReceived(data);
 }
 
-void mGPS::_uartTxStatic(const uint8_t* data, size_t len) {
+void mGPS::_uartTxStatic(const uint8_t* data, const size_t len) {
     if (_instance) _instance->_uartTx(data, len);
 }
 
@@ -171,7 +185,7 @@ void mGPS::_onAckReceived(void* data) {
     xSemaphoreGive(_ackSemaphore); // Libera la pausa
 }
 
-void mGPS::_uartTx(const uint8_t* data, const size_t len) {
+void mGPS::_uartTx(const uint8_t* data, const size_t len) const {
     uart_write_bytes((uart_port_t)_uartNum, (const char*)data, len);
 }
 

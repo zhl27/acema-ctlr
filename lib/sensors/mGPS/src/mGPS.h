@@ -63,7 +63,7 @@ private:
 
     void _onPvtReceived(void* data);
     void _onAckReceived(void* data);
-    void _uartTx(const uint8_t* data, size_t len);
+    void _uartTx(const uint8_t* data, size_t len) const;
     bool _waitAck(uint8_t cls, uint8_t id, uint32_t timeoutMs);
 };
 

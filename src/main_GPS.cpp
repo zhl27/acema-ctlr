@@ -174,21 +174,24 @@ void gps_task(void* pvParameters) {
 }
 
 // ==========================================
-// Funciones Arduino Nativas
+// Punto de entrada
 // ==========================================
+
+TaskHandle_t xTaskGpsHandle = NULL;
 
 void setup() {
     // Consola de Depuración
     Serial.begin(115200);
     while(!Serial) {;} 
     
-    Serial.println("\n=========================================");
-    Serial.println("   Arranque: Undimotriz Telemetry Sys    ");
-    Serial.println("=========================================");
+    Serial.println("\n============================");
+    Serial.println("   Arranque: Telemetry Sys   ");
+    Serial.println("=============================");
 
     // Inicializamos el semáforo binario
     ackSemaphore = xSemaphoreCreateBinary();
-    
+
+
     // Lanzamos la tarea anclada al Core 1 (El Core 0 se suele usar para WiFi/Radio)
     xTaskCreatePinnedToCore(
         gps_task,       // Función
@@ -196,13 +199,16 @@ void setup() {
         8192,           // Tamaño de Pila (Stack)
         NULL,           // Parámetros
         5,              // Prioridad
-        NULL,           // Handle
+        &xTaskGpsHandle, // Handle
         1               // Core
     );
+
+    vTaskDelete(NULL);
+
 }
 
 void loop() {
     // La tarea principal en Arduino simplemente parpadeará o dormirá.
     // Toda la carga pesada está delegada en gps_task.
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    // vTaskDelay(pdMS_TO_TICKS(1000));
 }

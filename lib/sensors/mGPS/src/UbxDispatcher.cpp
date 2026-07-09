@@ -8,7 +8,7 @@
  * @date 19-06-2026
  */
 
-#define getByte() 
+// #define getByte()
 
 UbxDispatcher::UbxDispatcher(const UbxRegMsg_t **ptrTablaMsg, const size_t tamanioTabla):
     _tablaMsg(ptrTablaMsg), _tablaMsgSize(tamanioTabla)
@@ -20,9 +20,6 @@ UbxDispatcher::UbxDispatcher(const UbxRegMsg_t **ptrTablaMsg, const size_t taman
     _checksumModulo[0] = _checksumModulo[1] = 0;
 }
 
-UbxDispatcher::~UbxDispatcher()
-{
-}
 
 void UbxDispatcher::waitSync1(uint8_t byte)
 {
@@ -72,7 +69,6 @@ void UbxDispatcher::loadSubencabezado(uint8_t byte)
                 mensajeEncontrado = true;
                 break;
             }
-            
         }
 
         if (mensajeEncontrado)

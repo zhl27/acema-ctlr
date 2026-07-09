@@ -53,8 +53,8 @@ typedef struct UBX_HEADER{
  */
 class UbxDispatcher {
 public:
-    UbxDispatcher(const UbxRegMsg_t **ptrTablaMsg, const size_t tamanioTabla);
-    ~UbxDispatcher();
+    UbxDispatcher(const UbxRegMsg_t **ptrTablaMsg, size_t tamanioTabla);
+    ~UbxDispatcher() = default;
 
     /* Posibles aplicaciones*/
     void pushByte(uint8_t byte);
@@ -69,7 +69,7 @@ public:
 
 
 private:
-    enum STATE: uint8_t {WAIT_SYNC1, WAIT_SYNC2, LOAD_SUBENCABEZADO, LOAD_PAYLOAD, IGNORE_PAYLOAD, CHECKSUM} estadoActual;
+    enum STATE: uint8_t {WAIT_SYNC1, WAIT_SYNC2, LOAD_SUBENCABEZADO, LOAD_PAYLOAD, IGNORE_PAYLOAD, CHECKSUM};
     enum SYNC: uint8_t {_1 = 0xB5, _2 = 0x62};
 
     ubx_header_t _header;
