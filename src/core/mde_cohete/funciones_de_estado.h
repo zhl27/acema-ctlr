@@ -6,6 +6,9 @@
 #define ACEMA_CTLR_FUNCIONES_DE_ESTADO_H
 
 #include "data.h"
+#include "mBuzzer.h"
+
+extern mBuzzer buzzer;
 
 namespace Cohete {
 

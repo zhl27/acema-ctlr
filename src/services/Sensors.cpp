@@ -3,9 +3,10 @@
 //
 
 #include "Sensors.h"
-
 #include "config.h"
-#include "SerialPrint.h"
+#include "esp_log.h"
+
+static const char *TAG_TASK_SENSORS = "SENSORS";
 
 // ---------------------------------------------------------
 // You MUST define the static variables here so the linker
@@ -21,16 +22,16 @@ bool Sensors::init() {
     // _gps.init(); // TODO: Reemplazar por implementación de Joe
 
     if (!_mpu6050.init(MPU_ADDR)) {
-        SerialPrint::err("Failed to find MPU6050 chip");
+        ESP_LOGE(TAG_TASK_SENSORS, "Failed to find MPU6050 chip");
         return false;
     }
-    SerialPrint::msg("MPU6050 Found!");
+    ESP_LOGI(TAG_TASK_SENSORS, "MPU6050 Found!");
 
     if (!_bmp280.init(BMP280_ADDR, BMP280_CHIPID)) {
-        SerialPrint::err("Failed to find BMP280 chip");
+        ESP_LOGE(TAG_TASK_SENSORS, "Failed to find BMP280 chip");
         return false;
     }
-    SerialPrint::msg("BMP280 Found!");
+    ESP_LOGI(TAG_TASK_SENSORS, "BMP280 Found!");
     return true;
 }
 

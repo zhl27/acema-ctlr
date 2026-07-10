@@ -6,7 +6,9 @@
 
 #include <esp32-hal.h>
 
-#include "SerialPrint.h"
+#include "esp_log.h"
+
+static const char *TAG_GSE = "CONEXIÓN GSE";
 
 LoraWrapped GSE::_lora(LORA_CS, LORA_RST, LORA_DIO0, LORA_DIO1, SPI);
 EstadoConexionGSE GSE::_currentState = EstadoConexionGSE::ROCKET_INIT;             // Assuming an int or an enum
@@ -19,7 +21,7 @@ void GSE::init() {
 #if defined(MICRO_ESP32)
     // El ESP32 mapea el SPI por software en las patas elegidas
     SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_CS);
-    Serial.println("Inicializando SPI en modo ESP32...");
+    ESP_LOGI(TAG_GSE, "Inicializando SPI en modo ESP32...");
 #elif defined(MICRO_NANO)
     // El Nano usa sus pines fijos de hardware por defecto
     // 1. Configurar Chip Select
@@ -34,12 +36,12 @@ void GSE::init() {
     // 3. Arrancar el SPI nativo a baja velocidad para los divisores
     SPI.begin();
     SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
-    Serial.println("Inicializando SPI en modo Arduino Nano...");
+    ESP_LOGI(TAG_GSE, "Inicializando SPI en modo Arduino Nano...");
 #endif
     if(_lora.begin()) {
-        SerialPrint::msg("LoRa listo para el Cohete!");
+        ESP_LOGI(TAG_GSE, "LoRa listo para el Cohete!");
     } else {
-        SerialPrint::err("Falla crítica en hardware LoRa");
+        ESP_LOGE(TAG_GSE, "Falla crítica en hardware LoRa");
     }
 }
 
@@ -50,16 +52,16 @@ void GSE::actualizar(data_all_t *data) {
 
         case ROCKET_INIT:
             if (_lora.begin(DEFAULT_SYNC_WORD, DEFAULT_ENCRY_WORD, DEFAULT_FREC)) {
-                Serial.println(F("[COHETE] Hardware LoRa enlazado. Estado: DISCONNECTED"));
+                ESP_LOGI(TAG_GSE, "[COHETE] Hardware LoRa enlazado. Estado: DISCONNECTED");
                 _currentState = ROCKET_DISCONNECTED;
             } else {
-                Serial.println(F("[ERROR] No se pudo comunicar con el chip SX1276. Reintentando..."));
+                ESP_LOGI(TAG_GSE, "[ERROR] No se pudo comunicar con el chip SX1276. Reintentando...");
                 vTaskDelay(pdMS_TO_TICKS(2000)); // Retardo seguro únicamente en fase de inicialización crítica
             }
             break;
 
         case ROCKET_DISCONNECTED:
-            Serial.println(F("[COHETE] Enviando PING de conexión hacia el GSE..."));
+            ESP_LOGI(TAG_GSE, "[COHETE] Enviando PING de conexión hacia el GSE...");
             if (_lora.c_connect_to_GSE()) {
                 _previousMillis = currentMillis; // Reseteamos temporizador para esperar el PONG
                 _currentState = ROCKET_WAITING_PONG;
@@ -69,13 +71,13 @@ void GSE::actualizar(data_all_t *data) {
         case ROCKET_WAITING_PONG:
             // Escucha no bloqueante del PONG
             if (_lora.c_connection_accepted()) {
-                Serial.println(F("[COHETE] ¡PONG Recibido! Enlace confirmado. Estado: CONNECTED"));
+                ESP_LOGI(TAG_GSE, "[COHETE] ¡PONG Recibido! Enlace confirmado. Estado: CONNECTED");
                 _cicloContador = 0;
                 _currentState = ROCKET_CONNECTED;
             }
             // Time-out de reintento: si pasan 3 segundos sin respuesta, vuelve a intentar conectar
             else if (currentMillis - _previousMillis >= 3000) {
-                Serial.println(F("[WARN] Tiempo de espera de PONG agotado. Reintentando enlace..."));
+                ESP_LOGI(TAG_GSE, "[WARN] Tiempo de espera de PONG agotado. Reintentando enlace...");
                 _currentState = ROCKET_DISCONNECTED;
             }
             break;
@@ -93,22 +95,21 @@ void GSE::actualizar(data_all_t *data) {
                 print_data(data); // como es inline, no hay problemas con "Serial"
 
                 if (actualizar_graficas(data)) {
-                    Serial.print(F("[TX] Telemetría enviada correctamente. Muestra: "));
-                    Serial.println(_cicloContador + 1);
+                    ESP_LOGI(TAG_GSE, "[TX] Telemetría enviada correctamente. Muestra: %d", _cicloContador + 1);
                     _cicloContador++;
                 } else {
-                    Serial.println(F("[ERROR TX] Pérdida de paquetes o hardware ocupado."));
+                    ESP_LOGE(TAG_GSE, "[ERROR TX] Pérdida de paquetes o hardware ocupado.");
                 }
 
                 if (_cicloContador % 5 == 0)  {
-                    Serial.println(F("\n[EVENTO] Alcanzadas las 50 muestras. Enviando ráfaga de mensajes críticos..."));
+                    ESP_LOGI(TAG_GSE, "[EVENTO] Alcanzadas las 50 muestras. Enviando ráfaga de mensajes críticos...");
 
                     if (enviar_mensaje("HOLA DESDE LA ESTRATOSFERA")) {
-                        Serial.println(F("[TX STRING] Mensaje enviado: 'HOLA DESDE LA ESTRATOSFERA'"));
+                        ESP_LOGI(TAG_GSE, "[TX STRING] Mensaje enviado: 'HOLA DESDE LA ESTRATOSFERA'");
                     }
 
                     if (enviar_error("Houston, tenemos un problema")) {
-                        Serial.println(F("[TX ERROR] Mensaje crítico enviado: 'Houston, tenemos un problema'"));
+                        ESP_LOGI(TAG_GSE, "[TX ERROR] Mensaje crítico enviado: 'Houston, tenemos un problema'");
                     }
 
                     // Resetear contador para iniciar el siguiente ciclo de 50 telemetrías

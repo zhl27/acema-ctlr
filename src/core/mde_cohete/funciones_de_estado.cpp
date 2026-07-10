@@ -2,10 +2,12 @@
 
 #include "mde_cohete.h"
 #include "SerialPrint.h"
+#include "esp_log.h"
 #include "services/Actuators.h"
+
 #include "services/GSE.h"
 #include "services/Sensors.h"
-
+#include  "include.h"
 
 
 // TODO: Integrar con la variable global COHETE para transiciones de estado
@@ -15,7 +17,7 @@ constexpr float PESO_KG_COMBUSTIBLE = 5; // TODO: COMPLETAR CON EL DATO REAL
 constexpr uint32_t CONEXION_GSE_TIMEOUT_MILLIS = 1000*5;
 constexpr float ALTURA_M_MAX = 1000;
 constexpr uint32_t GPS_TIMEOUT_MILLIS = 1000*5;
-constexpr uint32_t TIEMPO_MILLIS_ESPERA_WARMUP_MPU = 1000*60*5;
+constexpr uint32_t TIEMPO_MILLIS_ESPERA_WARMUP_MPU = 1000*5;
 
 
 namespace Cohete {
@@ -27,7 +29,7 @@ namespace Cohete {
     void calibrar_mpu_callback(TimerHandle_t xTimer) {
         Sensors::getMPU6050().calibrar();
         flag_timerRecalibrarMPU_disparado = true;
-        SerialPrint::msg("Temporizador xTimerRecalibrarMPU disparado!");
+        ESP_LOGI(TAG_BASE, "Temporizador xTimerRecalibrarMPU disparado!");
     }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -43,7 +45,8 @@ namespace Cohete {
         }
 
         bool en_codiciones_para_volar(data_all_t* datos_sensores) {
-            return flag_timerRecalibrarMPU_disparado; // TODO: COMPLETAR CONDICIONES PARA VUELO
+            return flag_timerRecalibrarMPU_disparado; // el flag funciona
+            // TODO: COMPLETAR CONDICIONES PARA VUELO.
         }
 
         bool hay_boost(const data_all_t* datos_sensores) {
@@ -62,7 +65,7 @@ namespace Cohete {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     void f_st_init(data_all_t* datos_sensores) {
-        SerialPrint::msg("MdE Entrando -> [INIT]");
+        ESP_LOGI(TAG_BASE, "INIT");
 
         // Esperar 5 minutos para que la mpu entre en calor, luego calibrarla.
         xTimerRecalibrarMPU =
@@ -75,7 +78,7 @@ namespace Cohete {
             );
         if( xTimerRecalibrarMPU != NULL ) {
             /* Iniciamos el temporizador con un tiempo de bloqueo (block time) de 0 */
-            SerialPrint::msg(" -> [INIT] Temporizador xTimerRecalibrarMPU creado. Se disparará en 5 minutos"); // TODO: mejorar sistema de logging
+            ESP_LOGI(TAG_BASE, " -> [INIT] Temporizador xTimerRecalibrarMPU creado. Se disparará en 5 minutos"); // TODO: mejorar sistema de logging
             xTimerStart( xTimerRecalibrarMPU, 0 );
         }
 
@@ -94,6 +97,7 @@ namespace Cohete {
         if (es_entrada_a_estado()) {
             if (GSE::estado_conexion_gse() == ROCKET_DISCONNECTED || GSE::estado_conexion_gse() == ROCKET_INIT) {
                 timestamp_millis_inicio_timeout = millis();
+                ESP_LOGI(TAG_BASE, " -> [CONEXIÓN GSE] Esperando conexión con GSE...");
             }
 
         }
@@ -104,6 +108,7 @@ namespace Cohete {
             }
         }
         else if (GSE::estado_conexion_gse() == ROCKET_CONNECTED) {
+            ESP_LOGI(TAG_BASE, " -> [CONEXIÓN GSE] Nos conectamos a la GSE.");
             transicionar_hacia(ST_ESPERA_GPS_PRECISO);
         }
     }
@@ -119,15 +124,16 @@ namespace Cohete {
         }
         if (datos_sensores->gps_nro_satelites < 4) {
             if (millis() % 200 == 0)
-                Serial.printf("[GPS] Esperando satélites. Visibles: %d\n", datos_sensores->gps_nro_satelites);
+                ESP_LOGI(TAG_BASE, " -> [GPS] Esperando satélites. Visibles: %d", datos_sensores->gps_nro_satelites);
         }
         else if (Evento::gps_es_preciso(datos_sensores)) {
-            SerialPrint::msg(" [GPS] Precisión de GPS asegurado!");
+            ESP_LOGI(TAG_BASE, " -> [GPS] Precisión de GPS asegurado!");
             transicionar_hacia(ST_ESPERA_IGNICION);
         }
     }
 
     void f_st_espera_ignicion(data_all_t* datos_sensores) {
+        static unsigned long last_millis = 0;
         // Aquí el cohete está pasivo en la rampa. Ignición es externa.
         // Lógica del filtro anti-zarandeo:
         // 1. Transformar aceleración a vector inercial.
@@ -137,13 +143,17 @@ namespace Cohete {
         // 3. if (tiempo_con_2g >= 150ms AND delta_altura > 4.0m) {
         //      Transición a ST_PROPULSION.
         //    }
+        if (es_entrada_a_estado()) {
+            ESP_LOGI(TAG_BASE, "[ESPERA IGNICION] Esperando condiciones necesarias para el vuelo...");
+        }
 
         if(Evento::en_codiciones_para_volar(datos_sensores)) {
             // if led no encendido: encenderlo para señalizar que ya podemos volar.
-            if (millis() % 1000 == 0) {
-                SerialPrint::msg("[ESPERA IGNICION] Cohete en condiciones para volar!");
+            if (millis() - last_millis >= 3000) {
+                last_millis = millis();
+                buzzer.beep(100);
+                ESP_LOGI(TAG_BASE, " -> [ESPERA IGNICION] Cohete en condiciones para volar!");
             }
-
 
             if (Evento::hay_boost(datos_sensores)) {
                 SYSTEM.timestamp_micros_inicio_pico_g = micros();
@@ -260,20 +270,20 @@ namespace Cohete {
         // Lógica:
         // if (altura_actual_filtrada <= 250.0m) { // ¡Cuidado de chequear contra cota_suelo_rampa!
         //      Ignición pirotécnica Paracaídas Principal.
-        //      SerialPrint::msg(" -> [NOMINAL] Paracaídas Principal desplegado.");
+        //      // ESP_LOGI(TAG_STATE_MACHINE, " -> [NOMINAL] Paracaídas Principal desplegado.");
         //      Transición a ST_ATERRIZAJE (o estado intermedio de espera).
         // }
     }
 
     void f_st_desplegar_principal_emergencia(data_all_t* datos_sensores) {
-        SerialPrint::msg(" -> [EMERGENCIA] Drogue fallido. Disparando Principal de inmediato!");
+        ESP_LOGI(TAG_BASE, " -> [EMERGENCIA] Drogue fallido. Disparando Principal de inmediato!");
         // Lógica:
         // 1. Disparo inmediato del paracaídas principal.
         // 2. Transición a ST_ATERRIZAJE (esperando el suelo).
     }
 
     void f_st_ejecutar_panico_flash_dump(data_all_t* datos_sensores) {
-        SerialPrint::msg(" -> [FATAL] Caída libre detectada. Volcando RAM a Flash!");
+        ESP_LOGI(TAG_BASE, " -> [FATAL] Caída libre detectada. Volcando RAM a Flash!");
         // Lógica:
         // 1. Las tarjetas SD mecánicas pueden corromperse en impactos duros.
         // 2. Escribir el buffer circular de últimos 5 segundos en la Flash de la ESP32
@@ -293,9 +303,9 @@ namespace Cohete {
 
         // MANEJO GENERICO DE FALLAS
 
-        SerialPrint::err("[ST_ERROR]");
-        SerialPrint::err("ERROR DESCONOCIDO SIN MANEJAR.");
-        SerialPrint::plot("SYSTEM.error", SYSTEM.error);
+        ESP_LOGE(TAG_BASE, "[ST_ERROR]");
+        ESP_LOGE(TAG_BASE, "ERROR DESCONOCIDO SIN MANEJAR.");
+        ESP_LOGE(TAG_BASE, "SYSTEM.error=%d", SYSTEM.error);
 
     }
 

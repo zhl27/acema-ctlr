@@ -12,7 +12,11 @@
 
 namespace Cohete {
 
-    /** @enum estado_t
+    static const char *TAG_BASE = "STATE MACHINE";
+    // const size_t TAG_BASE_LEN = strlen(TAG_BASE)+1;
+    // extern const size_t TAG_MAX_LEN;
+
+    /** @enum estado_cohete_t
      * @brief Máquina de estados secuencial de vuelo ACEMA
      */
     typedef enum {
@@ -30,7 +34,7 @@ namespace Cohete {
         ST_ATERRIZAJE,             // Reposo en suelo. Emisión de coordenadas GPS
         ST_ERROR,                  // Estado de captura de excepciones
         ST_NULL
-    } estado_t;
+    } estado_cohete_t;
 
     // enum EstadoVuelo : uint8_t {
     //     IDLE_PAD = 0,
@@ -42,7 +46,7 @@ namespace Cohete {
     //     ATERRIZADO = 6
     // };
 
-    /** @enum cod_error_t
+    /** @enum error_cohete_t
      * @brief Códigos de error instantáneos y de diagnóstico
      */
     typedef enum {
@@ -57,12 +61,12 @@ namespace Cohete {
         ERR_FRENADO_AERO_ATASCADO,   // Actuador de frenado aerodinámico no responde
         ERR_ESTADO_INVALIDO,         // cuando un estado_vuelo_t es mayor que ST_NULL
         ERR_DESCONOCIDO
-    } cod_error_t;
+    } error_cohete_t;
 
 
     typedef struct {
-        estado_t estado;
-        cod_error_t error; // contiene el ultimo error que se dio
+        estado_cohete_t estado;
+        error_cohete_t error; // contiene el ultimo error que se dio
         bool entrando_estado;
         // bool es_estado_salida;
 

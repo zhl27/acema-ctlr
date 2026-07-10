@@ -4,7 +4,9 @@
 
 #include "mde_cohete.h"
 
-#include "SerialPrint.h"
+#include "esp_log.h"
+
+
 
 namespace Cohete {
 
@@ -59,7 +61,7 @@ namespace Cohete {
     };
 
     // correlativo a estado_vuelo_t --> el orden importa
-    const char* estado_vuelo_string[] = {
+    const char* estado_cohete_string[] = {
         "ST_INIT",
         "ST_ESPERA_CONEXION_GSE",
         "ST_ESPERA_GPS_PRECISO",
@@ -75,6 +77,12 @@ namespace Cohete {
         "ST_ERROR",
         "ST_NULL"
     };
+    // const size_t TAG_MAX_LEN = TAG_BASE_LEN+22;
+    // static char TAG[TAG_MAX_LEN];
+
+
+
+
 
     void mde_cohete_actualizar(data_all_t* datos_sensores) {
         if (SYSTEM.estado > ST_NULL) {
@@ -95,22 +103,22 @@ namespace Cohete {
     //     SYSTEM.procesos.flujos.Sensors_a_Lora_enabled = false; // TODO: PENSAR SOLUCION MEJOR PARA MANEJAR LOS FLUJOS. QUIZAS UNA LISTA INDEXADA.
     // }
 
-    void transicion_error(const cod_error_t error, data_all_t *datos_sensores) {
+    void transicion_error(const error_cohete_t error, data_all_t *datos_sensores) {
         SYSTEM.error=error;
 
         switch (error) {
             case ERR_TIMEOUT_CONEXION_GSE:
+                ESP_LOGE(TAG_BASE, "Timeout de conexión con GSE.");
                 // matamos el proceso GSE asi no nos gasta recursos del cohete, o bajamos su frecuencia.
                 vTaskSuspend(SYSTEM.procesos.xTaskLoraHandle);
                 SYSTEM.procesos.flujos.Sensors_a_Lora_enabled = false;
-                SerialPrint::msg("Suspendido el Task Lora.");
+                ESP_LOGI(TAG_BASE, "Suspendido el Task Lora.");
                 // continuamos con la siguiente etapa.
                 transicionar_hacia(ST_ESPERA_GPS_PRECISO);
                 return;
             case ERR_GPS_TIMEOUT:
                 // TODO: QUÉ HACEMOS SI SE DA EL TIMEOUT DEL GPS ?
-                SerialPrint::msg("Timeout de GPS !!!");
-                SerialPrint::msg("Seguimos con el siguiente estado de la MdE.");
+                ESP_LOGE(TAG_BASE, "Timeout de GPS.");
                 transicionar_hacia(ST_ESPERA_IGNICION);
                 return;
             case ERR_NINGUNO:
@@ -144,16 +152,20 @@ namespace Cohete {
         //
     }
 
-    void transicionar_hacia(const estado_t nuevo_estado) {
+    void transicionar_hacia(const estado_cohete_t nuevo_estado) {
+        // TODO: Volver a visitar esta curiosidad. Ver "mde_cohete/include.h"
+        // strlcpy(TAG, TAG_BASE, TAG_BASE_LEN);
+        // strlcat(TAG, " - ", TAG_BASE_LEN+3);
+        // strlcat(TAG, estado_cohete_string[nuevo_estado], TAG_BASE_LEN);
         if (nuevo_estado > ST_NULL) {
             // transicion_error(ERR_ESTADO_INVALIDO, nullptr);
-            Serial.printf("Codigo enum %d es Estado inválido", nuevo_estado);
+            ESP_LOGE(TAG_BASE, "Codigo enum %d es Estado inválido.", nuevo_estado);
             return;
         }
         SYSTEM.estado = nuevo_estado;
         SYSTEM.entrando_estado = true;
         SYSTEM.timestamp_micros_entrada_estado = micros(); // grabamos este instante de transicion en el que entramos a un nuevo estado
-        Serial.printf("[MdE] Entrando -> %s\n", estado_vuelo_string[nuevo_estado]);
+        ESP_LOGI(TAG_BASE, "Entrando a: %s", estado_cohete_string[nuevo_estado]);
     }
 
     bool es_entrada_a_estado() {
