@@ -40,13 +40,13 @@ public:
     bool init(uint8_t addr = 0x69);
 
     // Getters
-    float getAccelX() const { return accelX; }
-    float getAccelY() const { return accelY; }
-    float getAccelZ() const { return accelZ; }
-    float getGyroX() const { return gyroX; }
-    float getGyroY() const { return gyroY; }
-    float getGyroZ() const { return gyroZ; }
-    float getTemp() const { return temp; }
+    // float getAccelX() const { return accelX; }
+    // float getAccelY() const { return accelY; }
+    // float getAccelZ() const { return accelZ; }
+    // float getGyroX() const { return gyroX; }
+    // float getGyroY() const { return gyroY; }
+    // float getGyroZ() const { return gyroZ; }
+    // float getTemp() const { return temp; }
 
     data_raw_mpu_t get_mpu_raw_data();
 

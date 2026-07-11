@@ -1,6 +1,3 @@
-//
-// Created by zhl on 6/3/26.
-//
 
 #include "mGPS.h"
 
@@ -111,7 +108,7 @@ void mGPS::init() {
     Serial.println("[GPS] Inicializacion completa.");
 }
 
-void mGPS::update() const {
+void mGPS::_update() const {
     uint8_t buffer[128];
     // Lee sin bloquear o con un bloqueo cortísimo
     const int len = uart_read_bytes((uart_port_t)_uartNum, buffer, sizeof(buffer), pdMS_TO_TICKS(1));
@@ -123,31 +120,12 @@ void mGPS::update() const {
     }
 }
 
-// ==========================================
-// Getters de la clase (Thread-Safe)
-// ==========================================
-uint32_t mGPS::getSatellites() const {
-    return get_gps_raw_data().numSV;
-}
-
-double mGPS::getLatitude() const {
-    return get_gps_raw_data().lat * 1e-7;
-}
-
-double mGPS::getLongitude() const {
-    return get_gps_raw_data().lon * 1e-7;
-}
-
-bool mGPS::is3dFixed() const {
-    nav_pvt_t data = get_gps_raw_data();
-    return (data.fixType == 3 || data.fixType == 4); // 3=3D Fix, 4=GNSS+Dead Reckoning
-}
 
 nav_pvt_t mGPS::get_gps_raw_data() const {
     nav_pvt_t copy;
-    xSemaphoreTake((SemaphoreHandle_t)_dataMutex, portMAX_DELAY);
+    xSemaphoreTake(_dataMutex, portMAX_DELAY);
     copy = _pvt_data; // Copia segura
-    xSemaphoreGive(static_cast<SemaphoreHandle_t>(_dataMutex));
+    xSemaphoreGive(_dataMutex);
     return copy;
 }
 
@@ -194,7 +172,7 @@ bool mGPS::_waitAck(uint8_t cls, uint8_t id, const uint32_t timeoutMs) {
     const uint32_t start = millis();
 
     while ((millis() - start) < timeoutMs) {
-        update(); // CRÍTICO: Procesamos los bytes del UART mientras esperamos
+        _update(); // CRÍTICO: Procesamos los bytes del UART mientras esperamos
         if (xSemaphoreTake(_ackSemaphore, 0) == pdTRUE) {
             return true; // Éxito! Recibimos el ACK de esta clase y ID.
         }

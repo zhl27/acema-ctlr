@@ -36,8 +36,8 @@ bool mBMP280::init(uint8_t addr, uint8_t chipid) {
 data_raw_bmp_t mBMP280::get_bmp_raw_data() {
     data_raw_bmp_t raw_bmp = {};
 
-    raw_bmp.presion = get_pressure();
-    raw_bmp.temp = get_temperature();
+    raw_bmp.presion = _get_pressure();
+    raw_bmp.temp = _get_temperature();
 
     return raw_bmp;
 

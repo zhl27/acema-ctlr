@@ -19,26 +19,30 @@ mMPU6050 Sensors::_mpu6050;
 bool Sensors::init() {
     Wire.begin(WIRE_SDA_0, WIRE_SCL_0);
     // Wire.setClock(400000); // Set I2C clock to 400kHz Fast Mode
-    // _gps.init(); // TODO: Reemplazar por implementación de Joe
 
     if (!_mpu6050.init(MPU_ADDR)) {
-        ESP_LOGE(TAG_TASK_SENSORS, "Failed to find MPU6050 chip");
+        ESP_LOGE(TAG_TASK_SENSORS, "Falló la inicialización de mMPU6050.");
         return false;
     }
-    ESP_LOGI(TAG_TASK_SENSORS, "MPU6050 Found!");
+    ESP_LOGI(TAG_TASK_SENSORS, "mMPU6050 inicializada correctamente!");
 
     if (!_bmp280.init(BMP280_ADDR, BMP280_CHIPID)) {
-        ESP_LOGE(TAG_TASK_SENSORS, "Failed to find BMP280 chip");
+        ESP_LOGE(TAG_TASK_SENSORS, "Falló la inicialización de mBMP280.");
         return false;
     }
-    ESP_LOGI(TAG_TASK_SENSORS, "BMP280 Found!");
+    ESP_LOGI(TAG_TASK_SENSORS, "mBMP280 inicializada correctamente!");
+    if (!_gps.init()) {
+        ESP_LOGE(TAG_TASK_SENSORS, "Falló la inicialización de mGPS.");
+        return false;
+    }
     return true;
 }
 
 // TODO: VER SI ES NECESARIO
-// bool Sensors::update() {
-//     return true;
-// }
+bool Sensors::update() {
+    // getGPS().update();
+    return true;
+}
 
 data_raw_t Sensors::get_raw_data() {
     data_raw_t raw = {};
@@ -47,8 +51,9 @@ data_raw_t Sensors::get_raw_data() {
     raw.mpu = getMPU6050().get_mpu_raw_data();
 
     // TODO: Traer datos nav_pvt_t del módulo GPS
+    raw.gps = getGPS().get_gps_raw_data();
 
-    raw.elapsed_time_micros = micros(); // Needs a real timestamp implementation
+    raw.timestamp_micros = micros(); // TODO: VER SI DEBEMOS UTILIZAR OTRA FUNCIÓN
 
     return raw;
 }

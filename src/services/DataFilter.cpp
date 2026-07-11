@@ -92,8 +92,8 @@ data_all_t DataFilter::process(const data_raw_t& raw) {
 
     // Cálculo del diferencial de tiempo (dt) para derivadas
     float dt = 0.0f;
-    if (!_es_primer_ciclo && raw.elapsed_time_micros > _ultimo_tiempo_us) {
-        dt = static_cast<float>(raw.elapsed_time_micros - _ultimo_tiempo_us) / 1000000.0f; // Convertir us a segundos
+    if (!_es_primer_ciclo && raw.timestamp_micros > _ultimo_tiempo_us) {
+        dt = static_cast<float>(raw.timestamp_micros - _ultimo_tiempo_us) / 1000000.0f; // Convertir us a segundos
     }
 
     // 2. Velocidad Vertical Z (m/s) y Aceleración Z (m/s2)
@@ -113,7 +113,7 @@ data_all_t DataFilter::process(const data_raw_t& raw) {
 
     // Guardar estados para el próximo ciclo
     _ultima_altura_m = out.altura_m;
-    _ultimo_tiempo_us = raw.elapsed_time_micros;
+    _ultimo_tiempo_us = raw.timestamp_micros;
 
     // 3. Momentum (P = m * v)
     out.momentum_kg_m_s = Cohete::SYSTEM.masa_cohete_kg * out.velocidad_z_m_s;
