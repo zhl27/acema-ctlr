@@ -35,6 +35,7 @@ bool Sensors::init() {
         ESP_LOGE(TAG_TASK_SENSORS, "Falló la inicialización de mGPS.");
         return false;
     }
+    ESP_LOGI(TAG_TASK_SENSORS, "mGPS inicializada correctamente!");
     return true;
 }
 
