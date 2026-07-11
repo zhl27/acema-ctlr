@@ -33,18 +33,6 @@ namespace Cohete {
 
 }
 
-/// UTILS
-
-// val0 --> valor de estudio
-// val1 --> valor objetivo
-// delta --> margen
-inline bool aproxima(const int val0, const int val1, const int delta) {
-    return (val0 <= val1 + delta && val0 >= val1 - delta);
-}
-// lo mismo que decir: es val0 menor por 5 unidades a val1?
-// inline bool menor_delta_que(const int val0, const int val1, const float delta) {
-//     return (val0 <= val1 + delta);
-// }
 
 
 #endif //ACEMA_CTLR_FUNCIONES_DE_ESTADO_H

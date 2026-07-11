@@ -20,21 +20,53 @@ constexpr uint32_t GPS_TIMEOUT_MILLIS = 1000*5;
 constexpr uint32_t TIEMPO_MILLIS_ESPERA_WARMUP_MPU = 1000*5;
 
 
+
 namespace Cohete {
 
-    static TimerHandle_t xTimerRecalibrarMPU;
-    static bool flag_timerRecalibrarMPU_disparado = false;
+    namespace Timers
+    {
+        static TimerHandle_t xTimerRecalibrarMPU;
+        static bool flag_recalibrarMPU_disparado = false;
 
-    // typedef void (* TimerCallbackFunction_t)( TimerHandle_t xTimer );
-    void calibrar_mpu_callback(TimerHandle_t xTimer) {
-        Sensors::getMPU6050().calibrar();
-        flag_timerRecalibrarMPU_disparado = true;
-        ESP_LOGI(TAG_BASE, "Temporizador xTimerRecalibrarMPU disparado!");
+        // typedef void (* TimerCallbackFunction_t)( TimerHandle_t xTimer );
+        void calibrar_mpu_callback(TimerHandle_t xTimer) {
+            Sensors::getMPU6050().calibrar();
+            flag_recalibrarMPU_disparado = true;
+            ESP_LOGI(TAG_BASE, "Temporizador xTimerRecalibrarMPU disparado!");
+        }
     }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    namespace Evento {
+    namespace Eventos {
+        // val0 --> valor de estudio
+        // val1 --> valor objetivo
+        // delta --> margen
+        inline bool aproxima(const int val0, const int val1, const int delta) {
+            return (val0 <= val1 + delta && val0 >= val1 - delta);
+        }
+        // lo mismo que decir: es val0 menor por 5 unidades a val1?
+        // inline bool menor_delta_que(const int val0, const int val1, const float delta) {
+        //     return (val0 <= val1 + delta);
+        // }
+
+        // TODO: Buscar nombres más representativos para estas dos funciones, quizás ni siquiera sirven lo suficiente como para existir en este mundo.
+        bool time_elapsed_since_last_millis_is_greater_than(const uint32_t time) {
+            static uint32_t last_millis = 0;
+            const uint32_t comp = millis() - last_millis >= time;
+            if (comp) {
+                last_millis = millis();
+            }
+            return comp;
+        }
+        bool time_elapsed_since_last_micros_is_greater_than(const uint64_t time) {
+            static uint64_t last_micros = 0;
+            const uint64_t comp = millis() - last_micros >= time;
+            if (comp) {
+                last_micros = millis();
+            }
+            return comp;
+        }
 
         bool gps_es_preciso(const data_all_t* datos_sensores) {
             return datos_sensores->gps_nro_satelites >= 5       // Mínimo 4 para 3D, 5 o 6 es más seguro
@@ -45,7 +77,7 @@ namespace Cohete {
         }
 
         bool en_codiciones_para_volar(data_all_t* datos_sensores) {
-            return flag_timerRecalibrarMPU_disparado; // el flag funciona
+            return Timers::flag_recalibrarMPU_disparado; // el flag funciona
             // TODO: COMPLETAR CONDICIONES PARA VUELO.
         }
 
@@ -68,18 +100,18 @@ namespace Cohete {
         ESP_LOGI(TAG_BASE, "INIT");
 
         // Esperar 5 minutos para que la mpu entre en calor, luego calibrarla.
-        xTimerRecalibrarMPU =
+        Timers::xTimerRecalibrarMPU =
             xTimerCreate(
                 "Recalibrar",
                 pdMS_TO_TICKS(TIEMPO_MILLIS_ESPERA_WARMUP_MPU),
                 pdFALSE, // one shot timer
                 nullptr,
-                calibrar_mpu_callback
+                Timers::calibrar_mpu_callback
             );
-        if( xTimerRecalibrarMPU != NULL ) {
+        if(Timers::xTimerRecalibrarMPU != NULL ) {
             /* Iniciamos el temporizador con un tiempo de bloqueo (block time) de 0 */
             ESP_LOGI(TAG_BASE, " -> [INIT] Temporizador xTimerRecalibrarMPU creado. Se disparará en 5 minutos"); // TODO: mejorar sistema de logging
-            xTimerStart( xTimerRecalibrarMPU, 0 );
+            xTimerStart(Timers::xTimerRecalibrarMPU, 0 );
         }
 
         transicionar_hacia(ST_ESPERA_CONEXION_GSE);
@@ -126,11 +158,13 @@ namespace Cohete {
             if (millis() % 200 == 0)
                 ESP_LOGI(TAG_BASE, " -> [GPS] Esperando satélites. Visibles: %d", datos_sensores->gps_nro_satelites);
         }
-        else if (Evento::gps_es_preciso(datos_sensores)) {
+        else if (Eventos::gps_es_preciso(datos_sensores)) {
             ESP_LOGI(TAG_BASE, " -> [GPS] Precisión de GPS asegurado!");
             transicionar_hacia(ST_ESPERA_IGNICION);
         }
     }
+
+
 
     void f_st_espera_ignicion(data_all_t* datos_sensores) {
         static unsigned long last_millis = 0;
@@ -147,7 +181,7 @@ namespace Cohete {
             ESP_LOGI(TAG_BASE, "[ESPERA IGNICION] Esperando condiciones necesarias para el vuelo...");
         }
 
-        if(Evento::en_codiciones_para_volar(datos_sensores)) {
+        if(Eventos::en_codiciones_para_volar(datos_sensores)) {
             // if led no encendido: encenderlo para señalizar que ya podemos volar.
             if (millis() - last_millis >= 3000) {
                 last_millis = millis();
@@ -155,12 +189,12 @@ namespace Cohete {
                 ESP_LOGI(TAG_BASE, " -> [ESPERA IGNICION] Cohete en condiciones para volar!");
             }
 
-            if (Evento::hay_boost(datos_sensores)) {
+            if (Eventos::hay_boost(datos_sensores)) {
                 SYSTEM.timestamp_micros_inicio_pico_g = micros();
                 transicionar_hacia(ST_BOOST);
             }
         }
-        else if (Evento::hay_boost(datos_sensores)) {
+        else if (Eventos::hay_boost(datos_sensores)) {
             transicion_error(ERR_DESPEGUE_PROHIBIDO, datos_sensores);
         }
     }
