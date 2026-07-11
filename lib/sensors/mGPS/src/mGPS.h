@@ -20,13 +20,23 @@ public:
 
     // Métodos principales
     void init();
-    void update() const;
+    void _update() const;
 
     // Getters
-    uint32_t getSatellites() const;
-    double getLatitude() const;
-    double getLongitude() const;
-    bool is3dFixed() const;
+    // uint32_t getSatellites() const {
+    //     return get_gps_raw_data().numSV;
+    // }
+    // double getLatitude() const {
+    //     return get_gps_raw_data().lat * 1e-7;
+    // }
+    // double getLongitude() const {
+    //     return get_gps_raw_data().lon * 1e-7;
+    // }
+    // bool is3dFixed() const {
+    //     nav_pvt_t data = get_gps_raw_data();
+    //     return (data.fixType == 3 || data.fixType == 4); // 3=3D Fix, 4=GNSS+Dead Reckoning
+    // }
+
     nav_pvt_t get_gps_raw_data() const;
 
 private:

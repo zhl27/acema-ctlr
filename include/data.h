@@ -48,7 +48,7 @@ typedef struct {
     data_raw_bmp_t bmp;  ///< Datos crudos del BMP280
     data_raw_mpu_t mpu;  ///< Datos crudos del MPU6050
     nav_pvt_t gps;       ///< Datos crudos del GPS
-    uint64_t elapsed_time_micros;  ///< Marca de tiempo de la lectura de los datos
+    uint64_t timestamp_micros;  ///< Marca de tiempo de la lectura de los datos
 } data_raw_t;
 
 
@@ -166,7 +166,7 @@ inline void print_data_raw(const data_raw_t *data) {
         return;
     }
     // Encabezado con el tiempo (uint64_t usa %llu)
-    Serial.printf("\n=== Datos crudos de Sensores (Tiempo: %llumicros) ===\n", data->elapsed_time_micros);
+    Serial.printf("\n=== Datos crudos de Sensores (Tiempo: %llumicros) ===\n", data->timestamp_micros);
 
     // --- Datos del BMP280 ---
     // Usamos %d casteando a int para los int32_t (compatible con ESP32/ARM)

@@ -34,8 +34,8 @@ public:
     bool init(uint8_t addr = 0x77, uint8_t chipid = BMP280_CHIPID);
 
     // Getters for current sensor readings
-    float get_temperature() { return _bmp.readTemperature(); }
-    float get_pressure() { return _bmp.readPressure(); }
+    float _get_temperature() { return _bmp.readTemperature(); }
+    float _get_pressure() { return _bmp.readPressure(); }
     // float getAltitude() { return bmp.readAltitude(1013.25f); } // NO USAMOS EL VALOR CALCULADO POR EL SENSOR
 
     data_raw_bmp_t get_bmp_raw_data();

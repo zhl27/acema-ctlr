@@ -4,7 +4,9 @@
 
 #include "mBuzzer.h"
 
-mBuzzer::mBuzzer(int pin) :
+// TODO: IMPLEMENTAR BUZZER NO BLOQUEANTE. HASTA ENTONCES, USAR CON MUCHÍSIMA CAUTELA ESTA CLASE!!!
+
+mBuzzer::mBuzzer(const int pin) :
     buzzerPin(pin),
     state(false)
 {}
