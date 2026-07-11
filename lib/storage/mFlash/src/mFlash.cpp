@@ -1,25 +1,25 @@
 //
-// Created by zhl on 6/24/26.
+// Created by lucaz on 11/7/2026.
 //
 
-#include "Flash.h"
+#include "mFlash.h"
+
+#include <Arduino.h>
+#include <SPI.h>
 
 // Driver
 // TODO: Falta revisión manual general de Flash
 
-Flash::Flash(uint8_t csPin) {
-    _csPin = csPin;
-}
 
-void Flash::begin() const {
+void mFlash::init() const {
     pinMode(_csPin, OUTPUT);
     digitalWrite(_csPin, HIGH);
 
     // Inicializa la línea SPI por defecto del ESP-WROOM-32 (VSPI) // TODO: Revisar, no queremos Virtual SPI
-    SPI.begin();
+    SPI.begin(); // ojo, esto ya se inicializa en otra parte!!!
 }
 
-void Flash::_leerChipID(uint8_t &manufacturerID, uint8_t &memoryTypeID, uint8_t &capacityID) const {
+void mFlash::_leerChipID(uint8_t &manufacturerID, uint8_t &memoryTypeID, uint8_t &capacityID) const {
     SPI.beginTransaction(SPISettings(_SPI_SPEED, MSBFIRST, SPI_MODE0));
 
     digitalWrite(_csPin, LOW);
@@ -33,7 +33,7 @@ void Flash::_leerChipID(uint8_t &manufacturerID, uint8_t &memoryTypeID, uint8_t 
     SPI.endTransaction();
 }
 
-bool Flash::testConnection(Stream &serialPort) const {
+bool mFlash::testConnection(Stream &serialPort) {
     uint8_t manufID = 0, memTypeID = 0, capID = 0;
 
     // Llamada interna al método privado
