@@ -66,7 +66,7 @@ mGPS::~mGPS() {
 // ==========================================
 // Init & Update
 // ==========================================
-void mGPS::init() {
+bool mGPS::init() {
     Serial.println("[GPS] Inicializando UART...");
 
     // 1. Configuración de UART en ESP-IDF
@@ -106,6 +106,8 @@ void mGPS::init() {
     _configurator->enableRegisteredMessages(_tablaRegistros, 2);
 
     Serial.println("[GPS] Inicializacion completa.");
+
+    return true;
 }
 
 void mGPS::_update() const {

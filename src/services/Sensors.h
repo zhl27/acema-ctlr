@@ -29,6 +29,7 @@ public:
 
     static bool update();
 
+
     // BMP280
     // static float getBmpTemp() { return _bmp280.get_temperature(); }
     // static float getPressure() { return _bmp280.get_pressure(); }

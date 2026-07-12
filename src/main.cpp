@@ -2,6 +2,7 @@
 #include "LoraWrapped.h"
 
 #include "main.h"
+#include <freertos/queue.h>
 
 void setup() {
     Serial.begin(115200); // TODO: Para la Compu de vuelo no se usa Serial
@@ -79,6 +80,26 @@ void loop(){
 
 // TODO: Pensar sobre este texto: "You need to gather large bursts of hardware data inside an Interrupt Service Routine (ISR) to be processed later by a task."
 void vTaskReadSensors(void *pvParameters) {
+    
+    // ---------------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------
+    
+    // Inicialización del sensor
+    Adafruit_MPU6050 mpu;
+    if (!mpu.begin()) {
+        Serial.println("Failed to find MPU6050 chip");
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+ 
+
+    // ---------------------------------------------------------------------------------
+    // Timer de muestreo
+    // ---------------------------------------------------------------------------------
+    TickType_t xLastWakeTime;
+    const TickType_t xPeriodo = pdMS_TO_TICKS(10); // Muestreo cada 10 ms (100 Hz)
+    // Inicializar el tiempo de referencia para vTaskDelayUntil
+    xLastWakeTime = xTaskGetTickCount();
+
     (void)pvParameters;
     while (true) {
 
@@ -88,6 +109,19 @@ void vTaskReadSensors(void *pvParameters) {
         data_raw_t raw = Sensors::get_raw_data();
 
         // print_data_raw(&raw);
+
+        // Espera estricta y precisa hasta el próximo ciclo de 10ms
+        vTaskDelayUntil(&xLastWakeTime, xPeriodo);
+
+        // A. Leer el sensor (Simulado)
+//        datoEnviar.lectura_sensor = analogRead(34) * (3.3 / 4095.0);
+
+        // B. Estampar el tiempo exacto en microsegundos
+//        datoEnviar.timestamp_us = esp_timer_get_time();
+
+        // C. Enviar a la cola de forma no bloqueante (timeout = 0)
+        // Si la cola está llena, ignora esta muestra para no retrasar el timer
+        xQueueSend(xColaSensores, &datoEnviar, 0);
 
         if (xDataFilterRingbuf != NULL) {
             if (xRingbufferSend(xDataFilterRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(50)) != pdTRUE) {

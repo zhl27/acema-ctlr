@@ -36,6 +36,19 @@ bool Sensors::init() {
         return false;
     }
     return true;
+
+    // -----------------------------------------------------------------------
+    // configuración del MPU
+    // -----------------------------------------------------------------------
+
+       //setupt motion detection
+    mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
+
+    mpu.setMotionDetectionThreshold(1);
+    mpu.setMotionDetectionDuration(20);
+    mpu.setInterruptPinLatch(true);	// Keep it latched.  Will turn off when reinitialized.
+    mpu.setInterruptPinPolarity(true);
+    mpu.setMotionInterrupt(true);
 }
 
 // TODO: VER SI ES NECESARIO

@@ -19,7 +19,7 @@ public:
     ~mGPS();
 
     // Métodos principales
-    void init();
+    bool init();
     void _update() const;
 
     // Getters
