@@ -46,7 +46,7 @@ data_raw_bmp_t mBMP280::get_bmp_raw_data() {
     data_raw_bmp_t raw_bmp = {};
 
     raw_bmp.presion_hpa = _get_pressure();
-    raw_bmp.temp = _get_temperature();
+    raw_bmp.temp_deg_c = _get_temperature();
     raw_bmp.altitud_m = _get_altitude(); 
 
     return raw_bmp;

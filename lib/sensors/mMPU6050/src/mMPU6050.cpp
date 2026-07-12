@@ -88,13 +88,13 @@ data_raw_mpu_t mMPU6050::get_mpu_raw_data() {
     _mpu.getEvent(&a, &g, &t);
 
     // Aplicamos el offset calculado en la calibración
-    raw_mpu.accel_x = a.acceleration.x - CalAccelX;
-    raw_mpu.accel_y = a.acceleration.y - CalAccelY;
-    raw_mpu.accel_z = a.acceleration.z - CalAccelZ;
+    raw_mpu.accel_x_g = a.acceleration.x - CalAccelX;
+    raw_mpu.accel_y_g = a.acceleration.y - CalAccelY;
+    raw_mpu.accel_z_g = a.acceleration.z - CalAccelZ;
     
-    raw_mpu.gyro_x  = g.gyro.x - CalGyroX;
-    raw_mpu.gyro_y  = g.gyro.y - CalGyroY;
-    raw_mpu.gyro_z  = g.gyro.z - CalGyroZ;
+    raw_mpu.gyro_x_rad_s  = g.gyro.x - CalGyroX;
+    raw_mpu.gyro_y_rad_s  = g.gyro.y - CalGyroY;
+    raw_mpu.gyro_z_rad_s  = g.gyro.z - CalGyroZ;
 
     return raw_mpu;
 }
