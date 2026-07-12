@@ -37,18 +37,6 @@ bool Sensors::init() {
     }
     return true;
 
-    // -----------------------------------------------------------------------
-    // configuración del MPU
-    // -----------------------------------------------------------------------
-
-       //setupt motion detection
-    mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
-
-    mpu.setMotionDetectionThreshold(1);
-    mpu.setMotionDetectionDuration(20);
-    mpu.setInterruptPinLatch(true);	// Keep it latched.  Will turn off when reinitialized.
-    mpu.setInterruptPinPolarity(true);
-    mpu.setMotionInterrupt(true);
 }
 
 // TODO: VER SI ES NECESARIO
@@ -66,7 +54,6 @@ data_raw_t Sensors::get_raw_data() {
     // TODO: Traer datos nav_pvt_t del módulo GPS
     raw.gps = getGPS().get_gps_raw_data();
 
-    raw.timestamp_micros = micros(); // TODO: VER SI DEBEMOS UTILIZAR OTRA FUNCIÓN
 
     return raw;
 }

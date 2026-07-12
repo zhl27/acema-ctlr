@@ -48,7 +48,7 @@ typedef struct {
     data_raw_bmp_t bmp;  ///< Datos crudos del BMP280
     data_raw_mpu_t mpu;  ///< Datos crudos del MPU6050
     nav_pvt_t gps;       ///< Datos crudos del GPS
-    uint64_t timestamp_micros;  ///< Marca de tiempo de la lectura de los datos
+    int64_t timestamp_us;  ///< Marca de tiempo de la lectura de los datos
 } data_raw_t;
 
 
@@ -69,6 +69,16 @@ typedef struct {
  *
  */
 typedef struct {
+    // --- CINEMÁTICA ANGULAR (Velocidades) ---
+    float vel_angular_z;              // Yaw rate (°/s)
+    float vel_angular_y;              // Roll rate (°/s)
+    float vel_angular_x;              // Pitch rate (°/s)
+
+    // --- CINEMÁTICA ANGULAR (Ángulos Absolutos) ---
+    float angulo_pitch;               // Ángulo Pitch filtrado por Kalman (°)
+    float angulo_yaw;                 // Ángulo Yaw filtrado por Kalman (°)
+    float angulo_respecto_z;          // Inclinación total del cohete
+
 
     // --- CINEMÁTICA LINEAL (Eje Z absoluto calibrado al cielo) ---
     float altura_m;                   // Altura filtrada sobre el suelo --
@@ -76,13 +86,6 @@ typedef struct {
     float aceleracion_z_m_s2;         // Aceleración lineal absoluta (sin gravedad)
 
     float momentum_kg_m_s;            // Cantidad de movimiento (P = m * v)
-
-    float vel_angular_z;              // Yaw rate
-    float vel_angular_y;              // Roll rate
-    float vel_angular_x;              // Pitch rate (deg/s o rad/s)
-
-    float angulo_respecto_z;
-
     float temperatura_amb_c;          // Tomada estrictamente del BMP280
     float densidad_aire_kg_m3;        // Calculada por ley de gases ideales
 
@@ -166,7 +169,7 @@ inline void print_data_raw(const data_raw_t *data) {
         return;
     }
     // Encabezado con el tiempo (uint64_t usa %llu)
-    Serial.printf("\n=== Datos crudos de Sensores (Tiempo: %llumicros) ===\n", data->timestamp_micros);
+    Serial.printf("\n=== Datos crudos de Sensores (Tiempo: %llumicros) ===\n", data->timestamp_us);
 
     // --- Datos del BMP280 ---
     // Usamos %d casteando a int para los int32_t (compatible con ESP32/ARM)

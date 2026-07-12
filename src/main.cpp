@@ -27,12 +27,14 @@ void setup() {
     Sensors::init();
     GSE::init();
 
-    // DATA DISTRIBUTOR
-    xDataFilterRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
-    if (xDataFilterRingbuf == NULL) {
-        ESP_LOGE(TAG_TASK_DATA_FILTER, "Error al crear xDataFilterRingbuf");
+    // --- DATA DISTRIBUTOR ---
+    // Crea una cola capaz de alojar hasta BUF_Q_SENSOR_SIZE muestras de tipo data_raw_t.
+    xColaSensores = xQueueCreate(BUF_Q_SENSOR_SIZE, sizeof(data_raw_t));
+
+    if (xColaSensores == NULL) {
+        ESP_LOGE(TAG_TASK_DATA_FILTER, "Error al crear xColaSensores");
     } else {
-        ESP_LOGI(TAG_TASK_DATA_FILTER, "xDataFilterRingbuf creado");
+        ESP_LOGI(TAG_TASK_DATA_FILTER, "xColaSensores creada correctamente");
     }
 
     // MDE
@@ -81,51 +83,38 @@ void loop(){
 // TODO: Pensar sobre este texto: "You need to gather large bursts of hardware data inside an Interrupt Service Routine (ISR) to be processed later by a task."
 void vTaskReadSensors(void *pvParameters) {
     
-    // ---------------------------------------------------------------------------------
-    // ---------------------------------------------------------------------------------
-    
-    // Inicialización del sensor
-    Adafruit_MPU6050 mpu;
-    if (!mpu.begin()) {
-        Serial.println("Failed to find MPU6050 chip");
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
- 
 
     // ---------------------------------------------------------------------------------
     // Timer de muestreo
     // ---------------------------------------------------------------------------------
     TickType_t xLastWakeTime;
-    const TickType_t xPeriodo = pdMS_TO_TICKS(10); // Muestreo cada 10 ms (100 Hz)
+    const TickType_t xPeriodo = pdMS_TO_TICKS(PERIOD_SAMPLIG_SENSORS_MS); // Muestreo cada 10 ms (100 Hz)
+  
     // Inicializar el tiempo de referencia para vTaskDelayUntil
     xLastWakeTime = xTaskGetTickCount();
 
     (void)pvParameters;
     while (true) {
+        // Espera estricta y precisa hasta el próximo ciclo de 10ms
+        vTaskDelayUntil(&xLastWakeTime, xPeriodo);
 
         ESP_LOGD(TAG_TASK_SENSORS, "Core ID: %d", xPortGetCoreID());
 
         // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
         data_raw_t raw = Sensors::get_raw_data();
 
+        // Timestamp con esp nativo
+        raw.timestamp_us = esp_timer_get_time();
         // print_data_raw(&raw);
 
-        // Espera estricta y precisa hasta el próximo ciclo de 10ms
-        vTaskDelayUntil(&xLastWakeTime, xPeriodo);
-
-        // A. Leer el sensor (Simulado)
-//        datoEnviar.lectura_sensor = analogRead(34) * (3.3 / 4095.0);
-
-        // B. Estampar el tiempo exacto en microsegundos
-//        datoEnviar.timestamp_us = esp_timer_get_time();
-
-        // C. Enviar a la cola de forma no bloqueante (timeout = 0)
-        // Si la cola está llena, ignora esta muestra para no retrasar el timer
-        xQueueSend(xColaSensores, &datoEnviar, 0);
-
-        if (xDataFilterRingbuf != NULL) {
-            if (xRingbufferSend(xDataFilterRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(50)) != pdTRUE) {
-                ESP_LOGE(TAG_TASK_SENSORS, "xRingbufferSend -> xDataFilterRingbuf failed (raw)");
+        // 3. Enviar a la cola del Filtro de Kalman de forma NO bloqueante (Timeout = 0)
+        // Si la cola se llena porque la se retrasó, preferimos perder una muestra 
+        // antes que congelar el temporizador de 10ms de los sensores.
+        if (xColaSensores != NULL) {
+            if (xQueueSend(xColaSensores, &raw, 0) != pdTRUE) {
+                // Si falla, registramos un Warning de telemetría (la cola está saturada)
+                ESP_LOGW(TAG_TASK_SENSORS, "Cola llena: Muestra descartada para proteger el timing.");
+                // SI VEMOS ESTE ERROR, HAY QUE AUMENTAR EL TAMÑO DE LA COLA
             }
         }
 
@@ -138,14 +127,102 @@ void vTaskReadSensors(void *pvParameters) {
 }
 
 void vTaskDataFilter(void *pvParameters) {
+    data_raw_t datoRecibido;
+    
+    int64_t timestamp_anterior = 0;
+    bool es_primera_muestra = true;
+
     (void)pvParameters;
+
     while (true) {
+        // T2 se duerme hasta que llegue el paquete crudo desde la Queue de T1
+        if (xQueueReceive(xColaSensores, &datoRecibido, portMAX_DELAY) == pdTRUE) {
+            
+            if (es_primera_muestra) {
+                timestamp_anterior = datoRecibido.timestamp_us;
+                es_primera_muestra = false;
+                continue;
+            }
 
+            // 1. Cálculo del Delta T (dt)
+            int64_t diferencia_tiempo = datoRecibido.timestamp_us - timestamp_anterior;
+            float delta_t = (float)diferencia_tiempo / 1000000.0f;
+            timestamp_anterior = datoRecibido.timestamp_us;
+
+            // -------------------------------------------------------------------------
+            // 2. MAPEO DE EJES (Sensor MPU -> Cohete Físico)
+            // Según mMPU6050.cpp, el eje X del sensor apunta hacia la nariz del cohete
+            // -------------------------------------------------------------------------
+            // Aceleraciones en Gs respecto a la estructura del cohete
+            float cohete_accel_z = datoRecibido.mpu.accel_x / 9.80665f; // Vertical real del cohete (Eje X del MPU)
+            float cohete_accel_y = datoRecibido.mpu.accel_y / 9.80665f; // Lateral (Eje Y del MPU)
+            float cohete_accel_x = datoRecibido.mpu.accel_z / 9.80665f; // Lateral (Eje Z del MPU)
+
+            // Velocidades angulares en °/s respecto a la estructura del cohete
+            // (Si la nariz es X en el MPU, entonces rotar sobre X es el Roll del cohete)
+            float cohete_gyro_yaw   = datoRecibido.mpu.gyro_x * 57.2958f; // Rotación sobre el eje vertical
+            float cohete_gyro_pitch = datoRecibido.mpu.gyro_y * 57.2958f; // Cabeceo
+            float cohete_gyro_roll  = datoRecibido.mpu.gyro_z * 57.2958f; // Alabeo
+
+            // -------------------------------------------------------------------------
+            // 3. TRIGONOMETRÍA Y FILTRADO (Usando los ejes mapeados del cohete)
+            // -------------------------------------------------------------------------
+            float accel_pitch = atan2(cohete_accel_x, cohete_accel_z) * 57.2958f;
+            float accel_yaw   = atan2(cohete_accel_y, cohete_accel_z) * 57.2958f;
+
+            // Filtro Kalman Dinámico (usamos cohete_accel_z que tiene 1G en rampa)
+            float pitch_filtrado = kalmanPitch.update(cohete_gyro_pitch, accel_pitch, delta_t, cohete_accel_z);
+            float yaw_filtrado   = kalmanYaw.update(cohete_gyro_yaw, accel_yaw, delta_t, cohete_accel_z);
+
+            // 4. Cálculo del Ángulo Total (Inclinación respecto a la vertical del cielo)
+            float pitch_rad = pitch_filtrado * (M_PI / 180.0f);
+            float yaw_rad   = yaw_filtrado * (M_PI / 180.0f);
+            float inclinacion_rad = acos(cos(pitch_rad) * cos(yaw_rad));
+            float inclinacion_total_grados = inclinacion_rad * (180.0f / M_PI);
+
+            // -------------------------------------------------------------------------
+            // 5. EMPAQUETADO FINAL (Estructura de data_all_t)
+            // -------------------------------------------------------------------------
+            data_all_t all_data = {}; // Inicializamos en 0
+            
+            // Velocidades angulares directas (°/s)
+            all_data.vel_angular_x = cohete_gyro_pitch; 
+            all_data.vel_angular_y = cohete_gyro_roll;
+            all_data.vel_angular_z = cohete_gyro_yaw;
+
+            // Ángulos absolutos filtrados (°)
+            all_data.angulo_pitch = pitch_filtrado;
+            all_data.angulo_yaw = yaw_filtrado;
+            all_data.angulo_respecto_z = inclinacion_total_grados;
+
+            // ... (Aquí mapearás el resto de variables: Barómetro, GPS, etc.) ...
+                    
+            // 6. DISTRIBUCIÓN A TAREAS (MdE, Lora)
+            if (xStateMachineRingbuf != NULL) {
+                xRingbufferSend(xStateMachineRingbuf, (void *)&all_data, sizeof(data_all_t), 0);
+            }
+            if (xLoraRingbuf != NULL) {
+                xRingbufferSend(xLoraRingbuf, (void *)&all_data, sizeof(data_all_t), 0);
+            }
+        }
+        
+    }
+}
+
+/*
+void vTaskDataFilter(void *pvParameters) {
+    (void)pvParameters;
+    
+    while (true) {
         ESP_LOGD(TAG_TASK_DATA_FILTER, "Core ID: %d", xPortGetCoreID());
+        // Dentro de tareaKalman
+        data_raw_t datoRecibido;
 
-        size_t item_size = 0;
-        void *item = xRingbufferReceive(xDataFilterRingbuf, &item_size, pdMS_TO_TICKS(2000));
-
+        // Se duerme aquí hasta que llegue un dato, liberando CPU para otras tareas.
+        if (xQueueReceive(xColaSensores, &datoRecibido, portMAX_DELAY) == pdTRUE) {
+            // Aquí procesas tu datoRecibido con el Filtro de Kalman
+            // ...
+        }
         if (item != NULL) {
             if (item_size == sizeof(data_raw_t)) {
 
@@ -188,9 +265,10 @@ void vTaskDataFilter(void *pvParameters) {
         } else {
             ESP_LOGI(TAG_TASK_DATA_FILTER, "No messages (timeout)");
         }
+        
     }
 }
-
+*/
 
 // Mock implementation of the State Machine task: consumes sensor messages and forwards/acts on them
 void vTaskStateMachine(void *pvParameters) {
