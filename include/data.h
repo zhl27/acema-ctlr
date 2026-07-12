@@ -36,6 +36,7 @@ typedef struct {
 typedef struct {
     float presion; ///< Presión cruda (valor de 20 bits) --> en la libreria se usa float
     float temp; ///< Temperatura cruda (valor de 20 bits)
+    float altitud;
 } data_raw_bmp_t;
 
 /**

@@ -3,34 +3,43 @@
 //
 
 #include "mBMP280.h"
-
 #include "data.h"
 #include "SerialPrint.h"
+#include <Arduino.h> // Necesario para la función delay() en la calibración
 
-// TODO: Crear Unit test para validar que el sensor detecta cambios significativos de presión/temperatura/altitud al soplar sobre él, y que no reacciona a cambios menores o ruido ambiental. Esto es crucial para confirmar que los umbrales definidos son adecuados para detectar el soplido sin generar falsos positivos.
-
-
-// initialize
-mBMP280::mBMP280()
-{}
+mBMP280::mBMP280() : _altitud_base(0.0f) {}
 
 bool mBMP280::init(uint8_t addr, uint8_t chipid) {
     if (!_bmp.begin(addr, chipid)) {
         return false;
     }
 
-    // Set configuration for high filter rate and 500ms delay to capture blowing fluctuations
+    // Configuración para telemetría de alta velocidad (Cohete)
     _bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     // Modo Normal (medición continua)
-                Adafruit_BMP280::SAMPLING_X1,     // Sobremuestreo de Temp (Ultra low power)
-                Adafruit_BMP280::SAMPLING_X1,     // Sobremuestreo de Presión (Ultra low power)
-                Adafruit_BMP280::FILTER_OFF,      // Filtro desactivado para mayor respuesta
+                Adafruit_BMP280::SAMPLING_X2,     // Sobremuestreo de Temp (Bajo, prioridad a la velocidad)
+                Adafruit_BMP280::SAMPLING_X8,     // Sobremuestreo de Presión (Moderado, reduce ruido aerodinámico)
+                Adafruit_BMP280::FILTER_OFF,      // Filtro IIR desactivado para evitar retrasos de fase en el vuelo
                 Adafruit_BMP280::STANDBY_MS_1);   // Tiempo de espera entre lecturas al mínimo (0.5 ms)
 
-    // // Initial readings to establish a baseline
-    // last_temp = get_temperature();
-    // last_pres = get_pressure();
-    // last_alt  = get_pressure();
+    // Calibración de la altitud en la rampa (Offset de la media)
+    float suma_altitud = 0.0f;
+    const int iteraciones = 200;
+
+    for (int i = 0; i < iteraciones; i++) {
+        suma_altitud += _bmp.readAltitude(1013.25f);
+        // Pequeño delay para permitir que el sensor complete su conversión interna
+        delay(5); 
+    }
+
+    // Guardamos la media térmica y barométrica del punto cero
+    _altitud_base = suma_altitud / (float)iteraciones;
+
     return true;
+}
+
+float mBMP280::_get_altitude() {
+    // Calculamos la Altitud Relativa (AGL) restando la calibración base
+    return _bmp.readAltitude(1013.25f) - _altitud_base;
 }
 
 data_raw_bmp_t mBMP280::get_bmp_raw_data() {
@@ -38,11 +47,7 @@ data_raw_bmp_t mBMP280::get_bmp_raw_data() {
 
     raw_bmp.presion = _get_pressure();
     raw_bmp.temp = _get_temperature();
+        raw_bmp.altitud = _get_altitude(); 
 
     return raw_bmp;
-
-    // // Update baseline history
-    // last_temp = current_temp;
-    // last_pres = current_pres;
-    // last_alt  = current_alt;
 }
