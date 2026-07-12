@@ -18,13 +18,13 @@
  * Contiene los datos sin procesar del acelerómetro y giroscopio.
  */
 typedef struct {
-    float accel_x; // Aceleración X (Raw) (TODO: Ver de obtener 16 bits)
-    float accel_y; // Aceleración Y (Raw)
-    float accel_z; // Aceleración Z (Raw)
+    float accel_x_g; // Aceleración X (Raw) (TODO: Ver de obtener 16 bits)
+    float accel_y_g; // Aceleración Y (Raw)
+    float accel_z_g; // Aceleración Z (Raw)
     // float temp;    // Temperatura (Raw) --> No usamos el dato temp (temperatura) de la mpu5060 (mpu) porque es del chip y no del ambiente. La mpu usa la temp porque afecta a sus mediciones.
-    float gyro_x;  // Velocidad angular X (Raw)
-    float gyro_y;  // Velocidad angular Y (Raw)
-    float gyro_z;  // Velocidad angular Z (Raw)
+    float gyro_x_rad_s;  // Velocidad angular X (Raw)
+    float gyro_y_rad_s;  // Velocidad angular Y (Raw)
+    float gyro_z_rad_s;  // Velocidad angular Z (Raw)
 } data_raw_mpu_t;
 
 /**
@@ -34,9 +34,9 @@ typedef struct {
  * Contiene los datos sin procesar del sensor barométrico.
  */
 typedef struct {
-    float presion; ///< Presión cruda (valor de 20 bits) --> en la libreria se usa float
-    float temp; ///< Temperatura cruda (valor de 20 bits)
-    float altitud;
+    float presion_hpa; ///< Presión cruda (valor de 20 bits) --> en la libreria se usa float
+    float temp_deg_c; ///< Temperatura cruda (valor de 20 bits)
+    float altitud_m;
 } data_raw_bmp_t;
 
 /**
@@ -71,20 +71,20 @@ typedef struct {
  */
 typedef struct {
     // --- CINEMÁTICA ANGULAR (Velocidades) ---
-    float vel_angular_z;              // Yaw rate (°/s)
-    float vel_angular_y;              // Roll rate (°/s)
-    float vel_angular_x;              // Pitch rate (°/s)
+    float vel_angular_z_deg_s;              // Yaw rate (°/s)
+    float vel_angular_y_deg_s;              // Roll rate (°/s)
+    float vel_angular_x_deg_s;              // Pitch rate (°/s)
 
     // --- CINEMÁTICA ANGULAR (Ángulos Absolutos) ---
-    float angulo_pitch;               // Ángulo Pitch filtrado por Kalman (°)
-    float angulo_yaw;                 // Ángulo Yaw filtrado por Kalman (°)
-    float angulo_respecto_z;          // Inclinación total del cohete
+    float angulo_pitch_deg;               // Ángulo Pitch filtrado por Kalman (°)
+    float angulo_yaw_deg;                 // Ángulo Yaw filtrado por Kalman (°)
+    float angulo_respecto_z_deg;          // Inclinación total del cohete
 
 
     // --- CINEMÁTICA LINEAL (Eje Z absoluto calibrado al cielo) ---
-    float altura_m;                   // Altura filtrada sobre el suelo --
-    float velocidad_z_m_s;            // Velocidad vertical real
-    float aceleracion_z_m_s2;         // Aceleración lineal absoluta (sin gravedad)
+    float altitud_filtrada_m;           // Altura filtrada sobre el suelo --
+    float vel_z_filtrada_m_s;            // Velocidad vertical real
+    float aceleracion_z_m_s2;           // Aceleración lineal absoluta (sin gravedad)
 
     float momentum_kg_m_s;            // Cantidad de movimiento (P = m * v)
     float temperatura_amb_c;          // Tomada estrictamente del BMP280
@@ -175,16 +175,16 @@ inline void print_data_raw(const data_raw_t *data) {
     // --- Datos del BMP280 ---
     // Usamos %d casteando a int para los int32_t (compatible con ESP32/ARM)
     Serial.printf("[BMP280]  Presion: %f | Temp: %f\n",
-                  data->bmp.presion,
-                  data->bmp.temp);
+                  data->bmp.presion_hpa,
+                  data->bmp.temp_deg_c);
 
     // --- Datos del MPU6050 ---
     // Usamos %d para los int16_t (se promueven automáticamente a int en C++)
     Serial.printf("[MPU6050] Accel X: %f | Y: %f | Z: %f\n",
-                  data->mpu.accel_x, data->mpu.accel_y, data->mpu.accel_z);
+                  data->mpu.accel_x_g, data->mpu.accel_y_g, data->mpu.accel_z_g);
 
     Serial.printf("[MPU6050] Gyro  X: %f | Y: %f | Z: %f\n",
-                  data->mpu.gyro_x, data->mpu.gyro_y, data->mpu.gyro_z);
+                  data->mpu.gyro_x_rad_s, data->mpu.gyro_y_rad_s, data->mpu.gyro_z_rad_s);
 
     // --- Datos del GPS (nav_pvt_t) ---
     Serial.printf("[GPS]     Latitud: %ld | Longitud: %ld | Satelites: %d\n",
@@ -206,17 +206,17 @@ inline void print_data(const data_all_t *data) {
     Serial.printf("\n=============== DATA_ALL_T (micros=%lu) ===============\n", micros());
 
     Serial.printf("--- CINEMÁTICA LINEAL ---\n");
-    Serial.printf("Altura:             %.2f m\n", data->altura_m);
-    Serial.printf("Velocidad Z:        %.2f m/s\n", data->velocidad_z_m_s);
+    Serial.printf("Altura:             %.2f m\n", data->altitud_filtrada_m);
+    Serial.printf("Velocidad Z:        %.2f m/s\n", data->vel_z_filtrada_m_s);
     Serial.printf("Aceleración Z:      %.2f m/s^2\n", data->aceleracion_z_m_s2);
 
     Serial.printf("--- DINÁMICA ---\n");
     Serial.printf("Momentum:           %.2f kg*m/s\n", data->momentum_kg_m_s);
 
     Serial.printf("--- CINEMÁTICA ANGULAR ---\n");
-    Serial.printf("Vel Angular X:      %.2f °/s (Pitch)\n", data->vel_angular_x);
-    Serial.printf("Vel Angular Y:      %.2f °/s (Roll)\n", data->vel_angular_y);
-    Serial.printf("Vel Angular Z:      %.2f °/s (Yaw)\n", data->vel_angular_z);
+    Serial.printf("Vel Angular X:      %.2f °/s (Pitch)\n", data->vel_angular_x_deg_s);
+    Serial.printf("Vel Angular Y:      %.2f °/s (Roll)\n", data->vel_angular_y_deg_s);
+    Serial.printf("Vel Angular Z:      %.2f °/s (Yaw)\n", data->vel_angular_z_deg_s);
 
     Serial.printf("--- AMBIENTALES PROCESADOS ---\n");
     Serial.printf("Temperatura Amb:    %.2f °C\n", data->temperatura_amb_c);

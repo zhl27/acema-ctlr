@@ -206,11 +206,11 @@ namespace Cohete {
         static float velocidad_z_entrada_st_boost;
 
         if (es_entrada_a_estado()) {
-            altura_entrada_st_boost = datos_sensores->altura_m;
+            altura_entrada_st_boost = datos_sensores->altitud_filtrada_m;
             aceleracion_z_entrada_st_boost = datos_sensores->aceleracion_z_m_s2;
-            velocidad_z_entrada_st_boost = datos_sensores->velocidad_z_m_s;
+            velocidad_z_entrada_st_boost = datos_sensores->vel_z_filtrada_m_s;
         }
-        else if ((datos_sensores->altura_m - altura_entrada_st_boost) < 10) { // TODO: DEFINIR BIEN LA CONDICION de DIFF ALTURAS, PARA RESPALDAR QUE ENTRAMOS A BOOST REALMENTE.
+        else if ((datos_sensores->altitud_filtrada_m - altura_entrada_st_boost) < 10) { // TODO: DEFINIR BIEN LA CONDICION de DIFF ALTURAS, PARA RESPALDAR QUE ENTRAMOS A BOOST REALMENTE.
             // si la diferencia no es considerable como para respaldar que estamos definitivamente en modo BOOST...
             transicion_error(ERR_DESPEGUE_FALSO_ZARANDEO, datos_sensores);
         }
@@ -223,7 +223,7 @@ namespace Cohete {
             // si hubo desaceleracion, deberiamos ver una velocidad cada vez menor.
             // --> esto no nos confirma nada, ya que la velocidad la calculamos a partir de la aceleracion.
             // Deberiamos comprobarlo con otros datos, quizas el GPS sea nuestro mejor aliado en este problema.
-            if ((velocidad_z_entrada_st_boost - datos_sensores->velocidad_z_m_s) > 0) {
+            if ((velocidad_z_entrada_st_boost - datos_sensores->vel_z_filtrada_m_s) > 0) {
                 SYSTEM.masa_cohete_kg -= PESO_KG_COMBUSTIBLE; // TODO: asumimos que el combustible se consumio completamente ?
                 transicionar_hacia(ST_FASE_BALISTICA);
             }
@@ -239,15 +239,15 @@ namespace Cohete {
         //    }
 
 
-        if (SYSTEM.contexto_fisico.altura_max_historica < datos_sensores->altura_m) {
+        if (SYSTEM.contexto_fisico.altura_max_historica < datos_sensores->altitud_filtrada_m) {
             // encontramos nueva altura historica
-            SYSTEM.contexto_fisico.altura_max_historica = datos_sensores->altura_m;
+            SYSTEM.contexto_fisico.altura_max_historica = datos_sensores->altitud_filtrada_m;
         }
         // chequeando para cambiar a ST_APOGEO
         // asumimos que ya pasamos EL instante del apogeo, y estariamos por ende
         // con velocidad hacia abajo
         // con aceleracion hacia abajo (constante como siempre, la de gravedad)
-        else if (datos_sensores->velocidad_z_m_s <= 0 // se mueve hacia abajo
+        else if (datos_sensores->vel_z_filtrada_m_s <= 0 // se mueve hacia abajo
             && datos_sensores->aceleracion_z_m_s2 < -A_GRAV + 2 // +2 para tener en cuenta errores
             )
         {
@@ -275,8 +275,8 @@ namespace Cohete {
 
         // chequear que realmente llegamos a apogeo
         // comprobar que altura paso por un punto mas alto y descendio inmediatamente
-        if (datos_sensores->velocidad_z_m_s <= 0) { // esta cayendo
-            if (datos_sensores->altura_m < SYSTEM.contexto_fisico.altura_max_historica) {
+        if (datos_sensores->vel_z_filtrada_m_s <= 0) { // esta cayendo
+            if (datos_sensores->altitud_filtrada_m < SYSTEM.contexto_fisico.altura_max_historica) {
                 transicionar_hacia(ST_DESCENSO_EVALUACION);
             }
         }

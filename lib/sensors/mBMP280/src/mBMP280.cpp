@@ -7,7 +7,7 @@
 #include "SerialPrint.h"
 #include <Arduino.h> // Necesario para la función delay() en la calibración
 
-mBMP280::mBMP280() : _altitud_base(0.0f) {}
+mBMP280::mBMP280() : _altitud_base_m(0.0f) {}
 
 bool mBMP280::init(uint8_t addr, uint8_t chipid) {
     if (!_bmp.begin(addr, chipid)) {
@@ -32,22 +32,22 @@ bool mBMP280::init(uint8_t addr, uint8_t chipid) {
     }
 
     // Guardamos la media térmica y barométrica del punto cero
-    _altitud_base = suma_altitud / (float)iteraciones;
+    _altitud_base_m = suma_altitud / (float)iteraciones;
 
     return true;
 }
 
 float mBMP280::_get_altitude() {
     // Calculamos la Altitud Relativa (AGL) restando la calibración base
-    return _bmp.readAltitude(1013.25f) - _altitud_base;
+    return _bmp.readAltitude(1013.25f) - _altitud_base_m;
 }
 
 data_raw_bmp_t mBMP280::get_bmp_raw_data() {
     data_raw_bmp_t raw_bmp = {};
 
-    raw_bmp.presion = _get_pressure();
+    raw_bmp.presion_hpa = _get_pressure();
     raw_bmp.temp = _get_temperature();
-        raw_bmp.altitud = _get_altitude(); 
+    raw_bmp.altitud_m = _get_altitude(); 
 
     return raw_bmp;
 }

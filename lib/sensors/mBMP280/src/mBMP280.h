@@ -18,7 +18,7 @@
 class mBMP280 {
 private:
     Adafruit_BMP280 _bmp;
-    float _altitud_base; // Variable para almacenar el Offset de la rampa de lanzamiento
+    float _altitud_base_m; // Variable para almacenar el Offset de la rampa de lanzamiento
 
 public:
     mBMP280();

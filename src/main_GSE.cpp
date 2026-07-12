@@ -63,12 +63,12 @@ void printPacketDebug(pkt_t* pkt) {
     else if (pkt->protocol == lora_protocol::C_PLOT) {
         data_all_t* datos = (data_all_t*)pkt->payload;
 
-        CONTADOR = datos->vel_angular_x;
+        CONTADOR = datos->vel_angular_x_deg_s;
 
         Serial.println(F("--- DATOS DE TELEMETRÍA (PLOT) ---"));
-        Serial.print(F("  vel angular x:   ")); Serial.println(datos->vel_angular_x);
-        Serial.print(F("  vel angular y:   ")); Serial.println(datos->vel_angular_y);
-        Serial.print(F("  vel angular z:   ")); Serial.println(datos->vel_angular_z);
+        Serial.print(F("  vel angular x:   ")); Serial.println(datos->vel_angular_x_deg_s);
+        Serial.print(F("  vel angular y:   ")); Serial.println(datos->vel_angular_y_deg_s);
+        Serial.print(F("  vel angular z:   ")); Serial.println(datos->vel_angular_z_deg_s);
         Serial.print(F("  temperatura amb c: ")); Serial.println(datos->temperatura_amb_c);
     } 
     else if (pkt->protocol == lora_protocol::C_MGS || pkt->protocol == lora_protocol::C_ERR) {

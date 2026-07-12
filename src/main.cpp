@@ -126,86 +126,156 @@ void vTaskReadSensors(void *pvParameters) {
     }
 }
 
-void vTaskDataFilter(void *pvParameters) {
-    data_raw_t datoRecibido;
-    
-    int64_t timestamp_anterior = 0;
-    bool es_primera_muestra = true;
 
-    (void)pvParameters;
 
-    while (true) {
-        // T2 se duerme hasta que llegue el paquete crudo desde la Queue de T1
-        if (xQueueReceive(xColaSensores, &datoRecibido, portMAX_DELAY) == pdTRUE) {
-            
-            if (es_primera_muestra) {
-                timestamp_anterior = datoRecibido.timestamp_us;
-                es_primera_muestra = false;
+
+void vTaskDataFilter(void *pvParameters)
+{
+    static Kalman2D kalmanAlt;
+    static bool kalmanAltInit = false;
+
+    static EmaFilter emaTemperatura(FREC_SAMPLING_SENSORS_HZ, 1.0f);
+    static EmaFilter emaPresion(FREC_SAMPLING_SENSORS_HZ, 2.0f);
+    static EmaFilter emaDensidad(FREC_SAMPLING_SENSORS_HZ, 1.0f);
+    static EmaFilter emaAccelVertical(FREC_SAMPLING_SENSORS_HZ, 15.0f);
+    data_raw_t raw;
+
+    int64_t timestampAnterior = 0;
+    bool primeraMuestra = true;
+
+    (void) pvParameters;
+
+    while (true)
+    {
+        if (xQueueReceive(xColaSensores, &raw, portMAX_DELAY) == pdTRUE){
+
+            //----------------------------------------------------------------------
+            // Primera muestra: solamente inicializa el tiempo
+            //----------------------------------------------------------------------
+            if (primeraMuestra)
+            {
+                timestampAnterior = raw.timestamp_us;
+                primeraMuestra = false;
                 continue;
             }
 
-            // 1. Cálculo del Delta T (dt)
-            int64_t diferencia_tiempo = datoRecibido.timestamp_us - timestamp_anterior;
-            float delta_t = (float)diferencia_tiempo / 1000000.0f;
-            timestamp_anterior = datoRecibido.timestamp_us;
+            //----------------------------------------------------------------------
+            // detal t
+            //----------------------------------------------------------------------
+            const float dt = (raw.timestamp_us - timestampAnterior) * 1e-6f;
 
-            // -------------------------------------------------------------------------
-            // 2. MAPEO DE EJES (Sensor MPU -> Cohete Físico)
-            // Según mMPU6050.cpp, el eje X del sensor apunta hacia la nariz del cohete
-            // -------------------------------------------------------------------------
-            // Aceleraciones en Gs respecto a la estructura del cohete
-            float cohete_accel_z = datoRecibido.mpu.accel_x / 9.80665f; // Vertical real del cohete (Eje X del MPU)
-            float cohete_accel_y = datoRecibido.mpu.accel_y / 9.80665f; // Lateral (Eje Y del MPU)
-            float cohete_accel_x = datoRecibido.mpu.accel_z / 9.80665f; // Lateral (Eje Z del MPU)
+            timestampAnterior = raw.timestamp_us;
 
-            // Velocidades angulares en °/s respecto a la estructura del cohete
-            // (Si la nariz es X en el MPU, entonces rotar sobre X es el Roll del cohete)
-            float cohete_gyro_yaw   = datoRecibido.mpu.gyro_x * 57.2958f; // Rotación sobre el eje vertical
-            float cohete_gyro_pitch = datoRecibido.mpu.gyro_y * 57.2958f; // Cabeceo
-            float cohete_gyro_roll  = datoRecibido.mpu.gyro_z * 57.2958f; // Alabeo
+            //----------------------------------------------------------------------
+            // MAPEO DE EJES (Sensor MPU -> Cohete Físico)
+            // Todo permanece en las unidades nativas
+            //----------------------------------------------------------------------
+            const float accelX_g = raw.mpu.accel_z_g;
+            const float accelY_g = raw.mpu.accel_y_g;
+            const float accelZ_g = raw.mpu.accel_x_g;
 
-            // -------------------------------------------------------------------------
-            // 3. TRIGONOMETRÍA Y FILTRADO (Usando los ejes mapeados del cohete)
-            // -------------------------------------------------------------------------
-            float accel_pitch = atan2(cohete_accel_x, cohete_accel_z) * 57.2958f;
-            float accel_yaw   = atan2(cohete_accel_y, cohete_accel_z) * 57.2958f;
+            const float gyroRoll_rad_s  = raw.mpu.gyro_z_rad_s;     // Alabeo
+            const float gyroPitch_rad_s = raw.mpu.gyro_y_rad_s;     // Cabeceo
+            const float gyroYaw_rad_s   = raw.mpu.gyro_x_rad_s;     // Rotación sobre el eje vertical
 
-            // Filtro Kalman Dinámico (usamos cohete_accel_z que tiene 1G en rampa)
-            float pitch_filtrado = kalmanPitch.update(cohete_gyro_pitch, accel_pitch, delta_t, cohete_accel_z);
-            float yaw_filtrado   = kalmanYaw.update(cohete_gyro_yaw, accel_yaw, delta_t, cohete_accel_z);
+            //----------------------------------------------------------------------
+            // Ángulos obtenidos del acelerómetro.
+            //----------------------------------------------------------------------
+            const float accelPitch_rad = atan2f(accelX_g, accelZ_g);
+            const float accelYaw_rad   = atan2f(accelY_g, accelZ_g);
 
-            // 4. Cálculo del Ángulo Total (Inclinación respecto a la vertical del cielo)
-            float pitch_rad = pitch_filtrado * (M_PI / 180.0f);
-            float yaw_rad   = yaw_filtrado * (M_PI / 180.0f);
-            float inclinacion_rad = acos(cos(pitch_rad) * cos(yaw_rad));
-            float inclinacion_total_grados = inclinacion_rad * (180.0f / M_PI);
+            //----------------------------------------------------------------------
+            // Kalman 1D
+            //
+            // Todo el filtro trabaja en: rad, rad/s, G
+            //----------------------------------------------------------------------
+            const float pitch_rad = kalmanPitch.update( gyroPitch_rad_s, accelPitch_rad, dt, accelZ_g);
 
-            // -------------------------------------------------------------------------
-            // 5. EMPAQUETADO FINAL (Estructura de data_all_t)
-            // -------------------------------------------------------------------------
-            data_all_t all_data = {}; // Inicializamos en 0
-            
-            // Velocidades angulares directas (°/s)
-            all_data.vel_angular_x = cohete_gyro_pitch; 
-            all_data.vel_angular_y = cohete_gyro_roll;
-            all_data.vel_angular_z = cohete_gyro_yaw;
+            const float yaw_rad = kalmanYaw.update( gyroYaw_rad_s, accelYaw_rad, dt, accelZ_g);
 
-            // Ángulos absolutos filtrados (°)
-            all_data.angulo_pitch = pitch_filtrado;
-            all_data.angulo_yaw = yaw_filtrado;
-            all_data.angulo_respecto_z = inclinacion_total_grados;
+            //----------------------------------------------------------------------
+            // Inclinación total respecto de la vertical. (Inclinación respecto a la vertical del cielo)
+            //----------------------------------------------------------------------
+            const float inclinacion_rad = acosf(cosf(pitch_rad) * cosf(yaw_rad));
 
-            // ... (Aquí mapearás el resto de variables: Barómetro, GPS, etc.) ...
-                    
-            // 6. DISTRIBUCIÓN A TAREAS (MdE, Lora)
-            if (xStateMachineRingbuf != NULL) {
-                xRingbufferSend(xStateMachineRingbuf, (void *)&all_data, sizeof(data_all_t), 0);
+            //----------------------------------------------------------------------
+            // Proyección de la aceleración longitudinal sobre el eje vertical global.
+            //
+            // El sensor lee: A_leida = A_real + gravedad_en_eje_z
+            // Entonces: A_real = A_leida - gravedad_en_eje_z
+            // Donde la gravedad proyectada en el eje longitudinal es 1g * cos(inclinacion)
+            // accelVertical_g continúa estando en G.
+            //----------------------------------------------------------------------
+            float accelVertical_g = accelZ_g * cosf(pitch_rad) * cosf(yaw_rad) - cosf(inclinacion_rad);
+            accelVertical_g = emaAccelVertical.actualizar(accelVertical_g); 
+
+            //----------------------------------------------------------------------
+            // Kalman 2D
+            //
+            // Este filtro trabaja naturalmente en SI.
+            //----------------------------------------------------------------------
+            constexpr float G_TO_MS2 = 9.80665f;
+
+            const float accelVertical_m_s2 = accelVertical_g * G_TO_MS2;
+
+            if (!kalmanAltInit) {
+                kalmanAlt.init(0.0f, 0.0f, 0.5f, 0.1f);  // Ajusta sigma según tus pruebas (ruido acel, ruido baro)
+                kalmanAltInit = true;
             }
-            if (xLoraRingbuf != NULL) {
-                xRingbufferSend(xLoraRingbuf, (void *)&all_data, sizeof(data_all_t), 0);
+
+            kalmanAlt.update(dt, accelVertical_m_s2, raw.bmp.altitud_m);
+
+            //----------------------------------------------------------------------
+            // EMPAQUETADO
+            //
+            // Recién acá convertimos a las unidades públicas de data_all_t.
+            //----------------------------------------------------------------------
+            //constexpr float RAD_TO_DEG = 57.2957795131f;
+
+            data_all_t out = {};
+
+            // Velocidades angulares
+            out.vel_angular_x_deg_s = gyroPitch_rad_s * RAD_TO_DEG;
+            out.vel_angular_y_deg_s = gyroRoll_rad_s  * RAD_TO_DEG;
+            out.vel_angular_z_deg_s = gyroYaw_rad_s   * RAD_TO_DEG;
+
+            // Actitud
+            out.angulo_pitch_deg      = pitch_rad * RAD_TO_DEG;
+            out.angulo_yaw_deg        = yaw_rad * RAD_TO_DEG;
+            out.angulo_respecto_z_deg = inclinacion_rad * RAD_TO_DEG;
+
+            // Cinemática vertical
+            out.altitud_filtrada_m  = kalmanAlt.getAltitude();
+            out.vel_z_filtrada_m_s   = kalmanAlt.getVelocity();
+            out.aceleracion_z_m_s2  = accelVertical_m_s2;
+
+            // Ambientales
+            out.temperatura_amb_c   = raw.bmp.temp_deg_c;
+            out.densidad_aire_kg_m3 = emaDensidad.actualizar(calcularDensidadAire(raw.bmp.presion_hpa, raw.bmp.temp_deg_c));
+            //----------------------------------------------------------------------
+            // Distribución (MdE, Lora)
+            //----------------------------------------------------------------------
+            if (xStateMachineRingbuf != NULL)
+            {
+                xRingbufferSend(
+                    xStateMachineRingbuf,
+                    &out,
+                    sizeof(data_all_t),
+                    0);
+            }
+
+            if (xLoraRingbuf != NULL)
+            {
+                xRingbufferSend(
+                    xLoraRingbuf,
+                    &out,
+                    sizeof(data_all_t),
+                    0);
             }
         }
-        
+        else {
+            ESP_LOGI(TAG_TASK_DATA_FILTER, "No messages (timeout)");
+        }
     }
 }
 
