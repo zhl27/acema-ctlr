@@ -80,6 +80,9 @@ void loop(){
 
 // TODO: Pensar sobre este texto: "You need to gather large bursts of hardware data inside an Interrupt Service Routine (ISR) to be processed later by a task."
 void vTaskReadSensors(void *pvParameters) {
+    // const TickType_t xFrequency = pdMS_TO_TICKS(7); // TODO: ~6.7 ms → 150 Hz --> frecuencia de rafagas --> es en realidad req de vTaskLora
+    // TickType_t xLastWakeTime = xTaskGetTickCount();
+
     (void)pvParameters;
     while (true) {
 
@@ -99,8 +102,7 @@ void vTaskReadSensors(void *pvParameters) {
         // SerialPrint::plot("contadorSensores", contadorSensores);
         // contadorSensores++;
 
-        // Simulate a 1 second sampling interval
-        // vTaskDelay(pdMS_TO_TICKS(1000)); // it yields CPU to lower priorities for 1s
+        // xTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
 }
 

@@ -17,7 +17,7 @@ constexpr float PESO_KG_COMBUSTIBLE = 5; // TODO: COMPLETAR CON EL DATO REAL
 constexpr uint32_t CONEXION_GSE_TIMEOUT_MILLIS = 1000*5;
 constexpr float ALTURA_M_MAX = 1000;
 constexpr uint32_t GPS_TIMEOUT_MILLIS = 1000*5;
-constexpr uint32_t TIEMPO_MILLIS_ESPERA_WARMUP_MPU = 1000*5;
+constexpr uint32_t TIEMPO_MILLIS_ESPERA_WARMUP_MPU = 1000*60*5;
 
 
 
@@ -68,7 +68,7 @@ namespace Cohete {
             return comp;
         }
 
-        bool gps_es_preciso(const data_all_t* datos_sensores) {
+        inline bool gps_es_preciso(const data_all_t* datos_sensores) {
             return datos_sensores->gps_nro_satelites >= 5       // Mínimo 4 para 3D, 5 o 6 es más seguro
                 && datos_sensores->gps_fix_type == 3            // Equivalente a 3D Fix en u-blox (fixType == 3)
                 && datos_sensores->gps_gnss_fix_ok == true      // ¡CRÍTICO! El flag del módulo que confirma que el arreglo es válido
@@ -81,7 +81,7 @@ namespace Cohete {
             // TODO: COMPLETAR CONDICIONES PARA VUELO.
         }
 
-        bool hay_boost(const data_all_t* datos_sensores) {
+        bool hay_boost(const data_all_t* datos_sensores) { // TODO: Completar lógica de Boost
             // aceleracion >= 2 g por 0,15 segs
             // 2gs = 2 * 9.81m/s2
             if (SYSTEM.timestamp_micros_inicio_pico_g <= micros() && micros() <= 150) {
@@ -126,7 +126,7 @@ namespace Cohete {
         // 3. Si (millis() - t_inicio_busqueda > TIMEOUT_LORA), entonces:
         //    COHETE.vuelo_en_silencio_radio = true;
         //    Transición forzada a ST_ESPERA_DESPEGUE (el despegue es prioridad).
-        if (es_entrada_a_estado()) {
+        if (entrando_a_estado()) {
             if (GSE::estado_conexion_gse() == ROCKET_DISCONNECTED || GSE::estado_conexion_gse() == ROCKET_INIT) {
                 timestamp_millis_inicio_timeout = millis();
                 ESP_LOGI(TAG_BASE, " -> [CONEXIÓN GSE] Esperando conexión con GSE...");
@@ -148,7 +148,7 @@ namespace Cohete {
     void f_st_espera_gps_preciso(data_all_t* datos_sensores) {
         static uint64_t timestamp_millis_inicio_timeout;
 
-        if (es_entrada_a_estado()) {
+        if (entrando_a_estado()) {
             timestamp_millis_inicio_timeout = millis();
         }
         else if ((millis() - timestamp_millis_inicio_timeout) >= GPS_TIMEOUT_MILLIS) {
@@ -177,7 +177,7 @@ namespace Cohete {
         // 3. if (tiempo_con_2g >= 150ms AND delta_altura > 4.0m) {
         //      Transición a ST_PROPULSION.
         //    }
-        if (es_entrada_a_estado()) {
+        if (entrando_a_estado()) {
             ESP_LOGI(TAG_BASE, "[ESPERA IGNICION] Esperando condiciones necesarias para el vuelo...");
         }
 
@@ -185,7 +185,7 @@ namespace Cohete {
             // if led no encendido: encenderlo para señalizar que ya podemos volar.
             if (millis() - last_millis >= 3000) {
                 last_millis = millis();
-                buzzer.beep(100);
+                // buzzer.beep(100);
                 ESP_LOGI(TAG_BASE, " -> [ESPERA IGNICION] Cohete en condiciones para volar!");
             }
 
@@ -194,7 +194,7 @@ namespace Cohete {
                 transicionar_hacia(ST_BOOST);
             }
         }
-        else if (Eventos::hay_boost(datos_sensores)) {
+        else if (Eventos::hay_boost(datos_sensores)) { // detectamos boost a pesar de no estar en condiciones para volar, KEEEEE!!!!!!
             transicion_error(ERR_DESPEGUE_PROHIBIDO, datos_sensores);
         }
     }
@@ -205,7 +205,7 @@ namespace Cohete {
         static float aceleracion_z_entrada_st_boost;
         static float velocidad_z_entrada_st_boost;
 
-        if (es_entrada_a_estado()) {
+        if (entrando_a_estado()) {
             altura_entrada_st_boost = datos_sensores->altura_m;
             aceleracion_z_entrada_st_boost = datos_sensores->aceleracion_z_m_s2;
             velocidad_z_entrada_st_boost = datos_sensores->velocidad_z_m_s;
@@ -217,12 +217,12 @@ namespace Cohete {
 
         // Cuando la aceleración vertical decaiga bruscamente (Burn-out / Fin de combustión)
         // if (datos_sensores-> altura_m < altura_entrada_st_boost) { --> esto no determina comienzo de fase balistica, es parte de, sí, pero no determina. --> la fase balistica comienza con una velocidad hacia arriba que va desacelerandose por la gravedad --> al comienzo, la altura sigue incrementandose, aunque a tasas cada vez menores, hasta que empezamos a tener velocidad hacia abajo.
-        if ((aceleracion_z_entrada_st_boost - datos_sensores->aceleracion_z_m_s2) > 0) { // Detectamos que hubo una DESaceleracion.
+        if ((aceleracion_z_entrada_st_boost - datos_sensores->aceleracion_z_m_s2) > -A_GRAV) { // Detectamos que hubo una DESaceleracion.
             // comparamos velocidad en el tiempo
             // TODO: Debemos comprobar que realmente hubo una DESaceleracion
-            // si hubo desaceleracion, deberiamos ver una velocidad cada vez menor.
-            // --> esto no nos confirma nada, ya que la velocidad la calculamos a partir de la aceleracion.
-            // Deberiamos comprobarlo con otros datos, quizas el GPS sea nuestro mejor aliado en este problema.
+            // usar velocidad para double-check --> no nos confirma nada, ya que la velocidad la calculamos a partir de la aceleracion.
+            // TODO: Deberiamos comprobarlo con otros datos, quizas el GPS sea nuestro mejor aliado en este problema.
+            // TODO: utilizar la altura (calculada a partir de la presion de la bmp) para verificar que hay un decremento en la tasa de cambio de la altura, es decir, que la altura sube cada vez más lento, hasta que su tasa de cambio se vuelva cero (implica que alcanzó apogeo)
             if ((velocidad_z_entrada_st_boost - datos_sensores->velocidad_z_m_s) > 0) {
                 SYSTEM.masa_cohete_kg -= PESO_KG_COMBUSTIBLE; // TODO: asumimos que el combustible se consumio completamente ?
                 transicionar_hacia(ST_FASE_BALISTICA);
@@ -238,44 +238,47 @@ namespace Cohete {
         //      Transición a ST_APOGEO.
         //    }
 
-
-        if (SYSTEM.contexto_fisico.altura_max_historica < datos_sensores->altura_m) {
+        if (datos_sensores->altura_m > SYSTEM.contexto_fisico.altura_max_historica) {
             // encontramos nueva altura historica
-            SYSTEM.contexto_fisico.altura_max_historica = datos_sensores->altura_m;
+            SYSTEM.contexto_fisico.altura_max_historica = datos_sensores->altura_m; // esto va buscando constantemente el apogeo
         }
-        // chequeando para cambiar a ST_APOGEO
+        // chequeando para cambiar a ST_DESPLIEGUE_DROGUE
         // asumimos que ya pasamos EL instante del apogeo, y estariamos por ende
-        // con velocidad hacia abajo
-        // con aceleracion hacia abajo (constante como siempre, la de gravedad)
+        // con velocidad hacia abajo,
+        // y con aceleracion hacia abajo (constante como siempre, la de gravedad)
         else if (datos_sensores->velocidad_z_m_s <= 0 // se mueve hacia abajo
-            && datos_sensores->aceleracion_z_m_s2 < -A_GRAV + 2 // +2 para tener en cuenta errores
-            )
+            && datos_sensores->aceleracion_z_m_s2 < -A_GRAV) // está bajo completo efecto de la gravedad --> TODO: TENER EN CUENTA VIENTO ETC ETC --> QUIZAS NO SEA SOLO GRAVEDAD
         {
-            // aproxima(datos_sensores->altura_m, ALTURA_M_MAX, 5) // TODO: Ver que cosas interesantes se puede hacer con esto.
-            // transicionamos hacia ST_APOGEO --> abrimos drogue
-            SYSTEM.timestamp_micros_apertura_drogue = micros();
-            Actuators::getPyroDrogue().armar();
-            Actuators::getPyroDrogue().disparar();
-            transicionar_hacia(ST_APOGEO);
+            if (!Actuators::getPyroDrogue().tieneContinuidad()) {
+                // aproxima(datos_sensores->altura_m, ALTURA_M_MAX, 5) // TODO: Ver que cosas interesantes se puede hacer con esto.
+                Actuators::getPyroDrogue().armar();
+                Actuators::getPyroDrogue().disparar();
+            }
+            else { // se encendió efectivamente el pirotécnico, podemos cambiar de estado.
+                SYSTEM.timestamp_micros_apertura_drogue = micros();
+                transicionar_hacia(ST_DESPLIEGUE_DROGUE);
+            }
         }
     }
 
-    void f_st_apogeo(data_all_t* datos_sensores) {
+    void f_st_despliegue_drogue(data_all_t* datos_sensores) { // TODO: ST_APOGEO quizás no sea necesario, es más bien un evento dentro de ST_FASE_BALISTICA
         // Lógica:
         // 1. Enviar señal de STOP a la cámara por pin/UART.
         // 2. Ignición pirotécnica del Drogue.
         // 4. Transición inmediata a ST_DESCENSO_EVALUACION.
 
-        // chequeamos que el paracaidas drogue realmente se desplegó
-        // medimos continuidad del pyro
-        // medimos que la velocidad sea constante (con cierto ruido que debemos ignorar) gracias al drogue haciendo friccion con el aire.
-        if (es_entrada_a_estado()) {
-
+        // Chequeamos que el paracaidas drogue realmente se desplegó
+        // 1. Medimos continuidad del pyro
+        // 2. Medimos que la velocidad sea constante (con cierto ruido que debemos ignorar) gracias al drogue haciendo friccion con el aire.
+        if (entrando_a_estado()) {
+            if (Actuators::getPyroDrogue().tieneContinuidad()) {
+                ESP_LOGI(TAG_BASE, " -> [%s] Drogue desplegado correctamente.", estado_cohete_string[SYSTEM.estado]);
+                transicionar_hacia(ST_DESCENSO_EVALUACION);
+            }
         }
-
         // chequear que realmente llegamos a apogeo
-        // comprobar que altura paso por un punto mas alto y descendio inmediatamente
-        if (datos_sensores->velocidad_z_m_s <= 0) { // esta cayendo
+        // comprobar que altura paso por un punto más alto y descendio inmediatamente
+        else if (datos_sensores->velocidad_z_m_s <= 0) { // está cayendo
             if (datos_sensores->altura_m < SYSTEM.contexto_fisico.altura_max_historica) {
                 transicionar_hacia(ST_DESCENSO_EVALUACION);
             }

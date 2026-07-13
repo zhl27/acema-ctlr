@@ -26,7 +26,7 @@ namespace Cohete {
         ST_ESPERA_IGNICION,        // En rampa. Ignición externa. Esperando trigger cinemático
         ST_BOOST,                  // Impulso detectado (>= 2g x 150ms + 4m)
         ST_FASE_BALISTICA,         // Inercia ascendente. Activa rutina de frenado aerodinámico
-        ST_APOGEO,                 // Derivada de altura nula. Disparo Drogue + Corte cámara
+        ST_DESPLIEGUE_DROGUE,                 // Derivada de altura nula. Disparo Drogue + Corte cámara
         ST_DESCENSO_EVALUACION,    // Ventana de 3 segundos post-drogue para testear salud
         ST_DESCENSO_NOMINAL,       // Drogue OK. Esperando cota de 250m para Principal
         ST_DESCENSO_EMERGENCIA,    // Drogue fallido (vy <= -35 m/s). Disparo Principal de auxilio
@@ -57,7 +57,7 @@ namespace Cohete {
         ERR_DESPEGUE_FALSO_ZARANDEO, // Se detectó un pico de Gs pero sin delta de altura
         ERR_DESPEGUE_PROHIBIDO,      // Se realizo despegue a pesar de no estar en condiciones
         ERR_TRAYECTORIA_NO_VERTICAL, // El vector de actitud se inclinó peligrosamente
-        ERR_DROGUE_DESGARRO,         // Aceleración anómala detectada durante los 3s de drogue
+        ERR_DROGUE_NO_EFECTO,         // Aceleración anómala detectada durante los 3s de drogue
         ERR_FRENADO_AERO_ATASCADO,   // Actuador de frenado aerodinámico no responde
         ERR_ESTADO_INVALIDO,         // cuando un estado_vuelo_t es mayor que ST_NULL
         ERR_DESCONOCIDO
@@ -111,7 +111,7 @@ namespace Cohete {
 
     } system_data_t;
 
-    extern system_data_t SYSTEM;
+    extern system_data_t SYSTEM; // SOLAMENTE DEBE SER MODIFICADA POR LA MDE DEL COHETE. LOS DEMÁS PROCESOS SOLO DEBERÍAN LEERLA, PERO NO DEBEN MODIFICARLA. // TODO: FORZAR SOLO LECTURA PARA OBJETOS EXTERNOS A LA MDE.
 
 }
 

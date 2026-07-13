@@ -40,7 +40,7 @@
 
 namespace Cohete {
 
-    bool es_entrada_a_estado();
+    bool entrando_a_estado();
     void transicionar_hacia(estado_cohete_t nuevo_estado);
 
     /** @brief Tabla de punteros a función estrictamente mapeada a estado_vuelo_t */
