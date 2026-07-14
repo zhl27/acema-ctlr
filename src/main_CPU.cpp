@@ -148,10 +148,10 @@ void loop() {
                 }
 
                 data_all_t paqueteTelemetria;
-                paqueteTelemetria.altura_m = simuladorAltitud;
-                paqueteTelemetria.vel_angular_x = analogRead(A0) * (5.0f / 1023.0f); // Conversión ADC a Voltaje
-                paqueteTelemetria.vel_angular_x = 0.0f;  // Variables estáticas de relleno
-                paqueteTelemetria.vel_angular_x = cicloContador;
+                paqueteTelemetria.altitud_filtrada_m = simuladorAltitud;
+                paqueteTelemetria.vel_angular_x_deg_s = analogRead(A0) * (5.0f / 1023.0f); // Conversión ADC a Voltaje
+                paqueteTelemetria.vel_angular_x_deg_s = 0.0f;  // Variables estáticas de relleno
+                paqueteTelemetria.vel_angular_x_deg_s = cicloContador;
 
                 // 2. Impresión visual estructurada y cruda antes del envío
                 print_data(&paqueteTelemetria);

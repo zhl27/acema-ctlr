@@ -1,23 +1,26 @@
 #include "EmaFilter.h"
+#include <cmath>
 
 EmaFilter::EmaFilter()
 {
-    _alfa = 1.0;
-    _salidaPrev = 0.0;
+    _alfa = 1.0f;
+    _salidaPrev = 0.0f;
     _estaInicializado = false;
+    _fc = 1.0f;
 }
 
 EmaFilter::EmaFilter(float alfa)
 {
     setAlfa(alfa);
-    _salidaPrev = 0.0;
-    _estaInicializado = false; 
+    _salidaPrev = 0.0f;
+    _estaInicializado = false;
+    _fc = 1.0f;
 }
 
 EmaFilter::EmaFilter(float FS, float fc)
 {
-    setFrecuenciaCorte(FS, fc);
-    _salidaPrev = 0.0;
+    configurarFrecuenciaCorte(FS, fc);
+    _salidaPrev = 0.0f;
     _estaInicializado = false;
 }
 
@@ -27,44 +30,73 @@ void EmaFilter::inicializar(float muestraInicial)
     _estaInicializado = true;
 }
 
-float EmaFilter::filtrar(float muestra)
+float EmaFilter::actualizar(float muestra)
 {
-// Corrección de transitorio inicial (para evitar arrancar desde 0 si la señal empieza alta)
-    if (!_estaInicializado) {
+    // Primera muestra: evita el transitorio inicial arrancando
+    // desde el valor medido y no desde cero.
+    if (!_estaInicializado)
+    {
         _salidaPrev = muestra;
-        muestra = true;
+        _estaInicializado = true;
         return _salidaPrev;
     }
 
-    // Ecuación en diferencias del EMA
-    double salidaActual = _alfa * muestra + (1.0 - _alfa) * _salidaPrev;
-    _salidaPrev = salidaActual;
-    
-    return salidaActual;
+    // Filtro EMA:
+    // y[k] = α·x[k] + (1-α)·y[k-1]
+    _salidaPrev =
+        _alfa * muestra +
+        (1.0f - _alfa) * _salidaPrev;
+
+    return _salidaPrev;
+}
+
+float EmaFilter::actualizar(float muestra, float dt)
+{
+    if (!_estaInicializado)
+    {
+        _salidaPrev = muestra;
+        _estaInicializado = true;
+        return _salidaPrev;
+    }
+
+    if (dt <= 0.0f) return _salidaPrev;
+
+    const float tau = 1.0f / (2.0f * static_cast<float>(M_PI) * _fc);
+    float alpha = dt / (tau + dt);
+    if (alpha > 1.0f) alpha = 1.0f;
+
+    _salidaPrev = alpha * muestra + (1.0f - alpha) * _salidaPrev;
+
+    return _salidaPrev;
 }
 
 void EmaFilter::resetear()
 {
     _estaInicializado = false;
-    _salidaPrev = 0.0;
+    _salidaPrev = 0.0f;
 }
 
 bool EmaFilter::setAlfa(float nuevoAlfa)
 {
-    if (nuevoAlfa > 0.0 && nuevoAlfa <= 1.0) {
-        _alfa = nuevoAlfa;
-        return true;
-    }
-    return false;
+    if (nuevoAlfa <= 0.0f || nuevoAlfa > 1.0f)
+        return false;
+
+    _alfa = nuevoAlfa;
+    return true;
 }
 
-bool EmaFilter::setFrecuenciaCorte(float FS, float fc)
+bool EmaFilter::configurarFrecuenciaCorte(float FS, float fc)
 {
-    if (fc <= 0.0 || FS <= 0.0) return false;
-        
-    // Ecuación de correspondencia temporal: alfaa = dt / (tau + dt)
-    double dt = 1.0 / FS;
-    double tau = 1.0 / (2.0 * M_PI * fc);
+    if (FS <= 0.0f || fc <= 0.0f)
+        return false;
+
+    _fc = fc;
+    // α = dt / (τ + dt)
+    // τ = 1 / (2πfc)
+    const float dt  = 1.0f / FS;
+    const float tau = 1.0f / (2.0f * static_cast<float>(M_PI) * fc);
+
     _alfa = dt / (tau + dt);
+
     return true;
 }

@@ -54,18 +54,18 @@ data_all_t DataFilter::process(const data_raw_t& raw) {
     // ==========================================
     // STEP 1: FILTRADO DE DATOS CRUDOS (EMA)
     // ==========================================
-    float raw_accel_x_f = filter_accel_x.filtrar((float)raw.mpu.accel_x);
-    float raw_accel_y_f = filter_accel_y.filtrar((float)raw.mpu.accel_y);
-    float raw_accel_z_f = filter_accel_z.filtrar((float)raw.mpu.accel_z);
+    float raw_accel_x_f = filter_accel_x.actualizar((float)raw.mpu.accel_x_g);
+    float raw_accel_y_f = filter_accel_y.actualizar((float)raw.mpu.accel_y_g);
+    float raw_accel_z_f = filter_accel_z.actualizar((float)raw.mpu.accel_z_g);
 
     // Filtrar giroscopio (Cinemática Angular directa)
-    out.vel_angular_x = filter_gyro_x.filtrar((float)raw.mpu.gyro_x);
-    out.vel_angular_y = filter_gyro_y.filtrar((float)raw.mpu.gyro_y);
-    out.vel_angular_z = filter_gyro_z.filtrar((float)raw.mpu.gyro_z);
+    out.vel_angular_x_deg_s = filter_gyro_x.actualizar((float)raw.mpu.gyro_x_rad_s);
+    out.vel_angular_y_deg_s = filter_gyro_y.actualizar((float)raw.mpu.gyro_y_rad_s);
+    out.vel_angular_z_deg_s = filter_gyro_z.actualizar((float)raw.mpu.gyro_z_rad_s);
 
     // Filtrar BMP280
-    float presion_filtrada = filter_bmp_presion.filtrar((float)raw.bmp.presion);
-    float temp_filtrada_raw = filter_bmp_temp.filtrar((float)raw.bmp.temp);
+    float presion_filtrada = filter_bmp_presion.actualizar((float)raw.bmp.presion_hpa);
+    float temp_filtrada_raw = filter_bmp_temp.actualizar((float)raw.bmp.temp_deg_c);
 
 
     // ==========================================
@@ -88,22 +88,22 @@ data_all_t DataFilter::process(const data_raw_t& raw) {
     // 1. Altura (m): Conversión barométrica estándar desde presión (Pa) a metros
     float P0 = 101325.0f; // Idealmente esto se calibra en el Pad // TODO: crear variable COHETE.presion_en_pad
     float altura_absoluta = 44330.0f * (1.0f - pow((presion_filtrada / P0), 0.1902949f));
-    out.altura_m = altura_absoluta - Cohete::SYSTEM.altitud_cero_pad_m;
+    out.altitud_filtrada_m = altura_absoluta - Cohete::SYSTEM.altitud_cero_pad_m;
 
     // Cálculo del diferencial de tiempo (dt) para derivadas
     float dt = 0.0f;
-    if (!_es_primer_ciclo && raw.timestamp_micros > _ultimo_tiempo_us) {
-        dt = static_cast<float>(raw.timestamp_micros - _ultimo_tiempo_us) / 1000000.0f; // Convertir us a segundos
+    if (!_es_primer_ciclo && raw.timestamp_us > _ultimo_tiempo_us) {
+        dt = static_cast<float>(raw.timestamp_us - _ultimo_tiempo_us) / 1000000.0f; // Convertir us a segundos
     }
 
     // 2. Velocidad Vertical Z (m/s) y Aceleración Z (m/s2)
     if (_es_primer_ciclo || dt <= 0.0f) {
-        out.velocidad_z_m_s = 0.0f;
+        out.vel_z_filtrada_m_s = 0.0f;
         out.aceleracion_z_m_s2 = 0.0f;
         _es_primer_ciclo = false;
     } else {
         // Velocidad vertical estimada por la derivada de la altura barométrica
-        out.velocidad_z_m_s = (out.altura_m - _ultima_altura_m) / dt;
+        out.vel_z_filtrada_m_s = (out.altitud_filtrada_m - _ultima_altura_m) / dt;
 
         // Aceleración lineal filtrada
         // NOTA: Para tener la aceleración absoluta sin gravedad, se debe restar g (~9.81)
@@ -112,11 +112,11 @@ data_all_t DataFilter::process(const data_raw_t& raw) {
     }
 
     // Guardar estados para el próximo ciclo
-    _ultima_altura_m = out.altura_m;
-    _ultimo_tiempo_us = raw.timestamp_micros;
+    _ultima_altura_m = out.altitud_filtrada_m;
+    _ultimo_tiempo_us = raw.timestamp_us;
 
     // 3. Momentum (P = m * v)
-    out.momentum_kg_m_s = Cohete::SYSTEM.masa_cohete_kg * out.velocidad_z_m_s;
+    out.momentum_kg_m_s = Cohete::SYSTEM.masa_cohete_kg * out.vel_z_filtrada_m_s;
 
 
     // ==========================================
@@ -131,9 +131,9 @@ data_all_t DataFilter::process(const data_raw_t& raw) {
     // Ángulo respecto al eje Z (Hacia el cielo)
     // Se usa el arccos( Z / Norma ). Retorna en Radianes y se convierte a Grados.
     if (norm_accel > 0.0f) {
-        out.angulo_respecto_z = acos(raw_accel_z_f / norm_accel) * 180.0f / M_PI;
+        out.angulo_respecto_z_deg = acos(raw_accel_z_f / norm_accel) * 180.0f / M_PI;
     } else {
-        out.angulo_respecto_z = 0.0f;
+        out.angulo_respecto_z_deg = 0.0f;
     }
 
 

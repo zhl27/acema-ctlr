@@ -206,11 +206,11 @@ namespace Cohete {
         static float velocidad_z_entrada_st_boost;
 
         if (entrando_a_estado()) {
-            altura_entrada_st_boost = datos_sensores->altura_m;
+            altura_entrada_st_boost = datos_sensores->altitud_filtrada_m;
             aceleracion_z_entrada_st_boost = datos_sensores->aceleracion_z_m_s2;
-            velocidad_z_entrada_st_boost = datos_sensores->velocidad_z_m_s;
+            velocidad_z_entrada_st_boost = datos_sensores->vel_z_filtrada_m_s;
         }
-        else if ((datos_sensores->altura_m - altura_entrada_st_boost) < 10) { // TODO: DEFINIR BIEN LA CONDICION de DIFF ALTURAS, PARA RESPALDAR QUE ENTRAMOS A BOOST REALMENTE.
+        else if ((datos_sensores->altitud_filtrada_m - altura_entrada_st_boost) < 10) { // TODO: DEFINIR BIEN LA CONDICION de DIFF ALTURAS, PARA RESPALDAR QUE ENTRAMOS A BOOST REALMENTE.
             // si la diferencia no es considerable como para respaldar que estamos definitivamente en modo BOOST...
             transicion_error(ERR_DESPEGUE_FALSO_ZARANDEO, datos_sensores);
         }
@@ -238,15 +238,16 @@ namespace Cohete {
         //      Transición a ST_APOGEO.
         //    }
 
-        if (datos_sensores->altura_m > SYSTEM.contexto_fisico.altura_max_historica) {
+
+        if (SYSTEM.contexto_fisico.altura_max_historica < datos_sensores->altitud_filtrada_m) {
             // encontramos nueva altura historica
-            SYSTEM.contexto_fisico.altura_max_historica = datos_sensores->altura_m; // esto va buscando constantemente el apogeo
+            SYSTEM.contexto_fisico.altura_max_historica = datos_sensores->altitud_filtrada_m;  // esto va buscando constantemente el apogeo
         }
         // chequeando para cambiar a ST_DESPLIEGUE_DROGUE
         // asumimos que ya pasamos EL instante del apogeo, y estariamos por ende
         // con velocidad hacia abajo,
         // y con aceleracion hacia abajo (constante como siempre, la de gravedad)
-        else if (datos_sensores->velocidad_z_m_s <= 0 // se mueve hacia abajo
+        else if (datos_sensores->vel_z_filtrada_m_s <= 0 // se mueve hacia abajo
             && datos_sensores->aceleracion_z_m_s2 < -A_GRAV) // está bajo completo efecto de la gravedad --> TODO: TENER EN CUENTA VIENTO ETC ETC --> QUIZAS NO SEA SOLO GRAVEDAD
         {
             if (!Actuators::getPyroDrogue().tieneContinuidad()) {
@@ -278,8 +279,8 @@ namespace Cohete {
         }
         // chequear que realmente llegamos a apogeo
         // comprobar que altura paso por un punto más alto y descendio inmediatamente
-        else if (datos_sensores->velocidad_z_m_s <= 0) { // está cayendo
-            if (datos_sensores->altura_m < SYSTEM.contexto_fisico.altura_max_historica) {
+       else if (datos_sensores->vel_z_filtrada_m_s <= 0) { // está cayendo
+            if (datos_sensores->altitud_filtrada_m < SYSTEM.contexto_fisico.altura_max_historica) {
                 transicionar_hacia(ST_DESCENSO_EVALUACION);
             }
         }

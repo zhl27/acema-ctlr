@@ -29,6 +29,15 @@ private:
 
     float temp;
 
+    // Variables de calibración
+    float CalAccelX;
+    float CalAccelY;
+    float CalAccelZ;
+    float CalGyroX;
+    float CalGyroY;
+    float CalGyroZ;
+    float Caltemp;
+
 public:
     mMPU6050();
 

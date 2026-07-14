@@ -18,9 +18,7 @@
 class mBMP280 {
 private:
     Adafruit_BMP280 _bmp;
-    // float last_temp;
-    // float last_pres;
-    // float last_alt;
+    float _altitud_base_m; // Variable para almacenar el Offset de la rampa de lanzamiento
 
 public:
     mBMP280();
@@ -36,10 +34,11 @@ public:
     // Getters for current sensor readings
     float _get_temperature() { return _bmp.readTemperature(); }
     float _get_pressure() { return _bmp.readPressure(); }
-    // float getAltitude() { return bmp.readAltitude(1013.25f); } // NO USAMOS EL VALOR CALCULADO POR EL SENSOR
+    
+    // Calcula y devuelve la altitud relativa al punto de despegue (AGL)
+    float _get_altitude(); 
 
     data_raw_bmp_t get_bmp_raw_data();
 };
-
 
 #endif //ACEMA_CTLR_MBMP280_H

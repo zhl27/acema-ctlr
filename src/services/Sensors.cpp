@@ -61,7 +61,7 @@ data_raw_t Sensors::get_raw_data() {
     // float alt_m     = pvt.hMSL / 1000.0f; // Altura sobre el nivel del mar
     // uint32_t sat    = pvt.numSV;
 
-    raw.timestamp_micros = micros(); // TODO: VER SI DEBEMOS UTILIZAR OTRA FUNCIÓN
+    // raw.timestamp_micros = micros(); // TODO: VER SI DEBEMOS UTILIZAR OTRA FUNCIÓN
 
     return raw;
 }
