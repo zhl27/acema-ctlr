@@ -4,53 +4,48 @@
 
 #include "eEsp32Cam.h"
 
-eEsp32Cam::eEsp32Cam(int rxPin, int txPin, uint32_t baudRate) {
-    _serial = &Serial1; // Usamos el UART1 de hardware del ESP32
-    _rxPin = rxPin;
-    _txPin = txPin;
-    _baudRate = baudRate;
-    _uartMutex = xSemaphoreCreateMutex();
-}
 
-void eEsp32Cam::begin() {
-    // Configuración de la matriz de enrutamiento GPIO para UART
-    _serial->begin(_baudRate, SERIAL_8N1, _rxPin, _txPin);
-    clearRxBuffer();
-}
-
-void eEsp32Cam::clearRxBuffer() {
-    while (_serial->available()) {
-        _serial->read();
+uint8_t eEsp32Cam::_calcularChecksum(const String& comando) {
+    uint8_t checksum = 0;
+    for (int i = 0; i < comando.length(); i++) {
+        checksum ^= comando[i];
     }
+    return checksum;
 }
 
-void eEsp32Cam::sendCommand(const char* cmd) {
-    clearRxBuffer();      // Evita leer respuestas viejas o ruido acumulado
-    _serial->println(cmd);
-    _serial->flush();     // Espera a que el último byte salte por el pin TX
+
+bool eEsp32Cam::enviar_comando(const String& cmdType, const String& payload = "") const {
+    const String trama = "$" + cmdType + "," + String(payload.length()) + "," + payload;
+    const uint8_t chk = _calcularChecksum(trama);
+
+    _uart->print(trama);
+    _uart->print("*");
+    _uart->println(chk, HEX);
+    _uart->flush();
+
+    return true;
 }
 
-String eEsp32Cam::receiveResponse(unsigned long timeoutMillis) {
+
+String eEsp32Cam::recibir_respuesta() const {
     unsigned long startMillis = millis();
-    while (millis() - startMillis < timeoutMillis) {
-        if (_serial->available()) {
-            String response = _serial->readStringUntil('\n');
-            response.trim(); // Elimina \r y espacios en blanco
-            return response;
+    String respuesta = "";
+
+    while ((millis() - startMillis) < _timeoutMs) {
+        if (_uart->available()) {
+            char c = _uart->read();
+            if (c == '\n') {
+                break; // Fin de la trama recibido
+            }
+            respuesta += c;
         }
-        delay(2); // Pequeña pausa para ceder tiempo a las tareas de FreeRTOS
     }
-    return ""; // Cadena vacía si ocurre un timeout
+    return respuesta;
 }
 
-char* eEsp32Cam::executeCommand(const char* cmd, unsigned long timeoutMillis) {
-    char* response;
-    // Solicitamos el "candado" de la UART. Si otra tarea la está usando, esperamos.
-    if (xSemaphoreTake(_uartMutex, portMAX_DELAY) == pdTRUE) {
-        sendCommand(cmd);
-        response = receiveResponse(timeoutMillis);
-        // Soltamos el "candado"
-        xSemaphoreGive(_uartMutex);
-    }
-    return response;
+
+bool eEsp32Cam::ejecutar_comando_sincrono(const String& cmdType, const String& payload, String& respuestaOut) const {
+    if (!enviar_comando(cmdType, payload)) return false; // TODO: el compilador dice que la condicion es siempre falsa.
+    respuestaOut = recibir_respuesta();
+    return respuestaOut.startsWith("$OK") || respuestaOut.startsWith("$DATA");
 }

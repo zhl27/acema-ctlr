@@ -4,65 +4,36 @@
 
 #ifndef ACEMA_CTLR_EESP32CAM_H
 #define ACEMA_CTLR_EESP32CAM_H
+#include <HardwareSerial.h>
 
-
-// En eEsp32Cam.h
-#include <FreeRTOS.h>
-#include <semphr.h>
-#include <stdint.h>
 
 class eEsp32Cam {
 private:
-    // ...
-public:
-    eEsp32Cam() {
-    }
-
-    String executeCommand(const String& cmd) {
-        String response = "";
-        // Solicitamos el "candado" de la UART. Si otra tarea la está usando, esperamos.
-        if (xSemaphoreTake(uartMutex, portMAX_DELAY) == pdTRUE) {
-            sendCommand(cmd);
-            response = receiveResponse();
-            // Soltamos el "candado"
-            xSemaphoreGive(uartMutex);
-        }
-        return response;
-    }
-};
-
-
-#ifndef E_ESP32_CAM_H
-#define E_ESP32_CAM_H
-
-#include <Arduino.h>
-
-class eEsp32Cam {
-private:
-    SemaphoreHandle_t _uartMutex; // Protege el puerto serie
-    HardwareSerial* _serial;
+    HardwareSerial* _uart;
     int _rxPin;
     int _txPin;
-    uint32_t _baudRate;
-    void clearRxBuffer();
+    unsigned long _baudrate;
+    uint32_t _timeoutMs = 100; // Timeout crítico de 100ms para no bloquear el vuelo
+
+    // Función interna para calcular un checksum XOR básico y validar integridad
+    static uint8_t _calcularChecksum(const String& comando);
 
 public:
-    // Configuración física por defecto: D34 (RX), D26 (TX)
-    eEsp32Cam(int rxPin = 34, int txPin = 26, uint32_t baudRate = 115200);
+    explicit eEsp32Cam(HardwareSerial& uartPort = Serial2, const int rxPin = 16, const int txPin = 17, unsigned long baudrate = 921600) : _uart(&uartPort), _rxPin(rxPin), _txPin(txPin), _baudrate(baudrate) {
+    }
 
-    // Inicializa el bus UART
-    void begin();
+    void init() const {
+        _uart->begin(_baudrate, SERIAL_8N1, _rxPin, _txPin);
+    }
 
-    // Envía un comando por TX
-    void sendCommand(const char* cmd);
+    // Envía un comando formateado con Checksum para garantizar integridad
+    bool enviar_comando(const String& cmdType, const String& payload = "") const;
 
-    // Espera y lee la respuesta por RX dentro de un tiempo máximo (timeout)
-    char* receiveResponse(unsigned long timeoutMillis = 2000);
+    // Espera una respuesta de la ESP-CAM de forma no bloqueante (con timeout)
+    String recibir_respuesta() const;
 
-    // Método transaccional: Limpia buffer, envía comando y devuelve la respuesta
-    char* executeCommand(const char* cmd, unsigned long timeoutMillis = 2000);
+    // Envía un comando y espera validación ($OK o $DATA)
+    bool ejecutar_comando_sincrono(const String& cmdType, const String& payload, String& respuestaOut) const;
 };
-
-#endif // E_ESP32_CAM_H
 
 #endif //ACEMA_CTLR_EESP32CAM_H

@@ -24,6 +24,8 @@
 #include "config.h"
 #include "services/EmaFilter.h"
 #include <cmath> // Para atan2
+#include <stddef.h>
+
 #include "services/Kalman1D.h"
 #include "services/Kalman2D.h"
 
@@ -60,6 +62,9 @@ static const char *TAG_TASK_FLASH = "TASK FLASH";
 static const char *TAG_TASK_LORA = "TASK LORA";
 
 mBuzzer buzzer(BUZZER_PIN);
+eEsp32Cam espCam();
+mSD tarjetaSD(espCam);
+
 
 int contadorMde = 0;
 int contadorFlash = 0;
