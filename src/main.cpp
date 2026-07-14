@@ -179,10 +179,18 @@ void vTaskDataFilter(void *pvParameters)
             const float gyroYaw_rad_s   = raw.mpu.gyro_x_rad_s;     // Rotación sobre el eje vertical
 
             //----------------------------------------------------------------------
-            // Ángulos obtenidos del acelerómetro.
+            // Ángulos obtenidos del acelerómetro (Trigonometría 3D Esférica)
+            // Eje vertical en reposo: +X
             //----------------------------------------------------------------------
-            const float accelPitch_rad = atan2f(accelX_g, accelZ_g);
-            const float accelYaw_rad   = atan2f(accelY_g, accelZ_g);
+
+            // Calcula las magnitudes adyacentes usando Pitágoras
+            const float adj_pitch = sqrtf((accelX_g * accelX_g) + (accelY_g * accelY_g));
+            const float adj_yaw   = sqrtf((accelX_g * accelX_g) + (accelZ_g * accelZ_g));
+
+            // Extraemos los ángulos en radianes usando atan2f(opuesto, adyacente)
+            const float accelPitch_rad = atan2f(accelZ_g, adj_pitch);
+            const float accelYaw_rad   = atan2f(accelY_g, adj_yaw);
+
 
             //----------------------------------------------------------------------
             // Kalman 1D
