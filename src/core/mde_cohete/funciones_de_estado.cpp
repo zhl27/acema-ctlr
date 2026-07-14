@@ -223,7 +223,7 @@ namespace Cohete {
             // usar velocidad para double-check --> no nos confirma nada, ya que la velocidad la calculamos a partir de la aceleracion.
             // TODO: Deberiamos comprobarlo con otros datos, quizas el GPS sea nuestro mejor aliado en este problema.
             // TODO: utilizar la altura (calculada a partir de la presion de la bmp) para verificar que hay un decremento en la tasa de cambio de la altura, es decir, que la altura sube cada vez más lento, hasta que su tasa de cambio se vuelva cero (implica que alcanzó apogeo)
-            if ((velocidad_z_entrada_st_boost - datos_sensores->velocidad_z_m_s) > 0) {
+            if ((velocidad_z_entrada_st_boost - datos_sensores->vel_z_filtrada_m_s) > 0) {
                 SYSTEM.masa_cohete_kg -= PESO_KG_COMBUSTIBLE; // TODO: asumimos que el combustible se consumio completamente ?
                 transicionar_hacia(ST_FASE_BALISTICA);
             }
