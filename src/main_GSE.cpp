@@ -8,6 +8,14 @@
 
 
 // Definís los pines específicos que ruteaste en la PCB de tu ESP32
+
+#ifdef XL1262_p01
+
+
+#endif
+
+#ifndef XL1262_p01
+
 #define ESP32_LORA_SCK  18
 #define ESP32_LORA_MISO 19
 #define ESP32_LORA_MOSI 23
@@ -15,6 +23,8 @@
 #define ESP32_LORA_RST  14
 #define ESP32_LORA_DIO0 2
 #define ESP32_LORA_DIO1 4
+
+#endif
 
 
 // Instanciamos pasándole los pines correspondientes
