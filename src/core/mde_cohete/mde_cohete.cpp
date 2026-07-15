@@ -30,17 +30,17 @@ namespace Cohete {
         },
 
         .timestamp_micros_entrada_estado = 0,
-        .timestamp_micros_inicio_pico_g = 0,
+        .timestamp_millis_inicio_pico_g = 0,
         .timestamp_micros_apertura_drogue = 0,
 
-        .contexto_fisico = {
-            .cota_suelo_rampa = 0.0f,
-            .altura_actual = 0.0f,
-            .altura_max_historica = 0.0f,
-            .acel_global = {0.0f, 0.0f, 0.0f},
-            .vel_global = {0.0f, 0.0f, 0.0f},
-            .pos_global = {0.0f, 0.0f, 0.0f},
-            .cuaternion_actitud = {1.0f, 0.0f, 0.0f, 0.0f} // Identidad
+        .ctx_fisico = {
+            .altura_m_max_historica = 0.0f,
+            .masa_cohete_kg = 0.0f, // TODO: masa_cohete_kg debe ser configurable a traves de comando desde GSE: "set_masa_cohete_kg" o similar
+            .altitud_cero_pad_m = 0.0f // TODO: altitud_cero_pad_m debe ser configurable a traves de comando desde GSE: "tara_altitud_cero_pad_m" o similar
+            // .acel_global = {0.0f, 0.0f, 0.0f},
+            // .vel_global = {0.0f, 0.0f, 0.0f},
+            // .pos_global = {0.0f, 0.0f, 0.0f},
+            // .cuaternion_actitud = {1.0f, 0.0f, 0.0f, 0.0f} // Identidad
         }
     };
 
@@ -113,7 +113,7 @@ namespace Cohete {
                 // matamos el proceso GSE asi no nos gasta recursos del cohete, o bajamos su frecuencia.
                 vTaskSuspend(SYSTEM.procesos.xTaskLoraHandle);
                 SYSTEM.procesos.flujos.Sensors_a_Lora_enabled = false;
-                ESP_LOGI(TAG_BASE, "Suspendido el Task Lora.");
+                ESP_LOGI(TAG_BASE, "Suspendido el Task Lora, ya que no nos comunicaremos con la GSE.");
                 // continuamos con la siguiente etapa.
                 transicionar_hacia(ST_ESPERA_GPS_PRECISO);
                 return;
@@ -122,28 +122,40 @@ namespace Cohete {
                 ESP_LOGE(TAG_BASE, "Timeout de GPS.");
                 transicionar_hacia(ST_ESPERA_IGNICION);
                 return;
-            case ERR_NINGUNO:
-                break;
+            // case ERR_NINGUNO:
+            //
+            //     return;
             case ERR_MPU_CALIBRACION_FALLIDA:
-                break;
+                ESP_LOGE(TAG_BASE, "FALTA IMPLEMENTAR. ERR_MPU_CALIBRACION_FALLIDA");
+                return;
             case ERR_DESPEGUE_FALSO_ZARANDEO:
-                break;
+                ESP_LOGE(TAG_BASE, "ERR_DESPEGUE_FALSO_ZARANDEO. Volvemos a ST_ESPERA_IGNICION.");
+                SYSTEM.timestamp_millis_inicio_pico_g = 0;
+                transicionar_hacia(ST_ESPERA_IGNICION);
+                return;
             case ERR_DESPEGUE_PROHIBIDO:
-                break;
+                ESP_LOGE(TAG_BASE, "FALTA IMPLEMENTAR. ERR_DESPEGUE_PROHIBIDO");
+                // TODO: Qué hacemos si realmente detectamos un despegue, pero el cohete no estaba en condiciones de volar? Pienso que: ya que esta en vuelo, mucho no podemos hacer al respecto, hay que continuar con lo que se tiene. Ver qué hacemos a partir de ahí.
+                return;
             case ERR_TRAYECTORIA_NO_VERTICAL:
-                break;
+                ESP_LOGE(TAG_BASE, "FALTA IMPLEMENTAR. ERR_TRAYECTORIA_NO_VERTICAL");
+                return;
             case ERR_DROGUE_NO_EFECTO:
-                break;
+                ESP_LOGE(TAG_BASE, "FALTA IMPLEMENTAR. ERR_DROGUE_NO_EFECTO");
+                return;
             case ERR_FRENADO_AERO_ATASCADO:
-                break;
+                ESP_LOGE(TAG_BASE, "FALTA IMPLEMENTAR. ERR_FRENADO_AERO_ATASCADO");
+                return;
             case ERR_ESTADO_INVALIDO:
-                break;
-            case ERR_DESCONOCIDO:
-                break;
+                ESP_LOGE(TAG_BASE, "FALTA IMPLEMENTAR. ERR_ESTADO_INVALIDO");
+                return;
+            // case ERR_DESCONOCIDO:
+            //     ESP_LOGE(TAG_BASE, "ERROR DESCONOCIDO.");
+            //     return;
         }
 
         // en caso de no ser ninguno de los anteriores
-        transicionar_hacia(ST_ERROR);
+        transicionar_hacia(ST_ERROR); // TODO: creo que no necesitamos un ST_ERROR, podemos usar esta función para manejar las cosas.
 
         // Acción de seguridad
         // paramos todos los timers ?

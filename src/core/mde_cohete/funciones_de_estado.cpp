@@ -13,9 +13,12 @@
 // TODO: Integrar con la variable global COHETE para transiciones de estado
 
 constexpr float A_GRAV = 9.81;
-constexpr float PESO_KG_COMBUSTIBLE = 5; // TODO: COMPLETAR CON EL DATO REAL
+constexpr float UMBRAL_ACEL_BOOST = 2 * A_GRAV;     // 2G según requerimientos
+constexpr int TIEMPO_MIN_BOOST_MS = 150;            // 0.15 segundos en milisegundos
+constexpr float DELTA_ALTURA_BOOST_M = 4.0f;        // Delta de seguridad contra falsos positivos en rampa // TODO: Revisar este 4
+constexpr float PESO_KG_COMBUSTIBLE = 5;            // TODO: COMPLETAR CON EL DATO REAL
 constexpr uint32_t CONEXION_GSE_TIMEOUT_MILLIS = 1000*5;
-constexpr float ALTURA_M_MAX = 1000;
+constexpr float ALTURA_M_MAX = 1000; // TODO: chequear ALTURA_M_MAX. Igual nos importa realmente este dato?
 constexpr uint32_t GPS_TIMEOUT_MILLIS = 1000*5;
 constexpr uint32_t TIEMPO_MILLIS_ESPERA_WARMUP_MPU = 1000*60*5;
 
@@ -77,18 +80,31 @@ namespace Cohete {
         }
 
         bool en_codiciones_para_volar(data_all_t* datos_sensores) {
-            return Timers::flag_recalibrarMPU_disparado; // el flag funciona
+            return Timers::flag_recalibrarMPU_disparado; // este flag nos permite asumir que los datos MPU son aceptables
             // TODO: COMPLETAR CONDICIONES PARA VUELO.
+            // queremos sí o sí el GPS para el vuelo?
         }
 
-        bool hay_boost(const data_all_t* datos_sensores) { // TODO: Completar lógica de Boost
+        bool hay_boost(data_all_t *datos_sensores) { // TODO: Completar lógica de Boost
             // aceleracion >= 2 g por 0,15 segs
-            // 2gs = 2 * 9.81m/s2
-            if (SYSTEM.timestamp_micros_inicio_pico_g <= micros() && micros() <= 150) {
-                if (datos_sensores->aceleracion_z_m_s2 >= 2*A_GRAV) {
-                    return true;
+            if (datos_sensores->aceleracion_z_m_s2 >= UMBRAL_ACEL_BOOST) { // detectamos un supuesto boost, chequeamos...
+                if (SYSTEM.timestamp_millis_inicio_pico_g == 0) { // que sea 0 significa que nunca antes habiamos detectado inicio de boost --> imposible que tengamos boost en micros()==0
+                    SYSTEM.timestamp_millis_inicio_pico_g = millis(); // detectamos un pico por primera vez y guardamos timestamp
                 }
+                else if (SYSTEM.timestamp_millis_inicio_pico_g <= millis() && millis() - SYSTEM.timestamp_millis_inicio_pico_g >= TIEMPO_MIN_BOOST_MS) {
+                    if (datos_sensores->altitud_filtrada_m > SYSTEM.ctx_fisico.altitud_cero_pad_m + DELTA_ALTURA_BOOST_M) {
+                        return true;
+                    }
+                }
+            } else {
+                // CRÍTICO: Si la aceleración cae por debajo de 2 g antes de confirmar el vuelo,
+                // se trató de un ruido, un golpe o un movimiento brusco manual.
+                // Reiniciamos el cronómetro a 0 para estar listos para el despegue real.
+                SYSTEM.timestamp_millis_inicio_pico_g = 0;
+                transicion_error(ERR_DESPEGUE_FALSO_ZARANDEO, datos_sensores);
+
             }
+
             return false;
         }
 
@@ -168,6 +184,7 @@ namespace Cohete {
 
     void f_st_espera_ignicion(data_all_t* datos_sensores) {
         static unsigned long last_millis = 0;
+        int altura_inicial = ;
         // Aquí el cohete está pasivo en la rampa. Ignición es externa.
         // Lógica del filtro anti-zarandeo:
         // 1. Transformar aceleración a vector inercial.
@@ -190,7 +207,7 @@ namespace Cohete {
             }
 
             if (Eventos::hay_boost(datos_sensores)) {
-                SYSTEM.timestamp_micros_inicio_pico_g = micros();
+                // SYSTEM.timestamp_millis_inicio_pico_g = micros();
                 transicionar_hacia(ST_BOOST);
             }
         }
@@ -210,7 +227,7 @@ namespace Cohete {
             aceleracion_z_entrada_st_boost = datos_sensores->aceleracion_z_m_s2;
             velocidad_z_entrada_st_boost = datos_sensores->vel_z_filtrada_m_s;
         }
-        else if ((datos_sensores->altitud_filtrada_m - altura_entrada_st_boost) < 10) { // TODO: DEFINIR BIEN LA CONDICION de DIFF ALTURAS, PARA RESPALDAR QUE ENTRAMOS A BOOST REALMENTE.
+        else if ((datos_sensores->altitud_filtrada_m - altura_entrada_st_boost) >= DELTA_ALTURA_BOOST_M) { // TODO: DEFINIR BIEN LA CONDICION de DIFF ALTURAS, PARA RESPALDAR QUE ENTRAMOS A BOOST REALMENTE.
             // si la diferencia no es considerable como para respaldar que estamos definitivamente en modo BOOST...
             transicion_error(ERR_DESPEGUE_FALSO_ZARANDEO, datos_sensores);
         }
@@ -224,7 +241,7 @@ namespace Cohete {
             // TODO: Deberiamos comprobarlo con otros datos, quizas el GPS sea nuestro mejor aliado en este problema.
             // TODO: utilizar la altura (calculada a partir de la presion de la bmp) para verificar que hay un decremento en la tasa de cambio de la altura, es decir, que la altura sube cada vez más lento, hasta que su tasa de cambio se vuelva cero (implica que alcanzó apogeo)
             if ((velocidad_z_entrada_st_boost - datos_sensores->vel_z_filtrada_m_s) > 0) {
-                SYSTEM.masa_cohete_kg -= PESO_KG_COMBUSTIBLE; // TODO: asumimos que el combustible se consumio completamente ?
+                SYSTEM.ctx_fisico.masa_cohete_kg -= PESO_KG_COMBUSTIBLE; // TODO: asumimos que el combustible se consumio completamente ?
                 transicionar_hacia(ST_FASE_BALISTICA);
             }
         }
@@ -239,9 +256,9 @@ namespace Cohete {
         //    }
 
 
-        if (SYSTEM.contexto_fisico.altura_max_historica < datos_sensores->altitud_filtrada_m) {
+        if (SYSTEM.ctx_fisico.altura_m_max_historica < datos_sensores->altitud_filtrada_m) {
             // encontramos nueva altura historica
-            SYSTEM.contexto_fisico.altura_max_historica = datos_sensores->altitud_filtrada_m;  // esto va buscando constantemente el apogeo
+            SYSTEM.ctx_fisico.altura_m_max_historica = datos_sensores->altitud_filtrada_m;  // esto va buscando constantemente el apogeo
         }
         // chequeando para cambiar a ST_DESPLIEGUE_DROGUE
         // asumimos que ya pasamos EL instante del apogeo, y estariamos por ende
@@ -280,7 +297,7 @@ namespace Cohete {
         // chequear que realmente llegamos a apogeo
         // comprobar que altura paso por un punto más alto y descendio inmediatamente
        else if (datos_sensores->vel_z_filtrada_m_s <= 0) { // está cayendo
-            if (datos_sensores->altitud_filtrada_m < SYSTEM.contexto_fisico.altura_max_historica) {
+            if (datos_sensores->altitud_filtrada_m < SYSTEM.ctx_fisico.altura_m_max_historica) {
                 transicionar_hacia(ST_DESCENSO_EVALUACION);
             }
         }

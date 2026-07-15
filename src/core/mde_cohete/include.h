@@ -55,7 +55,7 @@ namespace Cohete {
         ERR_GPS_TIMEOUT,             // Por si queremos forzar el lanzamiento sin GPS (override)
         ERR_MPU_CALIBRACION_FALLIDA, // El sensor no logró estabilizar offsets
         ERR_DESPEGUE_FALSO_ZARANDEO, // Se detectó un pico de Gs pero sin delta de altura
-        ERR_DESPEGUE_PROHIBIDO,      // Se realizo despegue a pesar de no estar en condiciones
+        ERR_DESPEGUE_PROHIBIDO,      // Se realizó despegue a pesar de no estar en condiciones
         ERR_TRAYECTORIA_NO_VERTICAL, // El vector de actitud se inclinó peligrosamente
         ERR_DROGUE_NO_EFECTO,         // Aceleración anómala detectada durante los 3s de drogue
         ERR_FRENADO_AERO_ATASCADO,   // Actuador de frenado aerodinámico no responde
@@ -66,7 +66,7 @@ namespace Cohete {
 
     typedef struct {
         estado_cohete_t estado;
-        error_cohete_t error; // contiene el ultimo error que se dio
+        error_cohete_t error; // contiene el último error que se dio
         bool entrando_estado;
         // bool es_estado_salida;
 
@@ -83,31 +83,27 @@ namespace Cohete {
             } flujos;
         } procesos;
 
-        float masa_cohete_kg;
-        float altitud_cero_pad_m;
 
         // Tracking de integradores temporales (Filtros anti-ruido)
-        uint64_t timestamp_micros_entrada_estado;
-        uint64_t timestamp_micros_inicio_pico_g;  ///< Mide los 150ms continuos de >= 2G
+        uint64_t timestamp_micros_entrada_estado; // se actualiza cada vez que entramos a un nuevo estado de la mde
+        uint64_t timestamp_millis_inicio_pico_g;  ///< Mide los 150ms continuos de >= 2G
         uint64_t timestamp_micros_apertura_drogue;
 
         struct {
             // Datos Barométricos puros (BMP280)
-            float cota_suelo_rampa;         ///< Altura de tara inicial (~3m)
-            float altura_actual;
-            float altura_max_historica;
+            float altura_m_max_historica;
+            float masa_cohete_kg;
+            float altitud_cero_pad_m; ///< Altura de tara inicial (~3m) --> se configura a traves de comandos GSE.
 
             // Datos Inerciales transformados al sistema Suelo (MPU6050 + Filtro)
-            Vector3D<float> acel_global;    ///< Ya restada la gravedad (-1g en Y)
-            Vector3D<float> vel_global;
-            Vector3D<float> pos_global;
+            // Vector3D<float> acel_global; ///< Ya restada la gravedad (-1g en Y)
+            // Vector3D<float> vel_global;
+            // Vector3D<float> pos_global;
 
-            // Cuaternión de transformación de coordenadas (Cuerpo -> Suelo)
-            float cuaternion_actitud[4]; // esto sirve para conocer posicion respecto al punto de origen a todo momento.  // TODO: chequear
-            // bool gps_3d_fix_obtenido;
-            // int satelites_visibles;
-            // float gps_hdop;
-        } contexto_fisico;
+            // // Cuaternión de transformación de coordenadas (Cuerpo -> Suelo)
+            // float cuaternion_actitud[4]; // esto sirve para conocer posicion respecto al punto de origen a todo momento.  // TODO: chequear
+
+        } ctx_fisico;
 
     } system_data_t;
 
