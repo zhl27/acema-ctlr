@@ -1,0 +1,75 @@
+#include <Arduino.h>
+
+// ============================================================================
+// CONFIGURACIÓN PRINCIPAL
+// ============================================================================
+void setup() {
+    Serial.begin(115200);
+
+
+}
+
+// ============================================================================
+// LAZO PRINCIPAL (MÁQUINA DE ESTADOS)
+// ============================================================================
+void loop() {
+    switch (currentState) {
+        
+        case GSE_INIT:
+            if (lora.begin(DEFAULT_SYNC_WORD, DEFAULT_ENCRY_WORD, DEFAULT_FREC)) {
+                #ifdef DEBUG
+                Serial.println(F("[GSE] Modulo LoRa inicializado con éxito. Esperando cohete..."));
+                #endif
+                currentState = GSE_RECEIVING_DATA;//GSE_WAITING_CONNECTION;
+            } else {
+                #ifdef DEBUG
+                Serial.println(F("[ERROR] Falló inicialización de LoRa. Reintentando en 2s..."));
+                #endif
+                delay(2000);
+            }
+            break;
+
+        case GSE_WAITING_CONNECTION:
+            // Escucha activa del PING de conexión
+            if (lora.g_accept_connection()) {
+                #ifdef DEBUG
+                Serial.println(F("[GSE] ¡Conexión establecida con el Cohete! Cambiando a modo escucha."));
+                #endif
+                currentState = GSE_RECEIVING_DATA;
+            }
+            break;
+
+        case GSE_RECEIVING_DATA:
+            pkt_t paqueteRecibido;
+            // TODO: COMPLETAR
+            
+            // Instanciamos el método genérico público de lectura de la fachada
+            // Nota: internamente gestiona la asignación y limpieza según protocolo
+            // Pasamos un puntero a una estructura externa provisional para capturar los metadatos.
+            //if (lora.g_accept_connection() == false) { 
+                // g_accept_connection lee paquetes internamente, pero para capturar los datos
+                // de telemetría continuos llamamos directamente a la lectura del paquete.
+                
+                // Hack estructurado: simulamos la llamada a read_package que declaraste privada.
+                // Como read_package es privada, una alternativa limpia para que el GSE lea datos genéricos
+                // es exponer un método público en tu fachada o usar una estructura dedicada.
+                // Dado que tu fachada lee automáticamente en base al búfer privado, implementamos la recepción:
+            //}
+            if(lora.read_packet(&paqueteRecibido)){
+                #ifndef DEBUG
+                sendBinaryToGUI(&paqueteRecibido); 
+                #endif
+                #ifdef DEBUG
+                printPacketDebug(&paqueteRecibido);
+                Serial.println("============================================");
+                Serial.print("MUESTRA NUMERO :");
+                Serial.println(CONTADOR);
+                Serial.println("============================================");
+                #endif
+            }
+            // Nota de integración: Para poder procesar datos continuos de manera limpia, 
+            // asumimos que implementaste o usás un método público de lectura en la fachada, 
+            // aquí emulamos la recepción usando los buffers internos expuestos por el comportamiento de la clase.
+            break;
+    }
+}

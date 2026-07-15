@@ -12,7 +12,7 @@ bool Camera::iniciarGrabacion() {
 
     String resp; // TODO: Usar String puede impactar a la eficiencia? Si es así, cuánto? Podríamos sacrificar eficiencia por legibilidad y mantenibilidad?
     // La ESP-CAM iniciará el guardado del flujo de video OV2640 a 25 fps en su SD
-    if (_espCam->ejecutar_comando_sincrono("CAM_REC_START", "", resp)) {
+    if (_espCam->sendCommandToCam("CAM_REC_START", "", resp)) {
         _grabando = true;
         return true;
     }
@@ -23,7 +23,7 @@ bool Camera::detenerGrabacion() {
     if (_espCam == nullptr || !_grabando) return false;
 
     String resp;
-    if (_espCam->ejecutar_comando_sincrono("CAM_REC_STOP", "", resp)) {
+    if (_espCam->sendCommandToCam("CAM_REC_STOP", "", resp)) {
         _grabando = false;
         return true;
     }

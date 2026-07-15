@@ -23,7 +23,8 @@ public:
     bool escribir(const char* rutaArchivo, const char* datos) const;
 
     // Lee el contenido de un archivo (útil para verificar configuraciones de tierra)
-    bool leer(const char* rutaArchivo, String& bufferSalida) const;
+    // TODO: FALTA IMPLEMENTAR mSD::leer, para futuros reqs
+    // bool leer(const char* rutaArchivo, String& bufferSalida) const;
 };
 
 

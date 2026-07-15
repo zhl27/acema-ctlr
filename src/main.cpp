@@ -24,7 +24,7 @@ void setup() {
     // buzzer.beep(500);
     espCam.init();
 
-    // Initialize the kinematic filter (Adjust mass and pad offset as needed for your launch)
+    /// Inicialización de Services
     // TODO: FALTA MODIFICAR DATAFILTER DE FORMA ACORDE A LOS REQUERIMIENTOS.
     DataFilter::init();
     Sensors::init();

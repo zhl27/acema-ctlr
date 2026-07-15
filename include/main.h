@@ -28,6 +28,8 @@
 
 #include "services/Kalman1D.h"
 #include "services/Kalman2D.h"
+#include "eEsp32Cam.h"
+#include "mSD.h"
 
 
 // Instancias globales de los filtros (Ajustar las varianzas empíricamente. Ej: Gyro=0.001, Accel=0.01)
@@ -62,7 +64,7 @@ static const char *TAG_TASK_FLASH = "TASK FLASH";
 static const char *TAG_TASK_LORA = "TASK LORA";
 
 mBuzzer buzzer(BUZZER_PIN);
-eEsp32Cam espCam();
+eEsp32Cam espCam;
 mSD tarjetaSD(espCam);
 
 
