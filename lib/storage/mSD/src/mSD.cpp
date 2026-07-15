@@ -4,35 +4,38 @@
 
 #include "mSD.h"
 
-// Lista de inicialización: pasamos los parámetros al objeto _cam
-mSD::mSD(int rxPin, int txPin, uint32_t baudRate) : _cam(rxPin, txPin, baudRate) {
-}
 
 bool mSD::init() {
-    _cam.begin();
+    if (_espCam == nullptr) return false;
 
-    // Solicitamos a la ESP32-S3-CAM que verifique si su tarjeta SD está montada
-    String response = _cam.executeCommand("CMD:INIT");
-    return (response.equals("ACK"));
+    // Verificamos si la tarjeta SD en la ESP-CAM está montada y lista
+    String respuesta;
+    _inicializado = _espCam->ejecutar_comando_sincrono("SD_INIT", "", respuesta);
+    return _inicializado;
 }
 
-bool mSD::write(const String& filename, const String& data) {
-    String command = "CMD:WRITE|" + filename + "|" + data;
-    String response = _cam.executeCommand(command);
+bool mSD::escribir(const char* rutaArchivo, const char* datos) const {
+    if (!_inicializado || _espCam == nullptr) return false;
 
-    // Si la ESP32-S3-CAM guardó el archivo exitosamente, responderá con ACK
-    return (response.equals("ACK"));
+    // Empaquetamos ruta y datos: "/vuelo.csv:1023,9.81,500"
+    const String payload = String(rutaArchivo) + ":" + String(datos);
+    String respuesta;
+
+    return _espCam->sendCommandToCam(CMD_SD_DUMP_START, payload, respuesta); // TODO: REVISAR
 }
 
-String mSD::read(const String& filename) {
-    String command = "CMD:READ|" + filename;
-    String response = _cam.executeCommand(command);
+// bool mSD::leer(const char* rutaArchivo, String& bufferSalida) const {
+//     if (!_inicializado || _espCam == nullptr) return false;
+//
+//     String respuesta;
+//     if (_espCam->ejecutar_comando_sincrono("SD_RD", String(rutaArchivo), bufferSalida)) {
+//         // Limpiamos la cabecera del protocolo de la respuesta
+//         const int idx = bufferSalida.indexOf(',');
+//         if (idx != -1) {
+//             bufferSalida = bufferSalida.substring(idx + 1);
+//         }
+//         return true;
+//     }
+//     return false;
+// }
 
-    // Si la respuesta comienza con el prefijo "DATA:", extraemos la información
-    if (response.startsWith("DATA:")) {
-        return response.substring(5);
-    }
-
-    // Si hubo error ("ERR:FILE_NOT_FOUND", timeout, etc.), retornamos vacío
-    return "";
-}

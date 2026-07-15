@@ -4,53 +4,46 @@
 
 #include "eEsp32Cam.h"
 
-eEsp32Cam::eEsp32Cam(int rxPin, int txPin, uint32_t baudRate) {
-    _serial = &Serial1; // Usamos el UART1 de hardware del ESP32
-    _rxPin = rxPin;
-    _txPin = txPin;
-    _baudRate = baudRate;
-    _uartMutex = xSemaphoreCreateMutex();
+#include <driver/uart.h>
+
+
+// uint8_t eEsp32Cam::_calcularChecksum(const char* txt) {
+//     uint8_t checksum = 0;
+//     for (int i = 0; i < strlen(txt); i++) {
+//         checksum ^= txt[i];
+//     }
+//     return checksum;
+// }
+
+uint8_t eEsp32Cam::_calculate_crc8(uint8_t opcode, uint8_t param) {
+
 }
 
-void eEsp32Cam::begin() {
-    // Configuración de la matriz de enrutamiento GPIO para UART
-    _serial->begin(_baudRate, SERIAL_8N1, _rxPin, _txPin);
-    clearRxBuffer();
-}
 
-void eEsp32Cam::clearRxBuffer() {
-    while (_serial->available()) {
-        _serial->read();
-    }
-}
 
-void eEsp32Cam::sendCommand(const char* cmd) {
-    clearRxBuffer();      // Evita leer respuestas viejas o ruido acumulado
-    _serial->println(cmd);
-    _serial->flush();     // Espera a que el último byte salte por el pin TX
-}
+bool eEsp32Cam::sendCommandToCam(uint8_t opcode, uint8_t param) {
+    uint8_t tx_packet[4];
+    tx_packet[0] = 0xAA;               // Sync byte
+    tx_packet[1] = opcode;             // e.g., CMD_CAM_CTRL
+    tx_packet[2] = param;              // e.g., 1 (Start)
+    tx_packet[3] = _calculate_crc8(tx_packet[1], tx_packet[2]); // Simple CRC
 
-String eEsp32Cam::receiveResponse(unsigned long timeoutMillis) {
-    unsigned long startMillis = millis();
-    while (millis() - startMillis < timeoutMillis) {
-        if (_serial->available()) {
-            String response = _serial->readStringUntil('\n');
-            response.trim(); // Elimina \r y espacios en blanco
-            return response;
+    int retries = 3;
+    while (retries > 0) {
+        // 1. Send the 4 bytes
+        uart_write_bytes(UART_NUM_1, (const char*)tx_packet, 4);
+
+        // 2. Wait for exactly 1 byte (ACK) with a 50ms timeout
+        uint8_t rx_ack = 0;
+        int len = uart_read_bytes(UART_NUM_1, &rx_ack, 1, pdMS_TO_TICKS(50));
+
+        if (len > 0 && rx_ack == ACK_SUCCESS) {
+            return true; // Success! Camera is rolling.
         }
-        delay(2); // Pequeña pausa para ceder tiempo a las tareas de FreeRTOS
-    }
-    return ""; // Cadena vacía si ocurre un timeout
-}
 
-char* eEsp32Cam::executeCommand(const char* cmd, unsigned long timeoutMillis) {
-    char* response;
-    // Solicitamos el "candado" de la UART. Si otra tarea la está usando, esperamos.
-    if (xSemaphoreTake(_uartMutex, portMAX_DELAY) == pdTRUE) {
-        sendCommand(cmd);
-        response = receiveResponse(timeoutMillis);
-        // Soltamos el "candado"
-        xSemaphoreGive(_uartMutex);
+        // If we get here, either timeout or NACK. Try again.
+        retries--;
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
-    return response;
+    return false; // Camera failed to respond after 3 tries
 }

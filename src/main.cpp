@@ -3,6 +3,9 @@
 
 #include "main.h"
 
+#include "services/Camera.h"
+#include "services/Persistence.h"
+
 void setup() {
     Serial.begin(115200); // TODO: Para la Compu de vuelo no se usa Serial
 
@@ -19,12 +22,15 @@ void setup() {
     // DESCOMENTAR DURANTE DESARROLLO SI TODAVIA NO TE DUELE LO SUFICIENTE LA CABEZA.
     buzzer.init();
     // buzzer.beep(500);
+    espCam.init();
 
-    // Initialize the kinematic filter (Adjust mass and pad offset as needed for your launch)
+    /// Inicialización de Services
     // TODO: FALTA MODIFICAR DATAFILTER DE FORMA ACORDE A LOS REQUERIMIENTOS.
     DataFilter::init();
     Sensors::init();
     GSE::init();
+    Persistence::init(tarjetaSD);
+    Camera::init(espCam);
 
     // --- DATA DISTRIBUTOR ---
     // Crea una cola capaz de alojar hasta BUF_Q_SENSOR_SIZE muestras de tipo data_raw_t.
