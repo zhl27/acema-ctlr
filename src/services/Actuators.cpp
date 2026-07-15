@@ -13,17 +13,17 @@
 mBuzzer Actuators::_buzzer(25);
 
 // Inicializamos el servo usando configuración específica, debemos pasarle una estructura mServoConfig_t
-mServoConfig_t config_servo = { // nota para el lector: esto es equivalente c/c++ a la solucion del code smell long parameters en Diseño de Sistemas
-    .pinServo = 0,
-    .pinPot = 0,
-    .pendiente = 0,
-    .alpha = 0,
-    .deadband = 0,
-    .minPulse = 0,
-    .maxPulse = 0,
-    .id = 0
+mServoConfig_t config_airbrake = {
+    .pinServo  = 27,        // Pin PWM del servo
+    // .pinPot    = 34,        // Cualquier pin ADC (no importa si flota, se ignorará)
+    // .pendiente = 0.0f,      // 0 grados por unidad ADC
+    // .alpha     = 0.0f,      // <--- CLAVE: 0% de peso a la lectura analógica
+    // .deadband  = 0.5f,      // Pequeño margen para evitar rebotes en los cálculos
+    .minPulse  = 500,       // Pulso en µs para 0°
+    .maxPulse  = 2500,      // Pulso en µs para 180°
+    .id        = 1
 };
-mServo Actuators::_servo(&config_servo);
+mServo Actuators::_servo(&config_airbrake);
 
 // Inicializamos los pirotécnicos basándonos en los pines sugeridos en mPyro.h
 // Drogue: Activar en D12, Continuidad en D35, Umbral 1000
