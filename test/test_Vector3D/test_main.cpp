@@ -6,6 +6,10 @@
 #include <unity.h>
 #include "Vector3D.h" // Incluimos la lógica a testear
 
+// arregla el error de SPI
+#include "LoraWrapped.h"
+#include <SPI.h>
+
 // Unity requiere estas dos funciones obligatoriamente
 void setUp(void) {
     // Se ejecuta ANTES de cada test (ideal para resetear variables, pines I2C/SPI, etc.)

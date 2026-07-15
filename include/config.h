@@ -13,7 +13,7 @@
 #define BUZZER_PIN 25
 #define WIRE_SDA_0 21
 #define WIRE_SCL_0 22
-
+#define SERVO_PIN 27
 
 /*************************/
 /*    DIRECCIONES I2C    */
