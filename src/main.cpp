@@ -1,7 +1,9 @@
 #include <SPI.h>
 #include "LoraWrapped.h"
 
-#include "main.h"
+#include "main.cpp.h"
+
+#include "services/Actuators.h"
 
 void setup() {
     Serial.begin(115200); // TODO: Para la Compu de vuelo no se usa Serial
@@ -16,13 +18,14 @@ void setup() {
 //     esp_log_level_set("*", ESP_LOG_DEBUG);
 // #endif
 
-    // DESCOMENTAR DURANTE DESARROLLO SI TODAVIA NO TE DUELE LO SUFICIENTE LA CABEZA.
-    buzzer.init();
-    // buzzer.beep(500);
-
     // DataFilter::init(); // TODO: Encapsular lógica de filtros de kalman dentro de DataFilter. Ahora mismo no se usa esta clase. Pero debería utilizarse para ocultar complejidad de filtros de kalman y afines.
     Sensors::init();
+    Actuators::init();
     GSE::init();
+
+    // DESCOMENTAR DURANTE DESARROLLO SI TODAVIA NO TE DUELE LO SUFICIENTE LA CABEZA.
+    // Actuators::getBuzzer().beep(500);
+
 
     // --- DATA DISTRIBUTOR ---
     // Crea una cola capaz de alojar hasta BUF_Q_SENSOR_SIZE muestras de tipo data_raw_t.
@@ -157,6 +160,10 @@ void vTaskDataFilter(void *pvParameters)
     {
         if (xQueueReceive(xColaSensores, &raw, portMAX_DELAY) == pdTRUE){
 
+#ifdef DEBUG_DATOS_CRUDOS
+            print_data_raw(&raw);
+#endif
+
             //----------------------------------------------------------------------
             // Primera muestra: solamente inicializa el tiempo
             //----------------------------------------------------------------------
@@ -260,6 +267,11 @@ void vTaskDataFilter(void *pvParameters)
             // Ambientales
             out.temperatura_amb_c   = raw.bmp.temp_deg_c;
             out.densidad_aire_kg_m3 = emaDensidad.actualizar(calcularDensidadAire(raw.bmp.presion_hpa, raw.bmp.temp_deg_c));
+
+#ifdef DEBUG_DATOS_FILTRADOS
+            print_data(&out);
+#endif
+
             //----------------------------------------------------------------------
             // Distribución (MdE, Lora)
             //----------------------------------------------------------------------
@@ -366,6 +378,7 @@ void vTaskStateMachine(void *pvParameters) {
             if (item_size == sizeof(data_all_t)) {
 
                 data_all_t *datos_sensores = static_cast<data_all_t *>(item);
+
 
                 // NOTA: Asegurarse de que mde_cohete_actualizar acepte un puntero a data_all_t
                 Cohete::mde_cohete_actualizar(datos_sensores);

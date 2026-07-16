@@ -53,24 +53,6 @@ namespace Cohete {
         //     return (val0 <= val1 + delta);
         // }
 
-        // TODO: Buscar nombres más representativos para estas dos funciones, quizás ni siquiera sirven lo suficiente como para existir en este mundo.
-        bool time_elapsed_since_last_millis_is_greater_than(const uint32_t time) {
-            static uint32_t last_millis = 0;
-            const uint32_t comp = millis() - last_millis >= time;
-            if (comp) {
-                last_millis = millis();
-            }
-            return comp;
-        }
-        bool time_elapsed_since_last_micros_is_greater_than(const uint64_t time) {
-            static uint64_t last_micros = 0;
-            const uint64_t comp = millis() - last_micros >= time;
-            if (comp) {
-                last_micros = millis();
-            }
-            return comp;
-        }
-
         inline bool gps_es_preciso(const data_all_t* datos_sensores) {
             return datos_sensores->gps_nro_satelites >= 5       // Mínimo 4 para 3D, 5 o 6 es más seguro
                 && datos_sensores->gps_fix_type == 3            // Equivalente a 3D Fix en u-blox (fixType == 3)
@@ -101,8 +83,6 @@ namespace Cohete {
                 // se trató de un ruido, un golpe o un movimiento brusco manual.
                 // Reiniciamos el cronómetro a 0 para estar listos para el despegue real.
                 SYSTEM.timestamp_millis_inicio_pico_g = 0;
-                transicion_error(ERR_DESPEGUE_FALSO_ZARANDEO, datos_sensores);
-
             }
 
             return false;
@@ -184,7 +164,6 @@ namespace Cohete {
 
     void f_st_espera_ignicion(data_all_t* datos_sensores) {
         static unsigned long last_millis = 0;
-        int altura_inicial = ;
         // Aquí el cohete está pasivo en la rampa. Ignición es externa.
         // Lógica del filtro anti-zarandeo:
         // 1. Transformar aceleración a vector inercial.
@@ -230,6 +209,7 @@ namespace Cohete {
         else if ((datos_sensores->altitud_filtrada_m - altura_entrada_st_boost) >= DELTA_ALTURA_BOOST_M) { // TODO: DEFINIR BIEN LA CONDICION de DIFF ALTURAS, PARA RESPALDAR QUE ENTRAMOS A BOOST REALMENTE.
             // si la diferencia no es considerable como para respaldar que estamos definitivamente en modo BOOST...
             transicion_error(ERR_DESPEGUE_FALSO_ZARANDEO, datos_sensores);
+            return;
         }
 
         // Cuando la aceleración vertical decaiga bruscamente (Burn-out / Fin de combustión)
@@ -260,12 +240,15 @@ namespace Cohete {
             // encontramos nueva altura historica
             SYSTEM.ctx_fisico.altura_m_max_historica = datos_sensores->altitud_filtrada_m;  // esto va buscando constantemente el apogeo
         }
-        // chequeando para cambiar a ST_DESPLIEGUE_DROGUE
-        // asumimos que ya pasamos EL instante del apogeo, y estariamos por ende
-        // con velocidad hacia abajo,
-        // y con aceleracion hacia abajo (constante como siempre, la de gravedad)
-        else if (datos_sensores->vel_z_filtrada_m_s <= 0 // se mueve hacia abajo
-            && datos_sensores->aceleracion_z_m_s2 < -A_GRAV) // está bajo completo efecto de la gravedad --> TODO: TENER EN CUENTA VIENTO ETC ETC --> QUIZAS NO SEA SOLO GRAVEDAD
+
+        // DETECCIÓN DE APOGEO:
+        // 1. La velocidad vertical se vuelve <= 0 m/s (con un pequeño margen anti-ruido, ej -0.5 m/s)
+        // 2. La altitud actual cayó al menos 1.5 metros desde el máximo histórico
+        // 3. En vuelo libre, el acelerómetro lee cerca de 0 m/s² (entre -5 m/s² y +2 m/s²)
+        const bool vel_negativa = (datos_sensores->vel_z_filtrada_m_s <= -0.5f);
+        const bool caida_confirmada = (SYSTEM.ctx_fisico.altura_m_max_historica - datos_sensores->altitud_filtrada_m) >= 1.5f;
+        const bool en_caida_libre = (datos_sensores->aceleracion_z_m_s2 > -6.0f && datos_sensores->aceleracion_z_m_s2 < 3.0f);
+        if ((vel_negativa || caida_confirmada) && en_caida_libre) // TODO: TENER EN CUENTA VIENTO ETC ETC --> QUIZAS NO SEA SOLO GRAVEDAD
         {
             if (!Actuators::getPyroDrogue().tieneContinuidad()) {
                 // aproxima(datos_sensores->altura_m, ALTURA_M_MAX, 5) // TODO: Ver que cosas interesantes se puede hacer con esto.
@@ -277,6 +260,10 @@ namespace Cohete {
                 transicionar_hacia(ST_DESPLIEGUE_DROGUE);
             }
         }
+        else { // Solo usamos el airbrake si todavia no llegamos a apogeo (que es cuando se desplega el drogue)
+            constexpr float angulo = 0.0f; // TODO: Acá iría la función de airbrake_mpc
+            Actuators::getServo().setAngulo(angulo);
+        }
     }
 
     void f_st_despliegue_drogue(data_all_t* datos_sensores) { // TODO: ST_APOGEO quizás no sea necesario, es más bien un evento dentro de ST_FASE_BALISTICA
@@ -287,16 +274,16 @@ namespace Cohete {
 
         // Chequeamos que el paracaidas drogue realmente se desplegó
         // 1. Medimos continuidad del pyro
-        // 2. Medimos que la velocidad sea constante (con cierto ruido que debemos ignorar) gracias al drogue haciendo friccion con el aire.
+        // 2. Medimos que la velocidad sea constante (con cierto ruido que debemos ignorar) gracias al drogue haciendo friccion con el aire. --> equivalente seria medir que aceleracion aproxima a 0.
         if (entrando_a_estado()) {
-            if (Actuators::getPyroDrogue().tieneContinuidad()) {
+            if (Eventos::aproxima(datos_sensores->aceleracion_z_m_s2, 0, 5)) {
                 ESP_LOGI(TAG_BASE, " -> [%s] Drogue desplegado correctamente.", estado_cohete_string[SYSTEM.estado]);
                 transicionar_hacia(ST_DESCENSO_EVALUACION);
             }
         }
         // chequear que realmente llegamos a apogeo
         // comprobar que altura paso por un punto más alto y descendio inmediatamente
-       else if (datos_sensores->vel_z_filtrada_m_s <= 0) { // está cayendo
+        else if (datos_sensores->vel_z_filtrada_m_s <= 0) { // está cayendo
             if (datos_sensores->altitud_filtrada_m < SYSTEM.ctx_fisico.altura_m_max_historica) {
                 transicionar_hacia(ST_DESCENSO_EVALUACION);
             }

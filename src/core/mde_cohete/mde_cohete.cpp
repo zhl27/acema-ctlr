@@ -86,15 +86,12 @@ namespace Cohete {
 
 
     void mde_cohete_actualizar(data_all_t* datos_sensores) {
-        if (SYSTEM.estado > ST_NULL) {
+        if (SYSTEM.estado >= ST_NULL) {
             transicion_error(ERR_ESTADO_INVALIDO, datos_sensores);
+            return;
         }
 
         // actualizar datos de COHETE con datos nuevos de los sensores
-
-        // if (SISTEMA.baro.presionBar > SISTEMA.limPresion.max || SISTEMA.flags.emergencia == 1) {
-        //     transicionError(self, datosEnsayo);
-        // }
 
         MDE_COHETE[SYSTEM.estado](datos_sensores); // Ejecuta la función que corresponde al estado actual
     }
@@ -170,7 +167,7 @@ namespace Cohete {
         // strlcpy(TAG, TAG_BASE, TAG_BASE_LEN);
         // strlcat(TAG, " - ", TAG_BASE_LEN+3);
         // strlcat(TAG, estado_cohete_string[nuevo_estado], TAG_BASE_LEN);
-        if (nuevo_estado > ST_NULL) {
+        if (nuevo_estado >= ST_NULL) {
             // transicion_error(ERR_ESTADO_INVALIDO, nullptr);
             ESP_LOGE(TAG_BASE, "Codigo enum %d es Estado inválido.", nuevo_estado);
             return;

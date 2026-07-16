@@ -59,7 +59,6 @@ static const char *TAG_TASK_STATE_MACHINE = "TASK STATE MACHINE";
 static const char *TAG_TASK_FLASH = "TASK FLASH";
 static const char *TAG_TASK_LORA = "TASK LORA";
 
-mBuzzer buzzer(BUZZER_PIN);
 
 int contadorMde = 0;
 int contadorFlash = 0;
