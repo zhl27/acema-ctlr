@@ -42,7 +42,7 @@ public:
     mMPU6050();
 
     /**
-     * @brief Initializes the sensor and configures high pass filtering & motion detection.
+     * @brief Initializes the sensor and configures high-pass filtering & motion detection.
      * @param addr I2C address (default 0x69)
      * @return true if initialized successfully, false otherwise.
      */
@@ -59,7 +59,7 @@ public:
 
     data_raw_mpu_t get_mpu_raw_data();
 
-    int calibrar(); // TODO: IMPLEMENTAR CALIBRACION DE MPU6050
+    int calibrar();
 };
 
 

@@ -16,7 +16,7 @@ mMPU6050::mMPU6050()
       CalAccelX(0.0f), CalAccelY(0.0f), CalAccelZ(0.0f),
       CalGyroX(0.0f), CalGyroY(0.0f), CalGyroZ(0.0f) {}
 
-bool mMPU6050::init(uint8_t addr) {
+bool mMPU6050::init(const uint8_t addr) {
     if (!_mpu.begin(addr)) {
         return false;
     }
@@ -35,14 +35,14 @@ bool mMPU6050::init(uint8_t addr) {
     _mpu.setInterruptPinLatch(false);             
     _mpu.setMotionInterrupt(false);               
 
-    // Calibra el sensor asumiendo que está en la rampa de lanzamiento
+    // Calibra el sensor asumiendo que está en la rampa de lanzamiento --> podemos calibrar en otras instancias --> desde GSE se podria mandar comando.
     calibrar();
 
     return true;
 }
 
 int mMPU6050::calibrar() {
-    const int num_muestras = 1000;
+    constexpr int num_muestras = 1000;
     float sum_ax = 0, sum_ay = 0, sum_az = 0;
     float sum_gx = 0, sum_gy = 0, sum_gz = 0;
     sensors_event_t a, g, t;
@@ -71,10 +71,10 @@ int mMPU6050::calibrar() {
     CalGyroZ = sum_gz / num_muestras;
 
     // Promediar acelerómetros
-    // NOTA: El eje X apunta hacia arriba (+Z del cohete). 
+    // NOTA: El eje Y apunta hacia arriba cuando la campu de vuelo esté instalado en el cohete.
     // Debe medir 1G (9.81 m/s^2) positivo o negativo dependiendo de la convención física.
-    // Asumimos que la gravedad empuja hacia abajo, por lo que el sensor siente una aceleración normal hacia arriba de +9.81 m/s^2.
-    CalAccelX = (sum_ax / num_muestras) - 9.80665f; 
+    // Asumimos que la gravedad empuja hacia abajo, por lo que el sensor siente una aceleración normal hacia arriba de +9.81 m/s^2. --> esto se resuelve automáticamente poniendo en cero los valores de salida final de nuestra mMPU6050
+    CalAccelX = (sum_ax / num_muestras);
     CalAccelY = (sum_ay / num_muestras); // Debería ser 0
     CalAccelZ = (sum_az / num_muestras); // Debería ser 0
 
