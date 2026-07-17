@@ -26,25 +26,13 @@ namespace Cohete {
         ST_ESPERA_IGNICION,        // En rampa. Ignición externa. Esperando trigger cinemático
         ST_BOOST,                  // Impulso detectado (>= 2g x 150ms + 4m)
         ST_FASE_BALISTICA,         // Inercia ascendente. Activa rutina de frenado aerodinámico
-        ST_DESPLIEGUE_DROGUE,                 // Derivada de altura nula. Disparo Drogue + Corte cámara
-        ST_DESCENSO_EVALUACION,    // Ventana de 3 segundos post-drogue para testear salud
-        ST_DESCENSO_NOMINAL,       // Drogue OK. Esperando cota de 250m para Principal
-        ST_DESCENSO_EMERGENCIA,    // Drogue fallido (vy <= -35 m/s). Disparo Principal de auxilio
+        ST_DROGUE_DESPLEGADO,      // Derivada de altura nula. Disparo Drogue + Corte cámara. Luego de 3 segundos post-drogue testear salud
+        ST_PCAIDAS_PPAL_DESPLEGADO,
         ST_CAIDA_CATASTROFICA,     // Falla total de retención. Pánico -> Volcado a Flash
         ST_ATERRIZAJE,             // Reposo en suelo. Emisión de coordenadas GPS
-        ST_ERROR,                  // Estado de captura de excepciones
         ST_NULL
     } estado_cohete_t;
 
-    // enum EstadoVuelo : uint8_t {
-    //     IDLE_PAD = 0,
-    //     IMPULSO_ASCENSO = 1,
-    //     VUELO_BALISTICO = 2,
-    //     APOGEO_DETECTADO = 3,
-    //     DESCENSO_DROGUE = 4,
-    //     DESCENSO_PRINCIPAL = 5,
-    //     ATERRIZADO = 6
-    // };
 
     /** @enum error_cohete_t
      * @brief Códigos de error instantáneos y de diagnóstico
@@ -65,10 +53,12 @@ namespace Cohete {
 
 
     typedef struct {
-        estado_cohete_t estado;
-        error_cohete_t error; // contiene el último error que se dio
-        bool entrando_estado;
+        estado_cohete_t _estado;
+        error_cohete_t _error; // contiene el último error que se dio
+        bool _entrando_estado;
         // bool es_estado_salida;
+
+        bool drogue_disparado;
 
         struct {
             TaskHandle_t xTaskReadSensorsHandle;
@@ -90,19 +80,11 @@ namespace Cohete {
         uint64_t timestamp_micros_apertura_drogue;
 
         struct {
-            // Datos Barométricos puros (BMP280)
             float altura_m_max_historica;
-            float masa_cohete_kg;
-            float altitud_cero_pad_m; ///< Altura de tara inicial (~3m) --> se configura a traves de comandos GSE.
-
-            // Datos Inerciales transformados al sistema Suelo (MPU6050 + Filtro)
-            // Vector3D<float> acel_global; ///< Ya restada la gravedad (-1g en Y)
-            // Vector3D<float> vel_global;
-            // Vector3D<float> pos_global;
-
-            // // Cuaternión de transformación de coordenadas (Cuerpo -> Suelo)
-            // float cuaternion_actitud[4]; // esto sirve para conocer posicion respecto al punto de origen a todo momento.  // TODO: chequear
-
+            uint32_t masa_g_cohete;
+            uint32_t masa_g_combustible;
+            float altitud_m_pad; ///< Altura de tara inicial (~3m) --> Se configura a traves de comandos GSE "TARA_INICIAL" --> guardamos el valor de ese instante de datos_sensores->altitud_filtrada_m
+            float altitud_m_relativa_al_pad;
         } ctx_fisico;
 
     } system_data_t;

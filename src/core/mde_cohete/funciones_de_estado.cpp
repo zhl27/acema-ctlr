@@ -13,14 +13,14 @@
 // TODO: Integrar con la variable global COHETE para transiciones de estado
 
 constexpr float A_GRAV = 9.81;
-constexpr float UMBRAL_ACEL_BOOST = 2 * A_GRAV;     // 2G según requerimientos
-constexpr int TIEMPO_MIN_BOOST_MS = 150;            // 0.15 segundos en milisegundos
-constexpr float DELTA_ALTURA_BOOST_M = 4.0f;        // Delta de seguridad contra falsos positivos en rampa // TODO: Revisar este 4
-constexpr float PESO_KG_COMBUSTIBLE = 5;            // TODO: COMPLETAR CON EL DATO REAL
+constexpr float UMBRAL_ACEL_BOOST = 2 * A_GRAV;     // 2G (acorde a requerimientos)
+constexpr int TIEMPO_MS_MIN_BOOST = 200;            // 0.2 segundos en milisegundos (acorde a requerimientos)
 constexpr uint32_t CONEXION_GSE_TIMEOUT_MILLIS = 1000*5;
 constexpr float ALTURA_M_MAX = 1000; // TODO: chequear ALTURA_M_MAX. Igual nos importa realmente este dato?
 constexpr uint32_t GPS_TIMEOUT_MILLIS = 1000*5;
 constexpr uint32_t TIEMPO_MILLIS_ESPERA_WARMUP_MPU = 1000*60*5;
+constexpr int DIFF_ALTURA_M_APOGEO_CAIDA = 10;
+constexpr int ALTITUD_DESPLIEGUE_PCAIDAS_PPAL = 250;
 
 
 
@@ -33,9 +33,12 @@ namespace Cohete {
 
         // typedef void (* TimerCallbackFunction_t)( TimerHandle_t xTimer );
         void calibrar_mpu_callback(TimerHandle_t xTimer) {
-            Sensors::getMPU6050().calibrar();
-            flag_recalibrarMPU_disparado = true;
             ESP_LOGI(TAG_BASE, "Temporizador xTimerRecalibrarMPU disparado!");
+            int res = Sensors::getMPU6050().calibrar();
+            if (res==0) {
+                flag_recalibrarMPU_disparado = true;
+                ESP_LOGI(TAG_BASE, "Calibración de MPU6050 exitosa.");
+            }
         }
     }
 
@@ -45,8 +48,9 @@ namespace Cohete {
         // val0 --> valor de estudio
         // val1 --> valor objetivo
         // delta --> margen
-        inline bool aproxima(const int val0, const int val1, const int delta) {
-            return (val0 <= val1 + delta && val0 >= val1 - delta);
+        inline bool aproxima(const float val0, const float val1, const float delta) {
+            return fabsf(val0 - val1) <= delta; // implementación que aprovecha la FPU de la ESP32
+            // return (val0 <= val1 + delta && val0 >= val1 - delta);
         }
         // lo mismo que decir: es val0 menor por 5 unidades a val1?
         // inline bool menor_delta_que(const int val0, const int val1, const float delta) {
@@ -68,13 +72,13 @@ namespace Cohete {
         }
 
         bool hay_boost(data_all_t *datos_sensores) { // TODO: Completar lógica de Boost
-            // aceleracion >= 2 g por 0,15 segs
+            // aceleracion >= 2 g por 0,2 segs
             if (datos_sensores->aceleracion_z_m_s2 >= UMBRAL_ACEL_BOOST) { // detectamos un supuesto boost, chequeamos...
                 if (SYSTEM.timestamp_millis_inicio_pico_g == 0) { // que sea 0 significa que nunca antes habiamos detectado inicio de boost --> imposible que tengamos boost en micros()==0
                     SYSTEM.timestamp_millis_inicio_pico_g = millis(); // detectamos un pico por primera vez y guardamos timestamp
                 }
-                else if (SYSTEM.timestamp_millis_inicio_pico_g <= millis() && millis() - SYSTEM.timestamp_millis_inicio_pico_g >= TIEMPO_MIN_BOOST_MS) {
-                    if (datos_sensores->altitud_filtrada_m > SYSTEM.ctx_fisico.altitud_cero_pad_m + DELTA_ALTURA_BOOST_M) {
+                else if (SYSTEM.timestamp_millis_inicio_pico_g <= millis() && millis() - SYSTEM.timestamp_millis_inicio_pico_g >= TIEMPO_MS_MIN_BOOST) {
+                    if (datos_sensores->altitud_filtrada_m > SYSTEM.ctx_fisico.altitud_m_pad + 4.0f) { // TODO: Revisar este 4
                         return true;
                     }
                 }
@@ -160,10 +164,7 @@ namespace Cohete {
         }
     }
 
-
-
     void f_st_espera_ignicion(data_all_t* datos_sensores) {
-        static unsigned long last_millis = 0;
         // Aquí el cohete está pasivo en la rampa. Ignición es externa.
         // Lógica del filtro anti-zarandeo:
         // 1. Transformar aceleración a vector inercial.
@@ -177,9 +178,10 @@ namespace Cohete {
             ESP_LOGI(TAG_BASE, "[ESPERA IGNICION] Esperando condiciones necesarias para el vuelo...");
         }
 
+        static unsigned long last_millis = 0;
         if(Eventos::en_codiciones_para_volar(datos_sensores)) {
             // if led no encendido: encenderlo para señalizar que ya podemos volar.
-            if (millis() - last_millis >= 3000) {
+            if (millis() - last_millis >= 3000) { // hacemos un beep cada 3 segundos
                 last_millis = millis();
                 // buzzer.beep(100);
                 ESP_LOGI(TAG_BASE, " -> [ESPERA IGNICION] Cohete en condiciones para volar!");
@@ -206,7 +208,8 @@ namespace Cohete {
             aceleracion_z_entrada_st_boost = datos_sensores->aceleracion_z_m_s2;
             velocidad_z_entrada_st_boost = datos_sensores->vel_z_filtrada_m_s;
         }
-        else if ((datos_sensores->altitud_filtrada_m - altura_entrada_st_boost) >= DELTA_ALTURA_BOOST_M) { // TODO: DEFINIR BIEN LA CONDICION de DIFF ALTURAS, PARA RESPALDAR QUE ENTRAMOS A BOOST REALMENTE.
+        // TODO: Revisar esta lógica
+        else if ((datos_sensores->altitud_filtrada_m - altura_entrada_st_boost) >= 2) {
             // si la diferencia no es considerable como para respaldar que estamos definitivamente en modo BOOST...
             transicion_error(ERR_DESPEGUE_FALSO_ZARANDEO, datos_sensores);
             return;
@@ -221,52 +224,89 @@ namespace Cohete {
             // TODO: Deberiamos comprobarlo con otros datos, quizas el GPS sea nuestro mejor aliado en este problema.
             // TODO: utilizar la altura (calculada a partir de la presion de la bmp) para verificar que hay un decremento en la tasa de cambio de la altura, es decir, que la altura sube cada vez más lento, hasta que su tasa de cambio se vuelva cero (implica que alcanzó apogeo)
             if ((velocidad_z_entrada_st_boost - datos_sensores->vel_z_filtrada_m_s) > 0) {
-                SYSTEM.ctx_fisico.masa_cohete_kg -= PESO_KG_COMBUSTIBLE; // TODO: asumimos que el combustible se consumio completamente ?
+                SYSTEM.ctx_fisico.masa_g_cohete -= SYSTEM.ctx_fisico.masa_g_combustible; // TODO: asumimos que el combustible se consumio completamente ?
                 transicionar_hacia(ST_FASE_BALISTICA);
             }
         }
     }
 
     void f_st_fase_balistica(data_all_t* datos_sensores) {
-        // Lógica:
-        // 1. Activar servomotores de frenado aerodinámico si están integrados.
-        // 2. Monitorear constantemente las condiciones de Apogeo:
-        //    if (velocidad_vertical <= 0 && aceleracion_vertical < 0 && altura_actual == altura_maxima) {
-        //      Transición a ST_APOGEO.
-        //    }
-
-
-        if (SYSTEM.ctx_fisico.altura_m_max_historica < datos_sensores->altitud_filtrada_m) {
-            // encontramos nueva altura historica
-            SYSTEM.ctx_fisico.altura_m_max_historica = datos_sensores->altitud_filtrada_m;  // esto va buscando constantemente el apogeo
-        }
-
-        // DETECCIÓN DE APOGEO:
-        // 1. La velocidad vertical se vuelve <= 0 m/s (con un pequeño margen anti-ruido, ej -0.5 m/s)
-        // 2. La altitud actual cayó al menos 1.5 metros desde el máximo histórico
-        // 3. En vuelo libre, el acelerómetro lee cerca de 0 m/s² (entre -5 m/s² y +2 m/s²)
-        const bool vel_negativa = (datos_sensores->vel_z_filtrada_m_s <= -0.5f);
-        const bool caida_confirmada = (SYSTEM.ctx_fisico.altura_m_max_historica - datos_sensores->altitud_filtrada_m) >= 1.5f;
-        const bool en_caida_libre = (datos_sensores->aceleracion_z_m_s2 > -6.0f && datos_sensores->aceleracion_z_m_s2 < 3.0f);
-        if ((vel_negativa || caida_confirmada) && en_caida_libre) // TODO: TENER EN CUENTA VIENTO ETC ETC --> QUIZAS NO SEA SOLO GRAVEDAD
-        {
-            if (!Actuators::getPyroDrogue().tieneContinuidad()) {
-                // aproxima(datos_sensores->altura_m, ALTURA_M_MAX, 5) // TODO: Ver que cosas interesantes se puede hacer con esto.
-                Actuators::getPyroDrogue().armar();
-                Actuators::getPyroDrogue().disparar();
-            }
-            else { // se encendió efectivamente el pirotécnico, podemos cambiar de estado.
-                SYSTEM.timestamp_micros_apertura_drogue = micros();
-                transicionar_hacia(ST_DESPLIEGUE_DROGUE);
+        // ACTUALIZACIÓN DE ALTURA MÁXIMA (Con protección contra picos durante descenso)
+        // Solo actualizamos el récord histórico si la velocidad aún es positiva o cercana a cero
+        if (datos_sensores->vel_z_filtrada_m_s > -0.2f) {
+            if (datos_sensores->altitud_filtrada_m > SYSTEM.ctx_fisico.altura_m_max_historica) {
+                SYSTEM.ctx_fisico.altura_m_max_historica = datos_sensores->altitud_filtrada_m;
             }
         }
-        else { // Solo usamos el airbrake si todavia no llegamos a apogeo (que es cuando se desplega el drogue)
-            constexpr float angulo = 0.0f; // TODO: Acá iría la función de airbrake_mpc
-            Actuators::getServo().setAngulo(angulo);
+
+        // GATES DE DETECCIÓN DE APOGEO
+        const bool vel_apogeo = (datos_sensores->vel_z_filtrada_m_s <= -0.3f);
+        const bool caida_confirmada = (SYSTEM.ctx_fisico.altura_m_max_historica - datos_sensores->altitud_filtrada_m) >= DIFF_ALTURA_M_APOGEO_CAIDA; // diff de 10 metros según requerimientos.
+
+        // En caída libre (sin empuje de motor), está bajo aceleracion gravitatoria pero afectada por el arrastre (drag).
+        // Un margen de [-5.0, +2.0] m/s² como "G-Gate" para evitar disparos durante empuje o eyección de etapas.
+        const bool g_gate_valido = (datos_sensores->aceleracion_z_m_s2 > -5.0f && datos_sensores->aceleracion_z_m_s2 < 2.0f);
+
+        // FILTRO DE PERSISTENCIA (Debounce de Apogeo - Evita falsos positivos por ruido)
+        // Requerimos que ambas condiciones (o caída confirmada) se mantengan por N ticks consecutivos (ej. 5 ticks = 33ms a 150Hz)
+        static uint8_t ticks_apogeo_confirmado = 0;
+        if ((vel_apogeo && g_gate_valido) || caida_confirmada) {
+            if (ticks_apogeo_confirmado < 255) ticks_apogeo_confirmado++;
+        } else {
+            ticks_apogeo_confirmado = 0; // Se reinicia si fue un pico de ruido efímero
+        }
+
+        // ALCANZAMOS APOGEO O NO
+        const bool apogeo_alcanzado_definitivamente = (ticks_apogeo_confirmado >= 5); // 5 ticks continuos confirman apogeo
+
+        if (apogeo_alcanzado_definitivamente) {
+            // Retraer el Airbrake antes de la eyección del drogue
+            Actuators::getServo().sendAngulo(0.0f);
+
+            // EVALUAR SI ENCENDER PYRO DE DROGUE O NO
+            if (!SYSTEM.drogue_disparado) {
+                if (!Actuators::getPyroDrogue().tieneContinuidad()) {
+                    // TODO: AJUSTAR MEDIDAS DE SEGURIDAD DE PYRO DROGUE
+                    Actuators::getPyroDrogue().armar();
+                    Actuators::getPyroDrogue().disparar();
+                    vTaskDelay(pdMS_TO_TICKS(2)); // TODO: Resolver tema del ringbuffer que tira error cuando usamos un delay en la MdE.
+                    if (Actuators::getPyroDrogue().tieneContinuidad()) {
+                        SYSTEM.drogue_disparado = true;
+                        SYSTEM.timestamp_micros_apertura_drogue = micros();
+                    }
+                    else {
+                        // ERROR CRÍTICO: Llegamos a apogeo, pero el MOSFETT está roto/desconectado. --> Significa que no podremos abrir drogue --> Intentamos abrir pcaidas ppal --> y si falla --> Prepararse para impactar --> Guardar en log Flash/SD y forzar transición tras un tiempo de espera de seguridad.
+                        // transicion_error(ERR) // TODO: Falta implementar manejo de error
+                    }
+                }
+            }
+            else {
+                // TODO: Chequear esto
+                // El disparo ya se ordenó. Esperamos un tiempo físico de quemado (ej. 100ms)
+                // antes de cambiar al estado de descenso, independientemente de la continuidad.
+                if ((micros() - SYSTEM.timestamp_micros_apertura_drogue) >= 100000UL) {
+                    Actuators::getPyroDrogue().desarmar(); // Cortar corriente al MOSFET por seguridad
+                    transicionar_hacia(ST_DROGUE_DESPLEGADO);
+                }
+            }
+        }
+            // en caso de no haber alcanzado apogeo todavia
+        else {
+            // VUELO BALÍSTICO NOMINAL (Aún ascendiendo hacia el apogeo)
+            // TODO: Reemplazar 0.0f por el controlador MPC
+            float angulo_airbrake = 0.0f;
+
+            // Medida de seguridad: Si la velocidad vertical ya es baja (< 15 m/s),
+            // no extender frenos para no perder control aerodinámico cerca del apogeo.
+            // TODO: También hay que detectar que no esté en coast --> creo que la condicion de la velocidad sirve, hay que chequear
+            if (datos_sensores->vel_z_filtrada_m_s < 15.0f) {
+                angulo_airbrake = 0.0f;
+            }
+            Actuators::getServo().sendAngulo(angulo_airbrake);
         }
     }
 
-    void f_st_despliegue_drogue(data_all_t* datos_sensores) { // TODO: ST_APOGEO quizás no sea necesario, es más bien un evento dentro de ST_FASE_BALISTICA
+    void f_st_drogue_desplegado(data_all_t* datos_sensores) {
         // Lógica:
         // 1. Enviar señal de STOP a la cámara por pin/UART.
         // 2. Ignición pirotécnica del Drogue.
@@ -276,22 +316,28 @@ namespace Cohete {
         // 1. Medimos continuidad del pyro
         // 2. Medimos que la velocidad sea constante (con cierto ruido que debemos ignorar) gracias al drogue haciendo friccion con el aire. --> equivalente seria medir que aceleracion aproxima a 0.
         if (entrando_a_estado()) {
-            if (Eventos::aproxima(datos_sensores->aceleracion_z_m_s2, 0, 5)) {
-                ESP_LOGI(TAG_BASE, " -> [%s] Drogue desplegado correctamente.", estado_cohete_string[SYSTEM.estado]);
-                transicionar_hacia(ST_DESCENSO_EVALUACION);
-            }
-        }
-        // chequear que realmente llegamos a apogeo
-        // comprobar que altura paso por un punto más alto y descendio inmediatamente
-        else if (datos_sensores->vel_z_filtrada_m_s <= 0) { // está cayendo
-            if (datos_sensores->altitud_filtrada_m < SYSTEM.ctx_fisico.altura_m_max_historica) {
-                transicionar_hacia(ST_DESCENSO_EVALUACION);
-            }
-        }
-    }
+            // vTaskDelay(pdMS_TO_TICKS(3)); // segun requerimientos --> preguntar: 3 milisegundos o 3 segundos
 
-    void f_st_evaluar_supervivencia_drogue(data_all_t* datos_sensores) {
-        // Este estado DEBE durar exactamente 3 segundos.
+            if (Eventos::aproxima(datos_sensores->aceleracion_z_m_s2, 0.0f, 5.0f)) {
+                ESP_LOGI(TAG_BASE, " -> [%s] Drogue desplegado correctamente.", estado_cohete_string[SYSTEM._estado]);
+                transicionar_hacia(ST_PCAIDAS_PPAL_DESPLEGADO);
+            }
+        }
+        // CHEQUEAR SI DEBEMOS DESPLEGAR PARACAIDAS PRINCIPAL O NO.
+        // Utilizamos debounce para descartar picos y errores rápidamente.
+        static uint8_t ticks_desplegamos_drogue = 0;
+        if (datos_sensores->vel_z_filtrada_m_s <= 0) { // está cayendo
+            if (SYSTEM.ctx_fisico.altitud_m_relativa_al_pad <= ALTITUD_DESPLIEGUE_PCAIDAS_PPAL) {
+                if (ticks_desplegamos_drogue < 255) ticks_desplegamos_drogue++;
+            }
+            else {
+                ticks_desplegamos_drogue = 0;
+            }
+        }
+        if (ticks_desplegamos_drogue >= 10) { // se cumple la condicion 10 ticks consecutivos
+            transicionar_hacia(ST_PCAIDAS_PPAL_DESPLEGADO);
+        }
+
         // Lógica:
         // if (millis() - COHETE.timestamp_apertura_drogue >= 3000) {
         //      if (velocidad_vertical <= -35 m/s) {
@@ -305,17 +351,22 @@ namespace Cohete {
         //          Transición a ST_DESCENSO_NOMINAL;
         //      }
         // }
+
     }
 
-    void f_st_descenso_controlado_drogue(data_all_t* datos_sensores) {
-        // Bajando con Drogue.
-        // Lógica:
-        // if (altura_actual_filtrada <= 250.0m) { // ¡Cuidado de chequear contra cota_suelo_rampa!
-        //      Ignición pirotécnica Paracaídas Principal.
-        //      // ESP_LOGI(TAG_STATE_MACHINE, " -> [NOMINAL] Paracaídas Principal desplegado.");
-        //      Transición a ST_ATERRIZAJE (o estado intermedio de espera).
-        // }
+    void f_st_pcaidas_ppal_desplegado(data_all_t* datos_sensores) {
+        // TODO: AHORA TENEMOS QUE CHEQUEAR QUE HAYA ATERRIZADO.
     }
+
+    // void f_st_descenso_controlado_drogue(data_all_t* datos_sensores) {
+    //     // Bajando con Drogue.
+    //     // Lógica:
+    //     // if (altura_actual_filtrada <= 250.0m) { // ¡Cuidado de chequear contra cota_suelo_rampa!
+    //     //      Ignición pirotécnica Paracaídas Principal.
+    //     //      // ESP_LOGI(TAG_STATE_MACHINE, " -> [NOMINAL] Paracaídas Principal desplegado.");
+    //     //      Transición a ST_ATERRIZAJE (o estado intermedio de espera).
+    //     // }
+    // }
 
     void f_st_desplegar_principal_emergencia(data_all_t* datos_sensores) {
         ESP_LOGI(TAG_BASE, " -> [EMERGENCIA] Drogue fallido. Disparando Principal de inmediato!");
@@ -324,7 +375,7 @@ namespace Cohete {
         // 2. Transición a ST_ATERRIZAJE (esperando el suelo).
     }
 
-    void f_st_ejecutar_panico_flash_dump(data_all_t* datos_sensores) {
+    void f_st_caida_catastrofica(data_all_t* datos_sensores) {
         ESP_LOGI(TAG_BASE, " -> [FATAL] Caída libre detectada. Volcando RAM a Flash!");
         // Lógica:
         // 1. Las tarjetas SD mecánicas pueden corromperse en impactos duros.
@@ -335,20 +386,10 @@ namespace Cohete {
 
     void f_st_aterrizaje(data_all_t* datos_sensores) {
         // Lógica:
-        // 1. Detectamos reposo en el suelo (posicion_world cerca de 0 relativa, acel == 0).
+        // 1. Detectamos reposo en el suelo (posicion_world cerca de 0 relativa, acel == 0). --> datos_sensores->altitud_m es la altitud relativa al mundo
         // 2. Detener logs de alta frecuencia para salvar batería.
         // 3. Cerrar archivos en la SD (flush y close).
-        // 4. Emitir un "beep" continuo y transmitir coordenadas Lat/Lon por LoRa cada X segundos.
-    }
-
-    void f_st_error(data_all_t* datos_sensores) {
-
-        // MANEJO GENERICO DE FALLAS
-
-        ESP_LOGE(TAG_BASE, "[ST_ERROR]");
-        ESP_LOGE(TAG_BASE, "ERROR DESCONOCIDO SIN MANEJAR.");
-        ESP_LOGE(TAG_BASE, "SYSTEM.error=%d", SYSTEM.error);
-
+        // 4. Emitir un "beeeeep beeeeep" continuo y transmitir coordenadas Lat/Lon por LoRa cada X segundos.
     }
 
 }

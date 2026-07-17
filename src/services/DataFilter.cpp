@@ -87,7 +87,7 @@ data_all_t DataFilter::process(const data_raw_t& raw) {
     // 1. Altura (m): Conversión barométrica estándar desde presión (Pa) a metros
     float P0 = 101325.0f; // Idealmente esto se calibra en el Pad // TODO: crear variable COHETE.presion_en_pad
     float altura_absoluta = 44330.0f * (1.0f - pow((presion_filtrada / P0), 0.1902949f));
-    out.altitud_filtrada_m = altura_absoluta - Cohete::SYSTEM.ctx_fisico.altitud_cero_pad_m;
+    out.altitud_filtrada_m = altura_absoluta - Cohete::SYSTEM.ctx_fisico.altitud_m_pad;
 
     // Cálculo del diferencial de tiempo (dt) para derivadas
     float dt = 0.0f;
@@ -115,7 +115,7 @@ data_all_t DataFilter::process(const data_raw_t& raw) {
     _ultimo_tiempo_us = raw.timestamp_us;
 
     // 3. Momentum (P = m * v)
-    out.momentum_kg_m_s = Cohete::SYSTEM.ctx_fisico.masa_cohete_kg * out.vel_z_filtrada_m_s;
+    out.momentum_kg_m_s = Cohete::SYSTEM.ctx_fisico.masa_g_cohete * out.vel_z_filtrada_m_s;
 
 
     // ==========================================
