@@ -17,7 +17,7 @@ private:
     const int _umbralVoltaje; // Umbral analógico para detectar continuidad
 
     TimerHandle_t _timer;
-
+static constexpr float MV_POR_PASO = 0.806f;
     /**
      * @brief Callback estático requerido por FreeRTOS para el Software Timer.
      * @param xTimer Handle del temporizador que generó el evento.
