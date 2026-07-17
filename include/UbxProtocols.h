@@ -292,23 +292,6 @@ typedef struct {
 
 #pragma pack(pop)
 
-// ==========================================
-// ID's de la clase ACK (Acknowledge)
-// ==========================================
-typedef enum class UBX_ID_ACK: uint8_t {
-    NAK = 0X00, // Mensaje no reconocido / Error de parámetro
-    ACK = 0X01  // Mensaje reconocido y aplicado
-} ubx_id_ack_e;
-
-// ==========================================
-// Estructura ACK/NAK Payload (2 Bytes)
-// ==========================================
-struct __attribute__((packed)) ubx_ack_payload_t {
-    uint8_t clsID;  // Clase del comando al que responde
-    uint8_t msgID;  // ID del comando al que responde
-};
-
-static_assert(sizeof(ubx_ack_payload_t) == 2, "Size of ack_payload_t must be exactly 2 bytes!");
 
 
 #endif
