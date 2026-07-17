@@ -2,7 +2,6 @@
 #include "LoraWrapped.h"
 
 #include "main.h"
-#include <freertos/queue.h>
 
 void setup() {
     Serial.begin(115200); // TODO: Para la Compu de vuelo no se usa Serial
@@ -36,6 +35,12 @@ void setup() {
     } else {
         ESP_LOGI(TAG_TASK_DATA_FILTER, "xColaSensores creada correctamente");
     }
+    // xDataFilterRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
+    // if (xDataFilterRingbuf == NULL) {
+    //     ESP_LOGE(TAG_TASK_DATA_FILTER, "Error al crear xDataFilterRingbuf");
+    // } else {
+    //     ESP_LOGI(TAG_TASK_DATA_FILTER, "xDataFilterRingbuf creado");
+    // }
 
     // MDE
     // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
@@ -63,11 +68,12 @@ void setup() {
     // }
 
     // TODO: Hacer un Profile. Ver si es overkill usar 4096 WORDs para esto. Ojo: WORD = 4 bits en la esp32. "You can use uxTaskGetStackHighWaterMark() to monitor unused stack space"
-    xTaskCreate(vTaskReadSensors, "ReadSensors", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskReadSensorsHandle));
-    xTaskCreate(vTaskStateMachine, "StateMachine", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskStateMachineHandle));
-    // xTaskCreate(vTaskFlash, "Flash", 4096, NULL, 3, &xTaskFlashHandle);
-    xTaskCreate(vTaskLora, "Lora", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskLoraHandle));
-    xTaskCreate(vTaskDataFilter, "DataFilter", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskDataFilterHandle));
+    xTaskCreatePinnedToCore(vTaskReadSensors, "ReadSensors", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskReadSensorsHandle), 1);
+    xTaskCreatePinnedToCore(vTaskStateMachine, "StateMachine", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskStateMachineHandle), 1);
+    xTaskCreatePinnedToCore(vTaskDataFilter, "DataFilter", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskDataFilterHandle), 1);
+
+    // xTaskCreatePinnedToCore(vTaskFlash, "Flash", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskFlashHandle), 0);
+    xTaskCreatePinnedToCore(vTaskLora, "Lora", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskLoraHandle), 0);
 
     vTaskDelete(NULL); // NULL hace referencia al task default que maneja a "void loop()"
 
@@ -82,14 +88,17 @@ void loop(){
 
 // TODO: Pensar sobre este texto: "You need to gather large bursts of hardware data inside an Interrupt Service Routine (ISR) to be processed later by a task."
 void vTaskReadSensors(void *pvParameters) {
-    
+    // const TickType_t xFrequency = pdMS_TO_TICKS(7); // TODO: ~6.7 ms → 150 Hz --> frecuencia de rafagas --> es en realidad req de vTaskLora
+    // TickType_t xLastWakeTime = xTaskGetTickCount();
+
+
 
     // ---------------------------------------------------------------------------------
     // Timer de muestreo
     // ---------------------------------------------------------------------------------
     TickType_t xLastWakeTime;
     const TickType_t xPeriodo = pdMS_TO_TICKS(PERIOD_SAMPLIG_SENSORS_MS); // Muestreo cada 10 ms (100 Hz)
-  
+
     // Inicializar el tiempo de referencia para vTaskDelayUntil
     xLastWakeTime = xTaskGetTickCount();
 
@@ -107,8 +116,10 @@ void vTaskReadSensors(void *pvParameters) {
         raw.timestamp_us = esp_timer_get_time();
         // print_data_raw(&raw);
 
+        // TODO: Por qué se utiliza una Queue en lugar de un Ringbuffer ?
+
         // 3. Enviar a la cola del Filtro de Kalman de forma NO bloqueante (Timeout = 0)
-        // Si la cola se llena porque la se retrasó, preferimos perder una muestra 
+        // Si la cola se llena porque la se retrasó, preferimos perder una muestra
         // antes que congelar el temporizador de 10ms de los sensores.
         if (xColaSensores != NULL) {
             if (xQueueSend(xColaSensores, &raw, 0) != pdTRUE) {
@@ -117,12 +128,16 @@ void vTaskReadSensors(void *pvParameters) {
                 // SI VEMOS ESTE ERROR, HAY QUE AUMENTAR EL TAMÑO DE LA COLA
             }
         }
+        // if (xDataFilterRingbuf != NULL) {
+        //     if (xRingbufferSend(xDataFilterRingbuf, (void *)&raw, sizeof(data_raw_t), pdMS_TO_TICKS(50)) != pdTRUE) {
+        //         ESP_LOGE(TAG_TASK_SENSORS, "xRingbufferSend -> xDataFilterRingbuf failed (raw)");
+        //     }
+        // }
 
         // SerialPrint::plot("contadorSensores", contadorSensores);
         // contadorSensores++;
 
-        // Simulate a 1 second sampling interval
-        // vTaskDelay(pdMS_TO_TICKS(1000)); // it yields CPU to lower priorities for 1s
+        // xTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
 }
 
@@ -215,7 +230,7 @@ void vTaskDataFilter(void *pvParameters)
             // accelVertical_g continúa estando en G.
             //----------------------------------------------------------------------
             float accelVertical_g = accelZ_g * cosf(pitch_rad) * cosf(yaw_rad) - cosf(inclinacion_rad);
-            accelVertical_g = emaAccelVertical.actualizar(accelVertical_g); 
+            accelVertical_g = emaAccelVertical.actualizar(accelVertical_g);
 
             //----------------------------------------------------------------------
             // Kalman 2D
@@ -290,7 +305,7 @@ void vTaskDataFilter(void *pvParameters)
 /*
 void vTaskDataFilter(void *pvParameters) {
     (void)pvParameters;
-    
+
     while (true) {
         ESP_LOGD(TAG_TASK_DATA_FILTER, "Core ID: %d", xPortGetCoreID());
         // Dentro de tareaKalman
@@ -301,6 +316,9 @@ void vTaskDataFilter(void *pvParameters) {
             // Aquí procesas tu datoRecibido con el Filtro de Kalman
             // ...
         }
+        // size_t item_size = 0;
+        // void *item = xRingbufferReceive(xDataFilterRingbuf, &item_size, pdMS_TO_TICKS(2000));
+
         if (item != NULL) {
             if (item_size == sizeof(data_raw_t)) {
 
@@ -343,7 +361,7 @@ void vTaskDataFilter(void *pvParameters) {
         } else {
             ESP_LOGI(TAG_TASK_DATA_FILTER, "No messages (timeout)");
         }
-        
+
     }
 }
 */

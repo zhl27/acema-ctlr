@@ -44,6 +44,7 @@ namespace Cohete {
         }
     };
 
+    // correlativo a estado_vuelo_t --> el orden importa
     const f_st_t MDE_COHETE[] = {
         f_st_init,
         f_st_espera_conexion_gse,
@@ -51,7 +52,7 @@ namespace Cohete {
         f_st_espera_ignicion,
         f_st_boost,
         f_st_fase_balistica,
-        f_st_apogeo,
+        f_st_despliegue_drogue,
         f_st_evaluar_supervivencia_drogue, // TODO: REVISAR A PARTIR DE ACÁ
         f_st_descenso_controlado_drogue,
         f_st_desplegar_principal_emergencia,
@@ -68,7 +69,7 @@ namespace Cohete {
         "ST_ESPERA_IGNICION",
         "ST_BOOST",
         "ST_FASE_BALISTICA",
-        "ST_APOGEO",
+        "ST_DESPLIEGUE_DROGUE",
         "ST_DESCENSO_EVALUACION",
         "ST_DESCENSO_NOMINAL",
         "ST_DESCENSO_EMERGENCIA",
@@ -131,7 +132,7 @@ namespace Cohete {
                 break;
             case ERR_TRAYECTORIA_NO_VERTICAL:
                 break;
-            case ERR_DROGUE_DESGARRO:
+            case ERR_DROGUE_NO_EFECTO:
                 break;
             case ERR_FRENADO_AERO_ATASCADO:
                 break;
@@ -168,7 +169,7 @@ namespace Cohete {
         ESP_LOGI(TAG_BASE, "Entrando a: %s", estado_cohete_string[nuevo_estado]);
     }
 
-    bool es_entrada_a_estado() {
+    bool entrando_a_estado() {
         const bool aux = SYSTEM.entrando_estado;
         SYSTEM.entrando_estado = false;
         return aux;
