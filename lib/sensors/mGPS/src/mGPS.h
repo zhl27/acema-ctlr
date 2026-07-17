@@ -12,11 +12,6 @@
 #include "UbxDispatcher.h"
 #include "UbxConfigurator.h"
 
-// Estructura de carga útil para verificación de ACK/NACK de u-blox (2 bytes)
-struct __attribute__((packed)) ubx_ack_payload_t {
-    uint8_t clsID;
-    uint8_t msgID;
-};
 
 class mGPS {
 public:
