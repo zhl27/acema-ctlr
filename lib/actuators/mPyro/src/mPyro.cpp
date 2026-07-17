@@ -53,10 +53,10 @@ bool mPyro::tieneContinuidad() {
 
     // Lee el valor del ADC asignado al pin S_PyRO_X
     const int tensionLectura_mV = static_cast<int>(analogRead(_pinContinuidad) * MV_POR_PASO);
-
-    // Si la lectura supera el umbral, significa que pasa corriente desde VBAT
-    // Si la lectura es inferior al umbral, significa que pasa corriente desde VBAT
-    return (tensionLectura_mV < _umbralVoltaje_mV);
+    
+    // Si supera el umbral (ej. es mayor a 500mV),
+    // hay retorno de tensión desde VBAT/3.3V
+    return (tensionLectura_mV > _umbralVoltaje_mV);
 }
 
 bool mPyro::disparar(uint32_t duracionMs) { // YA NO ES BLOQUEANTE: La tarea no se duerme
@@ -94,3 +94,23 @@ void mPyro::_finDisparo() const {
     digitalWrite(_pinActivar, LOW); // Vuelve a poner el Gate a GND (Abre circuito)
 }
 
+/**
+ * NOTAS DE LÓGICA:
+ * Estado PRE VUELO: 
+ *  - polling de tieneContinuidad(). 
+ *  - Si devuelve false: bloquear la secuencia de lanzamiento
+ *       y mandar un error por telemetría 
+ *      (Pirotécnico roto o mal conectado).
+ * 
+ * Estado APOGEO (Disparo): 
+ *  - Llamar disparar(). 
+ *  - No hay continuidad aquí porque,
+ *    cuando el MOSFET se activa el voltaje cae a 0V 
+ *    independientemente de si el pirotécnico está sano o se acaba de volatilizar.
+ * 
+ * Estado DESCENSO: 
+ *  - Una vez que el timer apagó el MOSFET, 
+ *    llamar a tieneContinuidad(). 
+ *  - Si ahora devuelve false, confirma que el disparo fue exitoso 
+ *      y el filamento se cortó.
+ */
