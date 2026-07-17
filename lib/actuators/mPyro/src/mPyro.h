@@ -46,7 +46,7 @@ public:
      * @param umbralVoltaje Valor ADC mínimo (0-4095) para considerar que hay continuidad. Por defecto 1000.
      */
     mPyro(uint8_t pinActivar, uint8_t pinContinuidad, int umbralVoltaje = 1000)
-        : _pinActivar(pinActivar), _pinContinuidad(pinContinuidad), _armado(false), _umbralVoltaje(umbralVoltaje), _timer(nullptr) {}
+        : _pinActivar(pinActivar), _pinContinuidad(pinContinuidad), _armado(false), _umbralVoltaje_mV(umbralVoltaje_mV), _timer(nullptr) {}
 
     mPyro();
 
