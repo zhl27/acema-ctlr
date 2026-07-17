@@ -17,7 +17,34 @@
 class mBuzzer {
 private:
     int buzzerPin;
-    bool state;
+    /* Enumeracioens con nombre y apellido para evitar conflictos de nombre */
+    typedef enum STATE_BUZZER { 
+        BUZZER_ST_IDLE,
+        BUZZER_ST_ON,
+        BUZZER_ST_WAIT,
+        BUZZER_ST_TOTAL
+    } stBuzzer_t;
+
+    stBuzzer_t state;
+    /* Puntero al estado */
+    void (mBuzzer::*_actualState)(void);
+    
+    /* mini timer propio. PAra no depender de RTOS*/
+    uint32_t _last_ms;
+    uint32_t _offTime_ms;       //  Duracion entre blink (pausas)
+    uint32_t _onTime_ms;        //  Duracion del pulso ON
+    uint8_t  _beepsRemaining;   //  Repeticiones (N)
+    bool _reloadedSequence;     //  Flag de secuencia
+    
+    /* estados */
+    void stIdle(void);
+    void stOn(void);
+    void stWait(void);
+
+    // Función auxiliar para cargar secuencias
+    void startSequence(uint8_t repetitions, uint32_t onTime, uint32_t offTime);
+
+
 
 public:
     /**
@@ -31,6 +58,16 @@ public:
      */
     void init();
 
+    /**
+     * @brief ejecuta la maquina de estados. Se debe llamar periodicamentre en un loop o task
+     */
+    void runBuzzer(){
+        // Ejecuta la función del estado actual
+        if (_actualState != nullptr) {
+            (this->*_actualState)();
+        }
+    }; // Otros nombres: run; handle; runFSM; 
+    
     /**
      * @brief Turns the buzzer ON.
      */
@@ -65,7 +102,7 @@ public:
     /**
      * @brief Returns the current state of the buzzer.
      */
-    bool isOn() const { return state; }
+    bool isOn() const { return (state == BUZZER_ST_ON); }
 };
 
 #endif //ACEMA_CTLR_MBUZZER_H

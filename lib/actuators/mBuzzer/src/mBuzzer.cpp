@@ -4,55 +4,147 @@
 
 #include "mBuzzer.h"
 
-// TODO: IMPLEMENTAR BUZZER NO BLOQUEANTE. HASTA ENTONCES, USAR CON MUCHÍSIMA CAUTELA ESTA CLASE!!!
+// --------------------------------------------
+// MACROS 
+// --------------------------------------------
 
-mBuzzer::mBuzzer(const int pin) :
-    buzzerPin(pin),
-    state(false)
-{}
+#define ON_BUZZER(pin) digitalWrite(pin, HIGH);
+#define OFF_BUZZER(pin) digitalWrite(pin, LOW)
+
+mBuzzer::mBuzzer(const int pin) : buzzerPin(pin)
+{
+    _last_ms = 0;
+    _onTime_ms = 0;
+    _offTime_ms = 0;
+    _beepsRemaining = 0;
+    state = BUZZER_ST_IDLE;
+    _actualState = &mBuzzer::stIdle;
+}
 
 void mBuzzer::init() {
     pinMode(buzzerPin, OUTPUT);
-    digitalWrite(buzzerPin, LOW);
-    state = false;
+    OFF_BUZZER(buzzerPin);
+    
+    state = BUZZER_ST_IDLE;
+    _actualState = &mBuzzer::stIdle;
+    _beepsRemaining = 0;
 }
 
-void mBuzzer::on() {
-    digitalWrite(buzzerPin, HIGH);
-    state = true;
+
+
+// ------------------------------------------
+// MÁQUINA DE ESTADOS
+// ------------------------------------------
+
+
+void mBuzzer::stIdle(void) {
+    // En reposo no hace nada, espera a que se cargue una secuencia.
 }
 
-void mBuzzer::off() {
-    digitalWrite(buzzerPin, LOW);
-    state = false;
-}
+void mBuzzer::stOn (void){
 
-void mBuzzer::toggle() {
-    if (state) {
-        off();
-    } else {
-        on();
+
+    // Timer soft de ON. Vencido el timer, apaga el buzzer. 
+    // Sólo activa la lógica si entró al estado por secuencia y no forzado 
+    if(_reloadedSequence && (millis() - _last_ms > _onTime_ms)){
+        OFF_BUZZER(buzzerPin);
+
+        _last_ms = millis();    // Actualzación del timer de wait
+        _beepsRemaining--;      // Descuenta el beep que acaba de sonar
+
+        // Aún quedan repeticiones, pasa al estado de pausa WAIT
+        if (_beepsRemaining > 0) {
+            state = BUZZER_ST_WAIT;
+            _actualState = &mBuzzer::stWait;
+        } 
+        // Terminó la secuencia
+        else {
+            state = BUZZER_ST_IDLE;
+            _actualState = &mBuzzer::stIdle;
+
+            _reloadedSequence = false; // Resetea la secuencia
+        }
     }
 }
 
-// TODO: BUZZER ES BLOQUEANTE, AHORA MISMO SOLAMENTE SOLAMENTE SE PUEDE USAR EN EL SETUP
-void mBuzzer::beep(const uint32_t durationMs) {
-    on();
-    // delay(durationMs);
-    vTaskDelay(pdMS_TO_TICKS(durationMs));
-    off();
+void mBuzzer::stWait(void) {
+    
+    // Timer soft de WAIT. Vencido el timer, prende el buzzer
+    // No revisa la reloadSequence pues sólo entra a este estado por secuencia 
+    if (millis() - _last_ms >= _offTime_ms) {
+        ON_BUZZER(buzzerPin);
+        _last_ms = millis(); // Actualización del timer para ON
+        
+        // Vuelve a prender para el siguiente beep
+        state = BUZZER_ST_ON;
+        _actualState = &mBuzzer::stOn;
+    }
 }
 
+
+
+
+
+// ------------------------------------------
+// CONTROL MANUAL Y SECUENCIAS
+// ------------------------------------------
+
+void mBuzzer::startSequence(uint8_t repetitions, uint32_t onTime, uint32_t offTime) {
+    // Se podria agregar un if(_reloadedSequence) {return;}
+    // o para garantizar la urgencia, que sólo si la secuencia es del tipo ERROR, o por prioridad si usamos valores numéricos
+    // (cambiar la firma del método) 
+    // Para sobrescribir las secuencias en caso de que haga múltiples llamadas
+    // Para más complejida, se podría agregar una pequeña cola de secuencias. (cola de eventos)
+    
+    _beepsRemaining = repetitions;
+    _onTime_ms = onTime;
+    _offTime_ms = offTime;
+    _last_ms = millis();
+    
+    ON_BUZZER(buzzerPin);
+    state = BUZZER_ST_ON;
+    _reloadedSequence = true; // Secuencia activada
+
+    _actualState = &mBuzzer::stOn;
+}
+
+void mBuzzer::on() {
+    _beepsRemaining = 0; // Cancela cualquier secuencia activa
+    ON_BUZZER(buzzerPin);
+    _reloadedSequence = false; // Fuerza la anulación de cualquier secuencia
+
+    state = BUZZER_ST_ON; 
+    _actualState = &mBuzzer::stOn; 
+}
+
+void mBuzzer::off() {
+    _beepsRemaining = 0; 
+    OFF_BUZZER(buzzerPin);
+
+    state = BUZZER_ST_IDLE;
+    _actualState = &mBuzzer::stIdle;
+}
+
+void mBuzzer::toggle() {
+    if (digitalRead(buzzerPin) == LOW) {
+        on();
+    } else {
+        off();
+    }
+}
+
+void mBuzzer::beep(const uint32_t durationMs) {
+    // 1 repetición, tiempo de ON dinámico, 0 ms de pausa (irrelevante para N=1)
+    startSequence(1, durationMs, 0);
+}
+
+// Podria haber un bool para verificar si se realizó la carga de la secuencia
 void mBuzzer::playSuccess() {
-    beep(100);
-    // delay(50);
-    vTaskDelay(pdMS_TO_TICKS(50));
-    beep(100);
+    // N = 2 | ON = 100ms | OFF = 50ms
+    startSequence(2, 100, 50);
 }
 
 void mBuzzer::playError() {
-    beep(500);
-    vTaskDelay(pdMS_TO_TICKS(100));
-    // delay(100);
-    beep(500);
+    // N = 2 | ON = 500ms | OFF = 100ms
+    startSequence(2, 500, 100);
 }
