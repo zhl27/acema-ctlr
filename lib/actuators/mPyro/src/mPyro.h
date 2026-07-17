@@ -112,7 +112,8 @@ public:
         const int lectura = analogRead(_pinContinuidad);
 
         // Si la lectura supera el umbral, significa que pasa corriente desde VBAT
-        return (lectura > _umbralVoltaje);
+// Si la lectura es inferior al umbral, significa que pasa corriente desde VBAT
+return (tensionLectura_mV < _umbralVoltaje_mV);
     }
 
     /**
