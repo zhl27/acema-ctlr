@@ -14,7 +14,7 @@ private:
     uint8_t _pinActivar;      // Pin GPIO de disparo (D12 o D13)
     uint8_t _pinContinuidad;  // Pin GPIO analógico de monitoreo (VN/39 o D35/35)
     bool _armado;             // Estado del seguro por software
-    const int _umbralVoltaje; // Umbral analógico para detectar continuidad
+    const int _umbralVoltaje_mV; // Umbral analógico para detectar continuidad
 
     TimerHandle_t _timer;
 static constexpr float MV_POR_PASO = 0.806f;
