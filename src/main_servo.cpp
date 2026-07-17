@@ -23,10 +23,10 @@ void setup() {
 
 void loop() {
     Serial.println("Moviendo a 90...");
-    airbrake.setAngulo(90.0f);
+    airbrake.sendAngulo(90.0f);
     delay(2000);
     
     Serial.println("Moviendo a 0...");
-    airbrake.setAngulo(0.0f);
+    airbrake.sendAngulo(0.0f);
     delay(2000);
 }

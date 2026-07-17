@@ -34,7 +34,7 @@ Kalman1D kalmanYaw(0.001f, 0.01f);
 
 // constexpr size_t RBUF_SIZE = 8192; // bytes per ring buffer
 constexpr size_t RBUF_SIZE = 4096; // bytes per ring buffer
-constexpr size_t BUF_Q_SENSOR_SIZE = 128;
+constexpr size_t BUF_Q_SENSOR_SIZE = 1024;
 constexpr float PERIOD_SAMPLIG_SENSORS_MS = 10; // muestreo cada 10 ms
 constexpr float FREC_SAMPLING_SENSORS_HZ = 1.0f/(float) (PERIOD_SAMPLIG_SENSORS_MS * 1e-3);
 

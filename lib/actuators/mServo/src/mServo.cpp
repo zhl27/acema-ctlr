@@ -18,12 +18,12 @@ bool mServo::init() {
 
   // Inicializamos la posición en 0 grados
   angActual = 0.0f;
-  setAngulo(angActual);
+  sendAngulo(angActual);
 
   return true;
 }
 
-void mServo::setAngulo(const float ang) {
+void mServo::sendAngulo(const float ang) {
   if (_cfg == nullptr) return;
 
   // Restringimos el valor entre los límites de operación del servo (0° a 180°)
@@ -37,7 +37,7 @@ void mServo::setAngulo(const float ang) {
   _servo.writeMicroseconds(pulse);
 }
 
-float mServo::getAngulo() const {
+float mServo::getLastSentAngulo() const {
   return angActual;
 }
 

@@ -160,9 +160,7 @@ void vTaskDataFilter(void *pvParameters)
     {
         if (xQueueReceive(xColaSensores, &raw, portMAX_DELAY) == pdTRUE){
 
-#ifdef DEBUG_DATOS_CRUDOS
             print_data_raw(&raw);
-#endif
 
             //----------------------------------------------------------------------
             // Primera muestra: solamente inicializa el tiempo
@@ -238,7 +236,7 @@ void vTaskDataFilter(void *pvParameters)
                 kalmanAltInit = true;
             }
 
-            kalmanAlt.update(dt, accelVertical_m_s2, raw.bmp.altitud_m);
+            kalmanAlt.update(dt, accelVertical_m_s2, raw.bmp.altitud_snm_m);
 
             //----------------------------------------------------------------------
             // EMPAQUETADO
@@ -268,9 +266,7 @@ void vTaskDataFilter(void *pvParameters)
             out.temperatura_amb_c   = raw.bmp.temp_deg_c;
             out.densidad_aire_kg_m3 = emaDensidad.actualizar(calcularDensidadAire(raw.bmp.presion_hpa, raw.bmp.temp_deg_c));
 
-#ifdef DEBUG_DATOS_FILTRADOS
             print_data(&out);
-#endif
 
             //----------------------------------------------------------------------
             // Distribución (MdE, Lora)

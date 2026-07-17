@@ -30,13 +30,13 @@ private:
     float temp;
 
     // Variables de calibración
-    float CalAccelX;
-    float CalAccelY;
-    float CalAccelZ;
-    float CalGyroX;
-    float CalGyroY;
-    float CalGyroZ;
-    float Caltemp;
+    float offset_accelX;
+    float offset_accelY;
+    float offset_accelZ;
+    float offset_gyroX;
+    float offset_gyroY;
+    float offset_gyroZ;
+    float offset_temp;
 
 public:
     mMPU6050();

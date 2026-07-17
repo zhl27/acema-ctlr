@@ -27,10 +27,10 @@ public:
     bool init();
 
     // Comanda el servo directamente al ángulo especificado a máxima velocidad (0.0° - 180.0°)
-    void setAngulo(float ang);
+    void sendAngulo(float ang);
 
     // Retorna el último ángulo comandado
-    float getAngulo() const;
+    float getLastSentAngulo() const;
 
     // Retorna el ID asignado
     uint8_t getID() const;
