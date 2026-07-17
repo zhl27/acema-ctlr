@@ -109,7 +109,7 @@ public:
         if (_pinContinuidad == 255) return false;
 
         // Lee el valor del ADC asignado al pin S_PyRO_X
-        const int lectura = analogRead(_pinContinuidad);
+        const int tensionLectura_mV = static_cast<int>(analogRead(_pinContinuidad) * MV_POR_PASO);
 
         // Si la lectura supera el umbral, significa que pasa corriente desde VBAT
 // Si la lectura es inferior al umbral, significa que pasa corriente desde VBAT
