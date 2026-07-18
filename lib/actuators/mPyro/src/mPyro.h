@@ -21,7 +21,7 @@ public:
      * @param pinContinuidad Pin analógico que lee el divisor de tensión.
      * @param umbralVoltaje Valor ADC mínimo (0-4095) para considerar que hay continuidad. Por defecto 1000.
      */
-    mPyro(uint8_t pinActivar, uint8_t pinContinuidad, int umbralVoltaje = 1000)
+    mPyro(const uint8_t pinActivar, const uint8_t pinContinuidad, const int umbralVoltaje = 1000)
         : _pinActivar(pinActivar), _pinContinuidad(pinContinuidad), _armado(false), _umbralVoltaje(umbralVoltaje) {}
 
     mPyro();
@@ -29,7 +29,7 @@ public:
     /**
      * @brief Configura los modos de los pines. Debe llamarse dentro del setup().
      */
-    void init() {
+    void init() const {
         pinMode(_pinActivar, OUTPUT);
         digitalWrite(_pinActivar, LOW); // Forzar estado seguro apagado al arrancar
 
@@ -50,6 +50,7 @@ public:
      */
     void desarmar() {
         _armado = false;
+        digitalWrite(_pinActivar, LOW);  // Vuelve a poner el Gate a GND (Abre circuito)
     }
 
     /**
@@ -63,7 +64,7 @@ public:
      * @brief Comprueba si el circuito pirotécnico está cerrado (bucle intacto).
      * @return true si detecta voltaje de VBAT a través del divisor, false si está abierto o quemado.
      */
-    bool tieneContinuidad() {
+    bool tieneContinuidad() const {
         if (_pinContinuidad == 255) return false;
 
         // Lee el valor del ADC asignado al pin S_PyRO_X
@@ -78,7 +79,7 @@ public:
      * @param duracionMs Tiempo en milisegundos que el MOSFET permanecerá activo.
      * @return true si el disparo se ejecutó, false si fue rechazado por estar desarmado.
      */
-    bool disparar(uint32_t duracionMs = 1500) { // OJO: ACCIÓN BLOQUEANTE --> DUERME LA TASK QUE LA CONTIENE
+    bool disparar(const uint32_t duracionMs = 1500) { // OJO: ACCIÓN BLOQUEANTE --> DUERME LA TASK QUE LA CONTIENE
         if (!_armado) {
             return false; // Rechazar disparo por seguridad si no está armado
         }

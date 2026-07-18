@@ -6,6 +6,10 @@
 #include <unity.h>
 #include "Actuators.h"
 
+// arregla el error de SPI
+#include "LoraWrapped.h"
+#include <SPI.h>
+
 // ====================================================================
 // Funciones requeridas por el framework Unity
 // ====================================================================
@@ -72,6 +76,8 @@ void test_pyro_arm_disarm_logic(void) {
 
 void test_servo_access(void) {
     mServo& servo = Actuators::getServo();
+
+    servo.
 
     // No podemos testear mucho estado interno del servo sin mockear hardware,
     // pero podemos asegurar que la referencia existe y el objeto es accesible.

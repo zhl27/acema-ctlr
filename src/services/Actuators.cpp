@@ -4,26 +4,24 @@
 
 #include "Actuators.h"
 
+#include "config.h"
+
 
 // ====================================================================
 // Inicialización de los miembros estáticos de la clase Actuators
 // ====================================================================
 
 // Inicializamos el buzzer usando el pin por defecto (25) o puedes especificar otro.
-mBuzzer Actuators::_buzzer(25);
+mBuzzer Actuators::_buzzer(BUZZER_PIN);
 
 // Inicializamos el servo usando configuración específica, debemos pasarle una estructura mServoConfig_t
-mServoConfig_t config_servo = { // nota para el lector: esto es equivalente c/c++ a la solucion del code smell long parameters en Diseño de Sistemas
-    .pinServo = 0,
-    .pinPot = 0,
-    .pendiente = 0,
-    .alpha = 0,
-    .deadband = 0,
-    .minPulse = 0,
-    .maxPulse = 0,
-    .id = 0
+mServoConfig_t config_airbrake = {
+    .pinServo  = SERVO_PIN,        // Pin PWM del servo
+    .minPulse  = 500,       // Pulso en µs para 0°
+    .maxPulse  = 2500,      // Pulso en µs para 180°
+    .id        = 1
 };
-mServo Actuators::_servo(&config_servo);
+mServo Actuators::_servo(&config_airbrake);
 
 // Inicializamos los pirotécnicos basándonos en los pines sugeridos en mPyro.h
 // Drogue: Activar en D12, Continuidad en D35, Umbral 1000

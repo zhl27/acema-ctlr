@@ -11,10 +11,11 @@
 namespace Cohete {
 
     system_data_t SYSTEM = {
-        .estado = ST_INIT,
-        .error = ERR_NINGUNO,
-        .entrando_estado = false,
+        ._estado = ST_INIT,
+        ._error = ERR_NINGUNO,
+        ._entrando_estado = false,
         // .es_estado_salida = false,
+        .drogue_disparado = false,
 
         .procesos ={
             .xTaskReadSensorsHandle = NULL,
@@ -30,17 +31,15 @@ namespace Cohete {
         },
 
         .timestamp_micros_entrada_estado = 0,
-        .timestamp_micros_inicio_pico_g = 0,
+        .timestamp_millis_inicio_pico_g = 0,
         .timestamp_micros_apertura_drogue = 0,
 
-        .contexto_fisico = {
-            .cota_suelo_rampa = 0.0f,
-            .altura_actual = 0.0f,
-            .altura_max_historica = 0.0f,
-            .acel_global = {0.0f, 0.0f, 0.0f},
-            .vel_global = {0.0f, 0.0f, 0.0f},
-            .pos_global = {0.0f, 0.0f, 0.0f},
-            .cuaternion_actitud = {1.0f, 0.0f, 0.0f, 0.0f} // Identidad
+        .ctx_fisico = {
+            .altura_m_max_historica = 0.0f,
+            .masa_g_cohete = 0, // TODO: masa_cohete_kg debe ser configurable a traves de comando desde GSE: "set_masa_cohete_kg" o similar
+            .masa_g_combustible = 0, // TODO: masa_combustible_kg debe ser configurable a traves de comando desde GSE: "set_masa_combustible_kg" o similar
+            .altitud_m_pad = 0.0f, // TODO: altitud_m_pad toma el valor actual de la altitud_bmp --> cuando comando desde GSE: "tara_altitud" o similar
+            .altitud_m_relativa_al_pad = 0.0f // se actualiza utilizando SYSTEM.ctx_fisico.altitud_m_cero_pad
         }
     };
 
@@ -52,13 +51,10 @@ namespace Cohete {
         f_st_espera_ignicion,
         f_st_boost,
         f_st_fase_balistica,
-        f_st_despliegue_drogue,
-        f_st_evaluar_supervivencia_drogue, // TODO: REVISAR A PARTIR DE ACÁ
-        f_st_descenso_controlado_drogue,
-        f_st_desplegar_principal_emergencia,
-        f_st_ejecutar_panico_flash_dump,
-        f_st_aterrizaje,
-        f_st_error,
+        f_st_drogue_desplegado,
+        f_st_pcaidas_ppal_desplegado,
+        f_st_caida_catastrofica,
+        f_st_aterrizaje
     };
 
     // correlativo a estado_vuelo_t --> el orden importa
@@ -69,34 +65,25 @@ namespace Cohete {
         "ST_ESPERA_IGNICION",
         "ST_BOOST",
         "ST_FASE_BALISTICA",
-        "ST_DESPLIEGUE_DROGUE",
-        "ST_DESCENSO_EVALUACION",
-        "ST_DESCENSO_NOMINAL",
-        "ST_DESCENSO_EMERGENCIA",
+        "ST_DROGUE_DESPLEGADO",
+        "ST_PCAIDAS_PPAL_DESPLEGADO",
         "ST_CAIDA_CATASTROFICA",
         "ST_ATERRIZAJE",
-        "ST_ERROR",
         "ST_NULL"
     };
-    // const size_t TAG_MAX_LEN = TAG_BASE_LEN+22;
-    // static char TAG[TAG_MAX_LEN];
-
-
-
 
 
     void mde_cohete_actualizar(data_all_t* datos_sensores) {
-        if (SYSTEM.estado > ST_NULL) {
+        if (SYSTEM._estado >= ST_NULL) {
             transicion_error(ERR_ESTADO_INVALIDO, datos_sensores);
+            return;
         }
 
         // actualizar datos de COHETE con datos nuevos de los sensores
+        SYSTEM.ctx_fisico.altitud_m_relativa_al_pad = datos_sensores->altitud_filtrada_m - SYSTEM.ctx_fisico.altitud_m_pad; // TODO: chequear que altitud_filtrada_m sea altitud del bmp280 y que represente altitud al nivel del mar
 
-        // if (SISTEMA.baro.presionBar > SISTEMA.limPresion.max || SISTEMA.flags.emergencia == 1) {
-        //     transicionError(self, datosEnsayo);
-        // }
 
-        MDE_COHETE[SYSTEM.estado](datos_sensores); // Ejecuta la función que corresponde al estado actual
+        MDE_COHETE[SYSTEM._estado](datos_sensores); // Ejecuta la función que corresponde al estado actual
     }
 
     // void pausar_proceso(TaskHandle_t proceso) {
@@ -105,7 +92,13 @@ namespace Cohete {
     // }
 
     void transicion_error(const error_cohete_t error, data_all_t *datos_sensores) {
-        SYSTEM.error=error;
+        if (error >= ERR_DESCONOCIDO) {
+            ESP_LOGE(TAG_BASE, "ERROR DESCONOCIDO SIN MANEJAR.");
+            ESP_LOGE(TAG_BASE, "SYSTEM.error=%d", SYSTEM._error);
+            return;
+        }
+
+        SYSTEM._error=error;
 
         switch (error) {
             case ERR_TIMEOUT_CONEXION_GSE:
@@ -113,7 +106,7 @@ namespace Cohete {
                 // matamos el proceso GSE asi no nos gasta recursos del cohete, o bajamos su frecuencia.
                 vTaskSuspend(SYSTEM.procesos.xTaskLoraHandle);
                 SYSTEM.procesos.flujos.Sensors_a_Lora_enabled = false;
-                ESP_LOGI(TAG_BASE, "Suspendido el Task Lora.");
+                ESP_LOGI(TAG_BASE, "Suspendido el Task Lora, ya que no nos comunicaremos con la GSE.");
                 // continuamos con la siguiente etapa.
                 transicionar_hacia(ST_ESPERA_GPS_PRECISO);
                 return;
@@ -122,28 +115,34 @@ namespace Cohete {
                 ESP_LOGE(TAG_BASE, "Timeout de GPS.");
                 transicionar_hacia(ST_ESPERA_IGNICION);
                 return;
-            case ERR_NINGUNO:
-                break;
             case ERR_MPU_CALIBRACION_FALLIDA:
-                break;
+                ESP_LOGE(TAG_BASE, "FALTA IMPLEMENTAR. ERR_MPU_CALIBRACION_FALLIDA");
+                return;
             case ERR_DESPEGUE_FALSO_ZARANDEO:
-                break;
+                ESP_LOGE(TAG_BASE, "ERR_DESPEGUE_FALSO_ZARANDEO. Volvemos a ST_ESPERA_IGNICION.");
+                SYSTEM.timestamp_millis_inicio_pico_g = 0;
+                transicionar_hacia(ST_ESPERA_IGNICION);
+                return;
             case ERR_DESPEGUE_PROHIBIDO:
-                break;
+                ESP_LOGE(TAG_BASE, "FALTA IMPLEMENTAR. ERR_DESPEGUE_PROHIBIDO");
+                // TODO: Qué hacemos si realmente detectamos un despegue, pero el cohete no estaba en condiciones de volar? Pienso que: ya que esta en vuelo, mucho no podemos hacer al respecto, hay que continuar con lo que se tiene. Ver qué hacemos a partir de ahí.
+                return;
             case ERR_TRAYECTORIA_NO_VERTICAL:
-                break;
+                ESP_LOGE(TAG_BASE, "FALTA IMPLEMENTAR. ERR_TRAYECTORIA_NO_VERTICAL");
+                return;
             case ERR_DROGUE_NO_EFECTO:
-                break;
+                ESP_LOGE(TAG_BASE, "FALTA IMPLEMENTAR. ERR_DROGUE_NO_EFECTO");
+                return;
             case ERR_FRENADO_AERO_ATASCADO:
-                break;
+                ESP_LOGE(TAG_BASE, "FALTA IMPLEMENTAR. ERR_FRENADO_AERO_ATASCADO");
+                return;
             case ERR_ESTADO_INVALIDO:
-                break;
-            case ERR_DESCONOCIDO:
-                break;
+                ESP_LOGE(TAG_BASE, "FALTA IMPLEMENTAR. ERR_ESTADO_INVALIDO");
+                return;
         }
 
         // en caso de no ser ninguno de los anteriores
-        transicionar_hacia(ST_ERROR);
+        // transicionar_hacia(ST_ERROR); // TODO: creo que no necesitamos un ST_ERROR, podemos usar esta función para manejar las cosas.
 
         // Acción de seguridad
         // paramos todos los timers ?
@@ -154,24 +153,24 @@ namespace Cohete {
     }
 
     void transicionar_hacia(const estado_cohete_t nuevo_estado) {
-        // TODO: Volver a visitar esta curiosidad. Ver "mde_cohete/include.h"
-        // strlcpy(TAG, TAG_BASE, TAG_BASE_LEN);
-        // strlcat(TAG, " - ", TAG_BASE_LEN+3);
-        // strlcat(TAG, estado_cohete_string[nuevo_estado], TAG_BASE_LEN);
-        if (nuevo_estado > ST_NULL) {
+        if (nuevo_estado >= ST_NULL) {
             // transicion_error(ERR_ESTADO_INVALIDO, nullptr);
-            ESP_LOGE(TAG_BASE, "Codigo enum %d es Estado inválido.", nuevo_estado);
-            return;
+            ESP_LOGE(TAG_BASE, "[%s] Codigo enum %d es Estado inválido.", estado_cohete_string[nuevo_estado], nuevo_estado);
+            return; // el return hace que no se efectivice ninguna transicion
         }
-        SYSTEM.estado = nuevo_estado;
-        SYSTEM.entrando_estado = true;
+        SYSTEM._estado = nuevo_estado;
+        SYSTEM._entrando_estado = true;
         SYSTEM.timestamp_micros_entrada_estado = micros(); // grabamos este instante de transicion en el que entramos a un nuevo estado
         ESP_LOGI(TAG_BASE, "Entrando a: %s", estado_cohete_string[nuevo_estado]);
     }
 
+    estado_cohete_t estado_actual() {
+        return SYSTEM._estado;
+    }
+
     bool entrando_a_estado() {
-        const bool aux = SYSTEM.entrando_estado;
-        SYSTEM.entrando_estado = false;
+        const bool aux = SYSTEM._entrando_estado;
+        SYSTEM._entrando_estado = false;
         return aux;
     }
 

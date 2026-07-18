@@ -34,8 +34,8 @@ Kalman1D kalmanYaw(0.001f, 0.01f);
 
 // constexpr size_t RBUF_SIZE = 8192; // bytes per ring buffer
 constexpr size_t RBUF_SIZE = 4096; // bytes per ring buffer
-constexpr size_t BUF_Q_SENSOR_SIZE = 128;
-constexpr float PERIOD_SAMPLIG_SENSORS_MS = 10;
+constexpr size_t BUF_Q_SENSOR_SIZE = 1024;
+constexpr float PERIOD_SAMPLIG_SENSORS_MS = 10; // muestreo cada 10 ms
 constexpr float FREC_SAMPLING_SENSORS_HZ = 1.0f/(float) (PERIOD_SAMPLIG_SENSORS_MS * 1e-3);
 
 // Ring buffer handles
@@ -59,7 +59,6 @@ static const char *TAG_TASK_STATE_MACHINE = "TASK STATE MACHINE";
 static const char *TAG_TASK_FLASH = "TASK FLASH";
 static const char *TAG_TASK_LORA = "TASK LORA";
 
-mBuzzer buzzer(BUZZER_PIN);
 
 int contadorMde = 0;
 int contadorFlash = 0;
@@ -70,7 +69,7 @@ int contadorLora = 0;
 
 constexpr float R_AIR = 287.05f;
 
-inline float calcularDensidadAire(float pressure_hpa, float temperature_deg_c)
+inline float calcularDensidadAire(const float pressure_hpa, const float temperature_deg_c)
 {
     return (pressure_hpa * 100.0f) / (R_AIR * (temperature_deg_c + 273.15f));
 }

@@ -6,6 +6,10 @@
 #include <unity.h>
 #include "mFlash.h"
 
+// arregla el error de SPI
+#include "LoraWrapped.h"
+#include <SPI.h>
+
 // Instanciamos el objeto mFlash usando el pin CS habitual (GPIO 4)
 mFlash flashTest(4);
 

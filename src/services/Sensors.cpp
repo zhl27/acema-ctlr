@@ -51,7 +51,6 @@ data_raw_t Sensors::get_raw_data() {
     raw.bmp = getBMP280().get_bmp_raw_data();
     raw.mpu = getMPU6050().get_mpu_raw_data();
 
-    // TODO: Traer datos nav_pvt_t del módulo GPS
     raw.gps = getGPS().get_gps_raw_data();
 
     // La conversion de abajo deberia realizarse junto a la limpieza de los datos. Sea DataFilter o EmaFilter o afines.
@@ -61,7 +60,8 @@ data_raw_t Sensors::get_raw_data() {
     // float alt_m     = pvt.hMSL / 1000.0f; // Altura sobre el nivel del mar
     // uint32_t sat    = pvt.numSV;
 
-    // raw.timestamp_micros = micros(); // TODO: VER SI DEBEMOS UTILIZAR OTRA FUNCIÓN
+    // Timestamp con esp nativo
+    raw.timestamp_us = esp_timer_get_time();
 
     return raw;
 }
