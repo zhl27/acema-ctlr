@@ -57,12 +57,28 @@ namespace Cohete {
         //     return (val0 <= val1 + delta);
         // }
 
-        inline bool gps_es_preciso(const data_all_t* datos_sensores) {
-            return datos_sensores->gps_nro_satelites >= 5       // Mínimo 4 para 3D, 5 o 6 es más seguro
-                && datos_sensores->gps_fix_type == 3            // Equivalente a 3D Fix en u-blox (fixType == 3)
-                && datos_sensores->gps_gnss_fix_ok == true      // ¡CRÍTICO! El flag del módulo que confirma que el arreglo es válido
-                && datos_sensores->gps_pdop <= 2.0;              // Dilución de precisión (pDOP * 0.01f) menor o igual a 2.0
-            // && datos_sensores->gps_hacc <= 2500; // ¡EXTRA! Precisión horizontal (hAcc) menor a 2.5 metros (2500 mm)
+        // TODO: SUPONGO QUE VAMOS A QUERER OVERRIDEAR ESTA CONDICION, EN CASO DE QUE LAS CONDICIONES NO CUMPLAN, LANZAR IGUAL EL COHETE.
+        bool gps_es_preciso(const data_all_t* datos_sensores) {
+            static uint8_t ticks_cumple_condiciones = 0;
+
+            const bool cumple =
+                datos_sensores->gps_nro_satelites >= 5       // Mínimo 4 para 3D, 5 o 6 es más seguro
+                && datos_sensores->gps_is_valid
+                && datos_sensores->gps_hdop <= 2.0;              // Dilución de precisión menor o igual a 2.0 es un buen valor
+
+            if (cumple) {
+                if (ticks_cumple_condiciones < 255) ticks_cumple_condiciones++;
+            }
+            else {
+                ticks_cumple_condiciones = 0; // se reinicia el contador si UNA sola vez no se cumple la condicion.
+            }
+
+            // queremos que se cumpla la condicion 50 ticks de corrido
+            if (ticks_cumple_condiciones > 50) {
+                return true;
+            }
+
+            return false;
         }
 
         bool en_codiciones_para_volar(data_all_t* datos_sensores) {
@@ -158,7 +174,7 @@ namespace Cohete {
             if (millis() % 200 == 0)
                 ESP_LOGI(TAG_BASE, " -> [GPS] Esperando satélites. Visibles: %d", datos_sensores->gps_nro_satelites);
         }
-        else if (Eventos::gps_es_preciso(datos_sensores)) {
+        else if (Eventos::gps_es_preciso(datos_sensores) || SYSTEM.gse_configs.gps_override_skip) {
             ESP_LOGI(TAG_BASE, " -> [GPS] Precisión de GPS asegurado!");
             transicionar_hacia(ST_ESPERA_IGNICION);
         }

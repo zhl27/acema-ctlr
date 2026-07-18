@@ -73,8 +73,11 @@ namespace Cohete {
             } flujos;
         } procesos;
 
+        struct {
+            bool gps_override_skip; // esto se configura con un comando desde la GSE --> // TODO: Cómo manejamos esto sin utilizar los temibles mutexes ?
+        } gse_configs;
 
-        // Tracking de integradores temporales (Filtros anti-ruido)
+        // Tracking de integradores temporales
         uint64_t timestamp_micros_entrada_estado; // se actualiza cada vez que entramos a un nuevo estado de la mde
         uint64_t timestamp_millis_inicio_pico_g;  ///< Mide los 150ms continuos de >= 2G
         uint64_t timestamp_micros_apertura_drogue;

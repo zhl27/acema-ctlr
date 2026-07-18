@@ -142,18 +142,6 @@ data_all_t DataFilter::process(const data_raw_t& raw) {
     // Nota: Los atributos raw.gps.* corresponden a los estándares de u-blox UBX-NAV-PVT
     // Si tu librería tiene nombres ligeramente diferentes (ej. num_sv), deberás ajustarlo.
 
-    out.gps_nro_satelites = raw.gps.numSV;
-    out.gps_fix_type      = raw.gps.fixType;
-
-    // Acceso directo a la estructura de bits definida en tu union
-    out.gps_gnss_fix_ok   = raw.gps.flags.bits.gnssFixOK;
-
-    out.gps_pdop          = static_cast<float>(raw.gps.pDOP) * 0.01f; // pDOP llega como entero escalado, se multiplica por 0.01 según tu comentario
-
-    // Latitud y longitud se envían multiplicadas por 1e7 para entrar en enteros de 32 bits
-    out.latitud           = static_cast<float>(raw.gps.lat) * 1e-7f;
-    out.longitud          = static_cast<float>(raw.gps.lon) * 1e-7f;
-
 
     return out;
 }
