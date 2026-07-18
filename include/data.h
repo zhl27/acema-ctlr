@@ -7,7 +7,6 @@
 #define ACEMA_CTLR_DATA_H
 
 #include <cstdint>
-#include "UbxProtocols.h.old"
 #include <cstdio>
 #include <cstdint>
 
@@ -40,6 +39,20 @@ typedef struct {
 } data_raw_bmp_t;
 
 /**
+ * @struct data_gps_t
+ * @brief Estructura de datos del NEO-7M obtenidos con TinyGPS++.
+ *
+ * Contiene los datos del GPS.
+ */
+struct data_gps_t {
+    bool is_valid;
+    double latitude;     // Grados
+    double longitude;    // Grados
+    uint32_t satellites; // Cantidad de satélites visibles
+    double hdop;
+};
+
+/**
  * @struct data_raw_t
  * @brief Flujo crudo. Estructura que agrupa todos los datos crudos de los sensores.
  *
@@ -48,7 +61,7 @@ typedef struct {
 typedef struct {
     data_raw_bmp_t bmp;  ///< Datos crudos del BMP280
     data_raw_mpu_t mpu;  ///< Datos crudos del MPU6050
-    nav_pvt_t gps;       ///< Datos crudos del GPS
+    data_gps_t gps;       ///< Datos crudos del GPS
     int64_t timestamp_us;  ///< Marca de tiempo de la lectura de los datos
 } data_raw_t;
 
@@ -89,14 +102,12 @@ typedef struct {
     float temperatura_amb_c;          // Tomada estrictamente del BMP280
     float densidad_aire_kg_m3;        // Calculada por ley de gases ideales
 
+    // --- GPS ---
+    bool gps_is_valid;
     uint32_t gps_nro_satelites;
-    uint32_t gps_fix_type;
-    bool gps_gnss_fix_ok;
-    float gps_pdop;
     float gps_hdop;
-
-    float latitud;
-    float longitud;
+    float gps_latitud;
+    float gps_longitud;
 
 } data_all_t; ///< Información de utilidad obtenida del ambiente a través de los sensores que YA ESTÁN SANITIZADOS Y FILTRADOS!
 
@@ -133,10 +144,11 @@ typedef struct {
 
     float angulo_respecto_z;
 
-    bool gps_3d_fijado;
-    float latitud;
-    float longitud;
-    uint32_t nro_satelites;
+    bool gps_is_valid;
+    uint32_t gps_nro_satelites;
+    float gps_hdop; // Esto muestra la precision de latitud y longitud. Menor o igual a 2 es un buen valor.
+    float gps_latitud;
+    float gps_longitud;
 
     uint32_t masa_cohete_g; // ponemos en gramos para evitar floats --> en GSE se convierte a Kg
 
@@ -187,7 +199,7 @@ inline void print_data_raw(const data_raw_t *data) {
 
     // --- Datos del GPS (nav_pvt_t) ---
     Serial.printf("[GPS]     Latitud: %ld | Longitud: %ld | Satelites: %d\n",
-                  (long)data->gps.lat,
+                  (long)data->gps.latitude,
                   (long)data->gps.lon,
                   (int)data->gps.numSV);
 
@@ -217,9 +229,9 @@ inline void print_plotter_data_raw(const data_raw_t *data) {
 
 #elif defined(PLOT_GPS_ONLY)
     Serial.printf("Lat:%ld,Lon:%ld,Sats:%d\r\n",
-                  (long)data->gps.lat,
-                  (long)data->gps.lon,
-                  (int)data->gps.numSV);
+                  (long)data->gps.latitude,
+                  (long)data->gps.longitude,
+                  (int)data->gps.satellites);
 
 #elif defined(PLOT_ALL)
     Serial.printf("Presion:%f,Temp:%f,AccX:%f,AccY:%f,AccZ:%f,GyroX:%f,GyroY:%f,GyroZ:%f,Lat:%ld,Lon:%ld,Sats:%d\r\n",

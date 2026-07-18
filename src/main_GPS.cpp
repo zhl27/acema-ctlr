@@ -1,68 +1,58 @@
 #include <Arduino.h>
-#include <TinyGPS++.h>
 
-#define GPS_RX_PIN 16 // Conectar al pin TX del módulo NEO-7M
-#define GPS_TX_PIN 17 // Conectar al pin RX del módulo NEO-7M
+#include "config.h"
+#include "mGPS.h"
 
-// Instanciar el objeto TinyGPS++ y el puerto serie
-TinyGPSPlus gps;
-HardwareSerial SerialGPS(2);
+// Instantiate mGPS: UART2, RX = GPIO 16, TX = GPIO 17, 9600 baud (NEO-7M default)
+mGPS gps(2, GPS_RX_PIN, GPS_TX_PIN, 9600);
 
 void setup() {
   Serial.begin(115200);
-  SerialGPS.begin(9600, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
+  while (!Serial) {
+    ; // Wait for native USB serial (if applicable)
+  }
 
-  Serial.println("--- Test Avanzado: Parseo de datos GPS NEO-7M ---");
-  Serial.println("Esperando fijación de satélites (FIX)...");
+  Serial.println("Starting mGPS Controller Test...");
+
+  if (!gps.init()) {
+    Serial.println("FATAL: mGPS initialization failed (Task or Queue creation error). Halting.");
+    while (true) {
+      vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+  }
+
+  Serial.println("mGPS initialized successfully. Background task running.");
+  Serial.println("Note: A cold GPS module indoors may take several minutes to acquire a fix.");
+  Serial.println("-------------------------------------------------------------------------");
 }
 
 void loop() {
-  // Alimenta el objeto GPS continuamente con los datos del puerto serie
-  while (SerialGPS.available() > 0) {
-    gps.encode(SerialGPS.read());
+  // Non-blocking read from the FreeRTOS mailbox queue
+  data_gps_t data = gps.get_gps_raw_data();
+
+  Serial.print("[GPS] Valid: ");
+  Serial.print(data.is_valid ? "YES" : "NO ");
+
+  Serial.print(" | Sats: ");
+  if (data.satellites < 10) Serial.print(" "); // Alignment padding
+  Serial.print(data.satellites);
+
+  Serial.print(" | HDOP: ");
+  Serial.print(data.hdop, 2);
+
+  if (data.is_valid) {
+    // Print 6 decimal places for standard GPS coordinate precision (~0.1m resolution)
+    Serial.print(" | Lat: ");
+    Serial.print(data.latitude, 6);
+    Serial.print(" | Lng: ");
+    Serial.print(data.longitude, 6);
+  } else {
+    Serial.print(" | Lat/Lng: [No Fix]");
   }
 
-  // Imprimir los datos cada 2 segundos
-  static unsigned long ultimaImpresion = 0;
-  if (millis() - ultimaImpresion > 2000) {
-    ultimaImpresion = millis();
+  Serial.println();
 
-    Serial.print("Satélites conectados: ");
-    Serial.println(gps.satellites.value());
-
-    if (gps.location.isValid()) {
-      Serial.print("Latitud: ");
-      Serial.print(gps.location.lat(), 6);
-      Serial.print(" | Longitud: ");
-      Serial.println(gps.location.lng(), 6);
-    } else {
-      Serial.println("Ubicación: No válida (Buscando satélites...)");
-    }
-
-    if (gps.altitude.isValid()) {
-      Serial.print("Altitud: ");
-      Serial.print(gps.altitude.meters());
-      Serial.println(" metros");
-    }
-
-    if (gps.time.isValid()) {
-      Serial.print("Hora UTC: ");
-      if (gps.time.hour() < 10) Serial.print(F("0"));
-      Serial.print(gps.time.hour());
-      Serial.print(F(":"));
-      if (gps.time.minute() < 10) Serial.print(F("0"));
-      Serial.print(gps.time.minute());
-      Serial.print(F(":"));
-      if (gps.time.second() < 10) Serial.print(F("0"));
-      Serial.println(gps.time.second());
-    }
-
-    Serial.println("---------------------------------------------");
-  }
-
-  // Alerta si pasan 5 segundos sin recibir datos en absoluto (problema de cableado)
-  if (millis() > 5000 && gps.charsProcessed() < 10) {
-    Serial.println("ERROR: No se reciben datos del GPS. Verifica el cableado RX/TX.");
-    while (true) { delay(500); }
-  }
+  // The background FreeRTOS task drains the UART buffer continuously every 10ms.
+  // You can delay loop() as long as you want without risking UART buffer overflows or lost sentences.
+  delay(1000);
 }

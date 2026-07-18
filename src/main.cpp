@@ -14,9 +14,7 @@ void setup() {
     ESP_LOGI("SETUP", "Comenzando SETUP.");
 
 //     esp_log_level_set("*", ESP_LOG_INFO); // TODO: INVESTIGAR XQ esp_log_level_set NO HACE NADA EN ABSOLUTO.
-// #ifdef DEBUG_ESP32
 //     esp_log_level_set("*", ESP_LOG_DEBUG);
-// #endif
 
     // DataFilter::init(); // TODO: Encapsular lógica de filtros de kalman dentro de DataFilter. Ahora mismo no se usa esta clase. Pero debería utilizarse para ocultar complejidad de filtros de kalman y afines.
     Sensors::init();
@@ -265,6 +263,13 @@ void vTaskDataFilter(void *pvParameters)
             // Ambientales
             out.temperatura_amb_c   = raw.bmp.temp_deg_c;
             out.densidad_aire_kg_m3 = emaDensidad.actualizar(calcularDensidadAire(raw.bmp.presion_hpa, raw.bmp.temp_deg_c));
+
+            // GPS
+            out.gps_is_valid = raw.gps.is_valid;
+            out.gps_hdop = raw.gps.hdop;
+            out.gps_nro_satelites = raw.gps.satellites;
+            out.gps_latitud = raw.gps.latitude;
+            out.gps_longitud = raw.gps.longitude;
 
             print_data(&out);
 

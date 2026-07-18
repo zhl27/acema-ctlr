@@ -30,6 +30,10 @@ namespace Cohete {
             }
         },
 
+        .gse_configs = {
+            .gps_override_skip = false,
+        },
+
         .timestamp_micros_entrada_estado = 0,
         .timestamp_millis_inicio_pico_g = 0,
         .timestamp_micros_apertura_drogue = 0,

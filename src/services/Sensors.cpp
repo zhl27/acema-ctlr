@@ -39,12 +39,6 @@ bool Sensors::init() {
     return true;
 }
 
-// TODO: VER SI ES NECESARIO
-bool Sensors::update() {
-    // getGPS().update();
-    return true;
-}
-
 data_raw_t Sensors::get_raw_data() {
     data_raw_t raw = {};
 
