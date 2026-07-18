@@ -77,6 +77,8 @@ CmdResult cmd_dupm_data(float value, void* context){
         if(ok) {
             // Imprime en formato CSV listo para copiar, pegar y graficar
             Serial.printf("%d,%.2f,%.2f\n", punto.timestamp, punto.valor_filtrado, punto.valor_crudo);
+            // MODIFICAR SEGÚN LA STRUC
+            // O ENCAPSULAR PARA QUE LA ESP DEL GSE PUEDA USARLO TAMBIEN
         }
     }
     Serial.printf("END_DUMP");
@@ -89,6 +91,44 @@ CmdResult cmd_dupm_data(float value, void* context){
     return res;
 }
 
+// ===================================================
+// SUGERENCIA PARA GUARDAR CAMBIOS EN LA MEMORIA
+
+ConfigDatos configActual; // <--- DEBE SER GLOBA U EN UNA STRUCT GLOBAL (SYSTEM)
+
+// Handlers que SOLO modifican la RAM
+CmdResult cmd_set_offset_x(float value, void* context) {
+    configActual.sensor_offset_x = value;
+    return {1, value};
+}
+
+CmdResult cmd_set_offset_y(float value, void* context) {
+    configActual.sensor_offset_y = value;
+    return {1, value};
+}
+
+// Handler dedicado exclusivamente a sincronizar RAM -> Flash
+CmdResult cmd_commit_config(float value, void* context) {
+    mFlash* flash = static_cast<mFlash*>(context);
+    
+    // Guardamos toda la estructura de una sola vez
+    flash->guardarConfig(&configActual, sizeof(configActual));
+    
+    return {1, 0.0f}; // Retornamos OK a la estación terrena
+}
+
+void setup() {
+    // ... inicialización ...
+//    cmdDispatcher.registerCommand(CMD_SET_OFFSET_X, cmd_set_offset_x, nullptr);
+//    cmdDispatcher.registerCommand(CMD_SET_OFFSET_Y, cmd_set_offset_y, nullptr);
+//    cmdDispatcher.registerCommand(CMD_COMMIT_CONFIG, cmd_commit_config, &memFlash);
+}
+/* Secuencia en tierra: El operador ajusta todo lo que necesita.
+ * Cuando el software de la PC muestra que todo está en orden, 
+ * se aprieta un botón "Guardar en Cohete" 
+ * que envía el CMD_COMMIT_CONFIG.
+ */
+// =======================================
 
 
 // Instancia del manager
@@ -105,12 +145,13 @@ void setup() {
     // cmdDispatcher.registerCommand(CMD_CLEAR_LOG, cmd_clear_log, &memFlash);
     // cmdDispatcher.registerCommand(CMD_DUMP_DATA, cmd_dump_dat, &memFlash);
 
-    // Se esperaría en algun momento, limpiar el logger antes de despegar, mas no, que sea condición para el depegue
+    // Se esperaría en algun momento, limpiar el logger antes de despegar,
+    // mas no, que sea condición para el depegue
     // LOGICA DE MAQUINA DE ESTADOS: Esto puede ir en la FSM para prevenir los reinicios
     // INTERLOCK 1: ¿La misión había sido armada/iniciada antes del reinicio?
     if (config.mision_activa == true) {
         
-        // INTERLOCK 2: Validación por sensores (Tu otra excelente idea)
+        // INTERLOCK 2: Validación por sensores
         // Comparamos la altitud actual con la altitud base que guardamos en prevuelo
         float altitud_actual = leerSensorBarometrico(); 
         
