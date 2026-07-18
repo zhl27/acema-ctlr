@@ -27,7 +27,7 @@ enum EstadoConexionGSE : std::uint8_t {
 };
 
 class GSE {
-    static constexpr long INTERVALO_TELEMETRIA = 1; // 5s de frecuencia de envío
+    static constexpr long INTERVALO_TELEMETRIA = 1000; // 5s de frecuencia de envío
 
     static EstadoConexionGSE _currentState;
 

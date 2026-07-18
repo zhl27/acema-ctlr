@@ -190,6 +190,7 @@ namespace Cohete {
         // 3. if (tiempo_con_2g >= 150ms AND delta_altura > 4.0m) {
         //      Transición a ST_PROPULSION.
         //    }
+
         if (entrando_a_estado()) {
             ESP_LOGI(TAG_BASE, "[ESPERA IGNICION] Esperando condiciones necesarias para el vuelo...");
         }
@@ -351,6 +352,7 @@ namespace Cohete {
             }
         }
         if (ticks_desplegamos_drogue >= 10) { // se cumple la condicion 10 ticks consecutivos
+            // TODO: pyro.armar();
             transicionar_hacia(ST_PCAIDAS_PPAL_DESPLEGADO);
         }
 
@@ -409,3 +411,8 @@ namespace Cohete {
     }
 
 }
+/**
+ * Si el drogue no tiene continuidad, abrir el paracaidas
+ * en el descenso
+ * 100m/S menor use usa
+ */

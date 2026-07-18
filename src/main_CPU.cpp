@@ -3,6 +3,8 @@
 #include "mBuzzer.h"
 #include "config.h"
 
+#define TIMEOUT_MS_PONG_WAIT 10000
+
 // ============================================================================
 // CONFIGURACIÓN CONDICIONAL DE PINES SEGÚN EL ENTORNO DEL .INI
 // ============================================================================
@@ -43,7 +45,7 @@ RocketState currentState = ROCKET_INIT;
 
 // Variables de control de tiempo y ciclos
 unsigned long previousMillis = 0;
-const long INTERVALO_TELEMETRIA = 1; // 5s de frecuencia de envío
+const long INTERVALO_TELEMETRIA = 5000; // 5s de frecuencia de envío
 
 int cicloContador = 0;
 float simuladorAltitud = 0.0f;
@@ -129,8 +131,8 @@ void loop() {
                 cicloContador = 0;
                 currentState = ROCKET_CONNECTED;
             } 
-            // Time-out de reintento: si pasan 3 segundos sin respuesta, vuelve a intentar conectar
-            else if (currentMillis - previousMillis >= 3000) {
+            // Time-out de reintento: si pasan TIMEOUT_MS_PONG_WAIT segundos sin respuesta, vuelve a intentar conectar
+            else if (currentMillis - previousMillis >= TIMEOUT_MS_PONG_WAIT) {
                 Serial.println(F("[WARN] Tiempo de espera de PONG agotado. Reintentando enlace..."));
                 currentState = ROCKET_DISCONNECTED;
             }
@@ -186,4 +188,5 @@ void loop() {
             }
             break;
     }
+    vTaskDelay(pdMS_TO_TICKS(10));
 }
