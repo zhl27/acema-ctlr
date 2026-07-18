@@ -7,7 +7,7 @@
 #define ACEMA_CTLR_DATA_H
 
 #include <cstdint>
-#include "UbxProtocols.h"
+#include "UbxProtocols.h.old"
 #include <cstdio>
 #include <cstdint>
 
@@ -93,6 +93,7 @@ typedef struct {
     uint32_t gps_fix_type;
     bool gps_gnss_fix_ok;
     float gps_pdop;
+    float gps_hdop;
 
     float latitud;
     float longitud;

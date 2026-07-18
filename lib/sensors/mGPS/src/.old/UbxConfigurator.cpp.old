@@ -1,4 +1,4 @@
-#include <UbxConfigurator.h>
+#include <UbxConfigurator.cpp.h>
 #include <cstring> // Necesario para memset y memcpy
 
 

@@ -3,7 +3,7 @@
 
 #include <cstdint>
 #include <cstddef>
-#include <UbxProtocols.h>
+#include <UbxProtocols.h.old>
 #include "UbxDispatcher.h" // Para conocer UbxRegMsg_t
 
 class UbxConfigurator {

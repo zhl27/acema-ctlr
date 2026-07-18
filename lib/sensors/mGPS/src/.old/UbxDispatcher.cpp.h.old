@@ -18,7 +18,7 @@
 #include <cstdint>
 #include <assert.h>
 #include <cstddef>
-#include "UbxProtocols.h"
+#include "UbxProtocols.h.old"
 
 //Fuerza al compilador a empaquetar estructuras estrechamente con una alineación de 1 byte
 #pragma pack(push, 1)

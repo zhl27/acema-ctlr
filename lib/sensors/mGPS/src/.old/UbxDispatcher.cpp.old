@@ -1,4 +1,4 @@
-#include "UbxDispatcher.h"
+#include "UbxDispatcher.cpp.h"
 #include <cstring>
 #include <cstddef>
 /**

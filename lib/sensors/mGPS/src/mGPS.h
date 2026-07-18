@@ -4,18 +4,23 @@
 
 #ifndef ACEMA_CTLR_MGPS_H
 #define ACEMA_CTLR_MGPS_H
-#include <Arduino.h>
-#include "driver/uart.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
-#include "freertos/task.h"
-#include "UbxDispatcher.h"
-#include "UbxConfigurator.h"
 
-// Estructura de carga útil para verificación de ACK/NACK de u-blox (2 bytes)
-struct __attribute__((packed)) ubx_ack_payload_t {
-    uint8_t clsID;
-    uint8_t msgID;
+#include <TinyGPS++.h>
+#include <freertos/queue.h>
+
+// Estructura de datos PVT (Position, Velocity, Time) para el lazo de control
+struct data_gps_t {
+    double latitude;     // Grados
+    double longitude;    // Grados
+    double altitude;     // Metros sobre el nivel del mar
+    double speed;        // m/s
+    double course;       // Grados
+    float hdop;          // Dilución Horizontal de Precisión (< 2.0 es ideal para lanzamiento)
+    float pdop;          // Dilución de precisión (pDOP * 0.01f) menor o igual a 2.0
+    uint8_t fix_type;    // 1 = Sin Fix, 2 = Fix 2D, 3 = Fix 3D (Aeronáutico)
+    uint32_t satellites; // Cantidad de satélites visibles
+    bool gnss_fix_ok;        // Estado de validación (True solo si hay Fix 3D y HDOP aceptable)
+    uint32_t last_update;// Timestamp (millis) de la última trama válida procesada
 };
 
 class mGPS {
@@ -26,7 +31,7 @@ public:
 
     // API Pública de Vuelo
     bool init();                        // Retorna true SOLO si la configuración aeronáutica fue confirmada
-    nav_pvt_t get_gps_raw_data() const; // Copia atómica thread-safe para el lazo de navegación
+    data_gps_t get_gps_raw_data() const; // Lectura instantánea no bloqueante (cero deadlocks)
 
 private:
     // Parámetros de hardware
@@ -35,50 +40,11 @@ private:
     int _txPin;
     uint32_t _baud;
 
-    // Almacenamiento de datos
-    nav_pvt_t _pvt_data_rx; // Buffer crudo para el Dispatcher (escritura desde UART)
-    nav_pvt_t _pvt_data;    // Buffer seguro para el usuario (Getters)
+    TinyGPSPlus _gps;
 
-    // Almacenamiento para verificación de ACKs
-    ubx_ack_payload_t _ack_payload_rx;
-    volatile uint8_t _last_ack_status; // 0x01 = ACK, 0x00 = NACK, 0xFF = Pendiente
+    QueueHandle_t _gpsQueue; // usamos freertos queues para no usar mutexes
 
-    // Sincronización FreeRTOS
-    SemaphoreHandle_t _ackSemaphore;
-    SemaphoreHandle_t _dataMutex; // Protege _pvt_data contra data-tearing
-    SemaphoreHandle_t _uartMutex; // Previene colisiones en el puerto serial
-    TaskHandle_t      _taskHandle; // Handle de la tarea de fondo
-
-    // Instancias de u-blox
-    UbxDispatcher* _dispatcher;
-    UbxConfigurator* _configurator;
-
-    // Tablas de enrutamiento
-    UbxRegMsg_t _regPvt;
-    UbxRegMsg_t _regAck;
-    UbxRegMsg_t _regNack;
-    const UbxRegMsg_t* _tablaRegistros[3];
-
-    // --- MÉTODOS INTERNOS Y CALLBACKS ESTÁTICOS ---
-    static mGPS* _instance;
-
-    void _update() const;
-    void _taskLoop(); // Bucle infinito ejecutado por la tarea de FreeRTOS
-
-    static void _taskLoopStatic(void* arg);
-    static void _onPvtReceivedStatic(void* data);
-    static void _onAckReceivedStatic(void* data);
-    static void _onNackReceivedStatic(void* data);
-    static void _uartTxStatic(const uint8_t* data, size_t len);
-    static bool _waitAckStatic(uint8_t cls, uint8_t id, uint32_t timeoutMs);
-
-    void _onPvtReceived(void* data);
-    void _onAckReceived(void* data);
-    void _onNackReceived(void* data);
-    void _uartTx(const uint8_t* data, size_t len) const;
-    bool _waitAck(uint8_t cls, uint8_t id, uint32_t timeoutMs);
+    static mGPS _instance;
 };
-
-
 
 #endif //ACEMA_CTLR_MGPS_H
