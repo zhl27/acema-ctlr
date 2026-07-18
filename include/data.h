@@ -9,7 +9,7 @@
 #include <cstdint>
 #include "UbxProtocols.h"
 #include <cstdio>
-#include <cstdint>
+
 
 /**
  * @struct data_raw_mpu_t
@@ -224,6 +224,12 @@ inline void print_data(const data_all_t *data) {
 
     Serial.printf("======================================================\n\n");
 }
+
+// Estructura del payload que viajará por la cola RTOS
+struct CommandPayload {
+    uint32_t opCode;
+    float value;
+};
 
 #endif //ACEMA_CTLR_DATA_H
 

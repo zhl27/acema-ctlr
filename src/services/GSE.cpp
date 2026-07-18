@@ -132,3 +132,10 @@ bool GSE::enviar_mensaje(const char* mensaje) {
 bool GSE::actualizar_graficas(const data_all_t *data) {
     return _lora.send_data(*data);
 }
+
+bool GSE::leer_paquete(pkt_t* paquete){
+    if(paquete == nullptr){
+        return false;
+    }
+    return _lora.read_packet(paquete); 
+}

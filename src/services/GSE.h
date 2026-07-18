@@ -46,6 +46,7 @@ public:
     static bool actualizar_graficas(const data_all_t *data);
     static bool enviar_mensaje(const char* mensaje);
     static bool enviar_error(const char* error);
+    static bool leer_paquete(pkt_t* paquete);
 
     static void actualizar(data_all_t *data);
 

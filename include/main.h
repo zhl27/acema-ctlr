@@ -26,7 +26,14 @@
 #include <cmath> // Para atan2
 #include "services/Kalman1D.h"
 #include "services/Kalman2D.h"
+#include "services/CmdDispatcher/CmdDispatcher.h"
+#include "services/EnlaceGSE/EnlaceGSE.h"
+#include "mPyro.h"
 
+// TODO: CAMBIAR LOS PINES POR LOS REALES
+#define PIN_PYRO 10
+#define PIN_CONTINUIDAD_PIRO 11
+#define UMBRAL_MIN_CONTINUIDAD_PYRO_mV 800
 
 // Instancias globales de los filtros (Ajustar las varianzas empíricamente. Ej: Gyro=0.001, Accel=0.01)
 Kalman1D kalmanPitch(0.001f, 0.01f);
@@ -60,12 +67,15 @@ static const char *TAG_TASK_FLASH = "TASK FLASH";
 static const char *TAG_TASK_LORA = "TASK LORA";
 
 mBuzzer buzzer(BUZZER_PIN);
+mPyro pirotecnico(PIN_PYRO,PIN_CONTINUIDAD_PIRO, PIN_CONTINUIDAD_PIRO);
 
 int contadorMde = 0;
 int contadorFlash = 0;
 int contadorSensores = 0;
 int contadorLora = 0;
 
+
+CmdDispatcher cmdDispatcher;
 // int muestreo_datos_crudos_ms = 500; // cada 0,5 segundos
 
 constexpr float R_AIR = 287.05f;

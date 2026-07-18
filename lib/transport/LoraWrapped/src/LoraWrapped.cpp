@@ -234,7 +234,25 @@ bool LoraWrapped::send_pong() {
     return _send_packet(&rx_packet);
 }
 
-bool LoraWrapped::read_packet(pkt_t *pPkt) {
+bool LoraWrapped::g_send_command(CommandPayload comando)
+{
+    pkt_t packet;
+    // Verifica conexion
+    if(_st !=CONNECTION_STATUS::CONNECTED)
+        return false;
+    
+    // Prepara el paquete
+    packet.protocol = lora_protocol::G_CMD;
+    packet.payload = &comando;
+    packet.len = sizeof(comando);
+
+    // Envia el paquete
+    return _send_packet(&packet);
+
+}
+
+bool LoraWrapped::read_packet(pkt_t *pPkt)
+{
     if(pPkt == nullptr /*||_st != CONNECTION_STATUS::CONNECTED*/)
         return false;
 
