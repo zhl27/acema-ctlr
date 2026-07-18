@@ -15,7 +15,7 @@
 constexpr float A_GRAV = 9.81;
 constexpr float UMBRAL_ACEL_BOOST = 2 * A_GRAV;     // 2G (acorde a requerimientos)
 constexpr int TIEMPO_MS_MIN_BOOST = 200;            // 0.2 segundos en milisegundos (acorde a requerimientos)
-constexpr uint32_t CONEXION_GSE_TIMEOUT_MILLIS = 1000*5;
+constexpr uint32_t CONEXION_GSE_TIMEOUT_MILLIS = 1000*60*2;
 constexpr float ALTURA_M_MAX = 1000; // TODO: chequear ALTURA_M_MAX. Igual nos importa realmente este dato?
 constexpr uint32_t GPS_TIMEOUT_MILLIS = 1000*5;
 constexpr uint32_t TIEMPO_MILLIS_ESPERA_WARMUP_MPU = 1000*60*5;

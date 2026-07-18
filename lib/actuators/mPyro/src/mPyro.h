@@ -6,6 +6,8 @@
 #define ACEMA_CTLR_MPYRO_H
 
 #include <Arduino.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/timers.h>
 
 class mPyro {
 private:
@@ -14,6 +16,28 @@ private:
     bool _armado;             // Estado del seguro por software
     const int _umbralVoltaje; // Umbral analógico para detectar continuidad
 
+    TimerHandle_t _timer;
+
+    /**
+     * @brief Callback estático requerido por FreeRTOS para el Software Timer.
+     * @param xTimer Handle del temporizador que generó el evento.
+     */
+    static void _timerCallback(TimerHandle_t xTimer) {
+        // Recuperamos el puntero a la instancia de la clase 'mPyro' desde el ID del timer
+        mPyro* instancia = static_cast<mPyro*>(pvTimerGetTimerID(xTimer));
+        if (instancia != nullptr) {
+            instancia->_finDisparo();
+        }
+    }
+
+    /**
+     * @brief Método privado que se ejecuta automáticamente cuando el temporizador expira.
+     * Desactiva el MOSFET y desarma el sistema.
+     */
+    void _finDisparo() const {
+        digitalWrite(_pinActivar, LOW); // Vuelve a poner el Gate a GND (Abre circuito)
+    }
+
 public:
     /**
      * @brief Constructor de la clase mPyro.
@@ -21,21 +45,39 @@ public:
      * @param pinContinuidad Pin analógico que lee el divisor de tensión.
      * @param umbralVoltaje Valor ADC mínimo (0-4095) para considerar que hay continuidad. Por defecto 1000.
      */
-    mPyro(const uint8_t pinActivar, const uint8_t pinContinuidad, const int umbralVoltaje = 1000)
-        : _pinActivar(pinActivar), _pinContinuidad(pinContinuidad), _armado(false), _umbralVoltaje(umbralVoltaje) {}
+    mPyro(uint8_t pinActivar, uint8_t pinContinuidad, int umbralVoltaje = 1000)
+        : _pinActivar(pinActivar), _pinContinuidad(pinContinuidad), _armado(false), _umbralVoltaje(umbralVoltaje), _timer(nullptr) {}
 
     mPyro();
 
     /**
-     * @brief Configura los modos de los pines. Debe llamarse dentro del setup().
+     * @brief Destructor por si se destruye la instancia, evitando fugas de memoria en FreeRTOS.
      */
-    void init() const {
+    ~mPyro() {
+        if (_timer != nullptr) {
+            xTimerDelete(_timer, 0);
+        }
+    }
+
+    /**
+     * @brief Configura los modos de los pines e inicializa el temporizador. Debe llamarse dentro del setup().
+     */
+    void init() {
         pinMode(_pinActivar, OUTPUT);
         digitalWrite(_pinActivar, LOW); // Forzar estado seguro apagado al arrancar
 
         if (_pinContinuidad != 255) {
             pinMode(_pinContinuidad, INPUT);
         }
+
+        // Creación del Software Timer de FreeRTOS en modo One-Shot (de un solo disparo)
+        _timer = xTimerCreate(
+            "mPyroTimer",        // Nombre de texto para depuración
+            pdMS_TO_TICKS(1500), // Periodo inicial por defecto en ticks
+            pdFALSE,             // pdFALSE = One-shot timer (se apaga automáticamente tras disparar)
+            this,                // ID del timer: pasamos 'this' para recuperarlo en el callback estático
+            _timerCallback       // Función estática a ejecutar al finalizar el tiempo
+        );
     }
 
     /**
@@ -75,25 +117,32 @@ public:
     }
 
     /**
-     * @brief Realiza el disparo del canal si el sistema está armado.
+     * @brief Realiza el disparo del canal si el sistema está armado de forma ASÍNCRONA (No bloqueante).
      * @param duracionMs Tiempo en milisegundos que el MOSFET permanecerá activo.
-     * @return true si el disparo se ejecutó, false si fue rechazado por estar desarmado.
+     * @return true si el disparo inició correctamente, false si fue rechazado (desarmado o error de timer).
      */
-    bool disparar(const uint32_t duracionMs = 1500) { // OJO: ACCIÓN BLOQUEANTE --> DUERME LA TASK QUE LA CONTIENE
-        if (!_armado) {
-            return false; // Rechazar disparo por seguridad si no está armado
+    bool disparar(uint32_t duracionMs = 1500) { // YA NO ES BLOQUEANTE: La tarea no se duerme
+        if (!_armado || _timer == nullptr) {
+            return false; // Rechazar disparo por seguridad si no está armado o el timer no se inicializó
         }
 
         digitalWrite(_pinActivar, HIGH); // Envía 3.3V al Gate del MOSFET (Cierra circuito)
-        vTaskDelay(pdMS_TO_TICKS(duracionMs)); // OJO, DELAY BLOQUEANTE,
-        digitalWrite(_pinActivar, LOW);  // Vuelve a poner el Gate a GND (Abre circuito)
+        _armado = false;
 
-        _armado = false; // Autodesarmado inmediato tras la ignición
+
+        // xTimerChangePeriod actualiza el periodo y ARRANCA el temporizador si estaba detenido.
+        // Un tiempo de espera de 0 (último parámetro) evita bloquear si la cola de comandos del timer está llena.
+        if (xTimerChangePeriod(_timer, pdMS_TO_TICKS(duracionMs), 0) != pdPASS) {
+            // Si el temporizador falla al arrancar por alguna razón, apagamos el pin inmediatamente por seguridad
+            digitalWrite(_pinActivar, LOW);
+            return false;
+        }
+
+        // El control retorna inmediatamente a tu Tarea/Loop principal.
+        // Cuando transcurran los 'duracionMs', FreeRTOS ejecutará _timerCallback -> finDisparo().
         return true;
     }
 
-
 };
-
 
 #endif //ACEMA_CTLR_MPYRO_H
