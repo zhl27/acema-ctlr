@@ -53,13 +53,15 @@ void CmdDispatcher::run() {
 
     while (true) {
         if (xQueueReceive(_cmdQueue, &receivedCmd, portMAX_DELAY) == pdTRUE) {
-            
+            CmdResult result{.status = 0, .data = 0.0f};
+
             for (size_t i = 0; i < _registeredCmds; i++) {
                 if (_lookupTable[i].opCode == receivedCmd.opCode) {
                     
                     // Ejecutar la operación y capturar el resultado
-                    CmdResult result = _lookupTable[i].callback(receivedCmd.value, _lookupTable[i].context);
-
+                    if(_lookupTable[i].callback){
+                        CmdResult result = _lookupTable[i].callback(receivedCmd.value, _lookupTable[i].context);
+                    }
                     // Enviar los resultados a la estación terrena
                     EnlaceGSE::enviarAcuseComando(receivedCmd.opCode, result.status, result.data);
                 }
