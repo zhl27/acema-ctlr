@@ -27,8 +27,6 @@
 #define BAUD_INITIAL    (9600)
 #define BAUD_TARGET     (115200)
 
-// Comentar esta línea para vuelo real (ahorra ciclos de CPU en la consola serial)
-#define PRINT_DATA
 
 // ==========================================
 // 2. Recursos Globales de Sincronización (RTOS)
@@ -56,11 +54,11 @@ void onPvtReceived(void* data) {
     // Sobrescribe la cola atómicamente en O(1) sin bloquear al productor ni al consumidor.
     xQueueOverwrite(pvtQueue, pvt);
 
-// #if defined(PRINT_DATA)
-//     ESP_LOGI("main_GPS", "\n[RX] >>> Paquete NAV-PVT actualizado en Cola de Aviónica <<<");
-//     ESP_LOGI("main_GPS", "Fix: %d | Satélites: %d | Altitud MSL: %.2f m | Vel 2D: %.2f m/s\n",
-//                   pvt->fixType, pvt->numSV, pvt->hMSL / 1000.0f, pvt->gSpeed / 1000.0f);
-// #endif
+#if defined(PRINT_DATA)
+    ESP_LOGI("main_GPS", "\n[RX] >>> Paquete NAV-PVT actualizado en Cola de Aviónica <<<");
+    ESP_LOGI("main_GPS", "Fix: %d | Satélites: %d | Altitud MSL: %.2f m | Vel 2D: %.2f m/s\n",
+                  pvt->fixType, pvt->numSV, pvt->hMSL / 1000.0f, pvt->gSpeed / 1000.0f);
+#endif
 }
 
 /**
@@ -202,7 +200,6 @@ void setup() {
 
     ESP_LOGI("main_GPS", "===  FLIGHT COMPUTER: TELEMETRY & GNSS SYS  ===");
 
-    // 1. Inicialización de Primitivas RTOS (Regla 3 NASA: Solo en inicialización)
     ackSemaphore = xSemaphoreCreateBinary();
     pvtQueue     = xQueueCreate(1, sizeof(nav_pvt_t)); // Cola de 1 posición para sobrescritura
 
