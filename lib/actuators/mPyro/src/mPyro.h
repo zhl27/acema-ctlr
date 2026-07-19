@@ -6,13 +6,33 @@
 #define ACEMA_CTLR_MPYRO_H
 
 #include <Arduino.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/timers.h>
 
+/**
+ * @warning La tensión de alimentación del pirotécnico debe ser menor a 9.9V. 
+ *      Pues el divisor resistivo divide por 3 la tensión de alimentación 
+ */
 class mPyro {
 private:
     uint8_t _pinActivar;      // Pin GPIO de disparo (D12 o D13)
     uint8_t _pinContinuidad;  // Pin GPIO analógico de monitoreo (VN/39 o D35/35)
     bool _armado;             // Estado del seguro por software
-    const int _umbralVoltaje; // Umbral analógico para detectar continuidad
+    const int _umbralVoltaje_mV; // Umbral analógico para detectar continuidad
+
+    TimerHandle_t _timer;
+    static constexpr float MV_POR_PASO = 0.806f;
+    /**
+     * @brief Callback estático requerido por FreeRTOS para el Software Timer.
+     * @param xTimer Handle del temporizador que generó el evento.
+     */
+    static void _timerCallback(TimerHandle_t xTimer);
+
+    /**
+     * @brief Método privado que se ejecuta automáticamente cuando el temporizador expira.
+     * Desactiva el MOSFET y desarma el sistema.
+     */
+    void _finDisparo() const;
 
 public:
     /**
@@ -21,78 +41,48 @@ public:
      * @param pinContinuidad Pin analógico que lee el divisor de tensión.
      * @param umbralVoltaje Valor ADC mínimo (0-4095) para considerar que hay continuidad. Por defecto 1000.
      */
-    mPyro(uint8_t pinActivar, uint8_t pinContinuidad, int umbralVoltaje = 1000)
-        : _pinActivar(pinActivar), _pinContinuidad(pinContinuidad), _armado(false), _umbralVoltaje(umbralVoltaje) {}
+    mPyro(uint8_t pinActivar, uint8_t pinContinuidad, int umbralVoltaje_mV = 1000);
 
-    mPyro();
+    //mPyro();
 
     /**
-     * @brief Configura los modos de los pines. Debe llamarse dentro del setup().
+     * @brief Destructor por si se destruye la instancia, evitando fugas de memoria en FreeRTOS.
      */
-    void init() {
-        pinMode(_pinActivar, OUTPUT);
-        digitalWrite(_pinActivar, LOW); // Forzar estado seguro apagado al arrancar
+    ~mPyro();
 
-        if (_pinContinuidad != 255) {
-            pinMode(_pinContinuidad, INPUT);
-        }
-    }
+    /**
+     * @brief Configura los modos de los pines e inicializa el temporizador. Debe llamarse dentro del setup().
+     */
+    void init();
 
     /**
      * @brief Quita el seguro de software para permitir el disparo.
      */
-    void armar() {
-        _armado = true;
-    }
+    void armar();
 
     /**
      * @brief Pone el seguro de software para bloquear activaciones.
      */
-    void desarmar() {
-        _armado = false;
-    }
+    void desarmar();
 
     /**
      * @brief Devuelve el estado actual del seguro de software.
      */
-    bool estaArmado() const {
-        return _armado;
-    }
+    bool estaArmado() const;
 
     /**
      * @brief Comprueba si el circuito pirotécnico está cerrado (bucle intacto).
      * @return true si detecta voltaje de VBAT a través del divisor, false si está abierto o quemado.
      */
-    bool tieneContinuidad() {
-        if (_pinContinuidad == 255) return false;
-
-        // Lee el valor del ADC asignado al pin S_PyRO_X
-        const int lectura = analogRead(_pinContinuidad);
-
-        // Si la lectura supera el umbral, significa que pasa corriente desde VBAT
-        return (lectura > _umbralVoltaje);
-    }
+    bool tieneContinuidad();
 
     /**
-     * @brief Realiza el disparo del canal si el sistema está armado.
+     * @brief Realiza el disparo del canal si el sistema está armado de forma ASÍNCRONA (No bloqueante).
      * @param duracionMs Tiempo en milisegundos que el MOSFET permanecerá activo.
-     * @return true si el disparo se ejecutó, false si fue rechazado por estar desarmado.
+     * @return true si el disparo inició correctamente, false si fue rechazado (desarmado o error de timer).
      */
-    bool disparar(uint32_t duracionMs = 1500) { // OJO: ACCIÓN BLOQUEANTE --> DUERME LA TASK QUE LA CONTIENE
-        if (!_armado) {
-            return false; // Rechazar disparo por seguridad si no está armado
-        }
-
-        digitalWrite(_pinActivar, HIGH); // Envía 3.3V al Gate del MOSFET (Cierra circuito)
-        vTaskDelay(pdMS_TO_TICKS(duracionMs)); // OJO, DELAY BLOQUEANTE,
-        digitalWrite(_pinActivar, LOW);  // Vuelve a poner el Gate a GND (Abre circuito)
-
-        _armado = false; // Autodesarmado inmediato tras la ignición
-        return true;
-    }
-
+    bool disparar(uint32_t duracionMs = 1500);
 
 };
-
 
 #endif //ACEMA_CTLR_MPYRO_H

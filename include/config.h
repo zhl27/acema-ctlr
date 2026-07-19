@@ -13,6 +13,9 @@
 #define BUZZER_PIN 25
 #define WIRE_SDA_0 21
 #define WIRE_SCL_0 22
+#define SERVO_PIN 27
+#define GPS_RX_PIN 16 // Conectar al pin TX del módulo NEO-7M
+#define GPS_TX_PIN 17 // Conectar al pin RX del módulo NEO-7M
 
 
 /*************************/

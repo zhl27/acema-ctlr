@@ -17,19 +17,15 @@ namespace Cohete {
 
     // --- Prototipos de la Máquina de Estados de Vuelo ---
     void f_st_init(data_all_t* datos_sensores);
-    void f_st_warmup_mpu(data_all_t* datos_sensores);
     void f_st_espera_conexion_gse(data_all_t* datos_sensores);
     void f_st_espera_gps_preciso(data_all_t* datos_sensores);
     void f_st_espera_ignicion(data_all_t* datos_sensores);
     void f_st_boost(data_all_t* datos_sensores);
     void f_st_fase_balistica(data_all_t* datos_sensores);
-    void f_st_despliegue_drogue(data_all_t* datos_sensores);
-    void f_st_evaluar_supervivencia_drogue(data_all_t* datos_sensores);
-    void f_st_descenso_controlado_drogue(data_all_t* datos_sensores);
-    void f_st_desplegar_principal_emergencia(data_all_t* datos_sensores);
-    void f_st_ejecutar_panico_flash_dump(data_all_t* datos_sensores);
+    void f_st_drogue_desplegado(data_all_t* datos_sensores);
+    void f_st_pcaidas_ppal_desplegado(data_all_t* datos_sensores);
+    void f_st_caida_catastrofica(data_all_t* datos_sensores);
     void f_st_aterrizaje(data_all_t* datos_sensores);
-    void f_st_error(data_all_t* datos_sensores);
 
 }
 

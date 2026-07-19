@@ -4,6 +4,10 @@
 #include "UbxDispatcher.h"
 #include "UbxProtocols.h"
 
+// arregla el error de SPI
+#include "LoraWrapped.h"
+#include <SPI.h>
+
 // ==========================================
 // Mocks y Variables Globales para Tests
 // ==========================================

@@ -7,7 +7,6 @@
 #define ACEMA_CTLR_DATA_H
 
 #include <cstdint>
-#include "UbxProtocols.h"
 #include <cstdio>
 
 
@@ -34,10 +33,24 @@ typedef struct {
  * Contiene los datos sin procesar del sensor barométrico.
  */
 typedef struct {
-    float presion_hpa; ///< Presión cruda (valor de 20 bits) --> en la libreria se usa float
-    float temp_deg_c; ///< Temperatura cruda (valor de 20 bits)
-    float altitud_m;
+    float presion_hpa;  ///< Presión cruda (valor de 20 bits) --> en la libreria se usa float
+    float temp_deg_c;   ///< Temperatura cruda (valor de 20 bits)
+    float altitud_snm_m;    ///< Altura sobre el nivel del mar (snm)
 } data_raw_bmp_t;
+
+/**
+ * @struct data_gps_t
+ * @brief Estructura de datos del NEO-7M obtenidos con TinyGPS++.
+ *
+ * Contiene los datos del GPS.
+ */
+struct data_gps_t {
+    bool is_valid;
+    double latitude;     // Grados
+    double longitude;    // Grados
+    uint32_t satellites; // Cantidad de satélites visibles
+    double hdop;
+};
 
 /**
  * @struct data_raw_t
@@ -48,7 +61,7 @@ typedef struct {
 typedef struct {
     data_raw_bmp_t bmp;  ///< Datos crudos del BMP280
     data_raw_mpu_t mpu;  ///< Datos crudos del MPU6050
-    nav_pvt_t gps;       ///< Datos crudos del GPS
+    data_gps_t gps;       ///< Datos crudos del GPS
     int64_t timestamp_us;  ///< Marca de tiempo de la lectura de los datos
 } data_raw_t;
 
@@ -80,27 +93,21 @@ typedef struct {
     float angulo_yaw_deg;                 // Ángulo Yaw filtrado por Kalman (°)
     float angulo_respecto_z_deg;          // Inclinación total del cohete
 
-
-    // --- CINEMÁTICA LINEAL (Eje Z absoluto calibrado al cielo) ---
-    float altitud_filtrada_m;           // Altura filtrada sobre el suelo --
-    float vel_z_filtrada_m_s;            // Velocidad vertical real
-    float aceleracion_z_m_s2;           // Aceleración lineal absoluta (sin gravedad)
+    // --- CINEMÁTICA LINEAL (Eje Y absoluto calibrado al cielo) ---
+    float altitud_filtrada_m;         // Altura filtrada sobre el suelo --> obtenida del bmp280
+    float vel_z_filtrada_m_s;         // Velocidad vertical real
+    float aceleracion_z_m_s2;         // Aceleración lineal absoluta (sin gravedad)
 
     float momentum_kg_m_s;            // Cantidad de movimiento (P = m * v)
     float temperatura_amb_c;          // Tomada estrictamente del BMP280
     float densidad_aire_kg_m3;        // Calculada por ley de gases ideales
 
-    // float posicion_relativa;          // Altura casteada para ahorrar ancho de banda LoRa
-    // float velocidad;                  // Velocidad vertical casteada
-    // float momentum;                   // Momentum casteado
-
+    // --- GPS ---
+    bool gps_is_valid;
     uint32_t gps_nro_satelites;
-    uint32_t gps_fix_type;
-    bool gps_gnss_fix_ok;
-    float gps_pdop;
-
-    float latitud;
-    float longitud;
+    float gps_hdop;
+    float gps_latitud;
+    float gps_longitud;
 
 } data_all_t; ///< Información de utilidad obtenida del ambiente a través de los sensores que YA ESTÁN SANITIZADOS Y FILTRADOS!
 
@@ -122,8 +129,8 @@ typedef struct {
 // - Código de error
 typedef struct {
 
-    float altura_bmp;
-    float altura_mpu;
+    float altura_m_snm; // obtenida del bmp280
+    float altura_relativa_a_pad;
 
     float vel_z_bmp;
     float vel_y_bmp;
@@ -137,18 +144,21 @@ typedef struct {
 
     float angulo_respecto_z;
 
-    bool gps_3d_fijado;
-    float latitud;
-    float longitud;
-    int32_t nro_satelites;
+    bool gps_is_valid;
+    uint32_t gps_nro_satelites;
+    float gps_hdop; // Esto muestra la precision de latitud y longitud. Menor o igual a 2 es un buen valor.
+    float gps_latitud;
+    float gps_longitud;
 
+    uint32_t masa_cohete_g; // ponemos en gramos para evitar floats --> en GSE se convierte a Kg
 
     float angulo_airbrake;
 
     bool hay_continuidad_pyro_pcaidas_ppal;
     bool hay_continuidad_pyro_pcaidas_drogue;
 
-    int32_t codigo_error;
+    uint32_t estado_vuelo;
+    uint32_t error_vuelo;
 
 } data_gse_t;
 
@@ -164,6 +174,7 @@ typedef struct {
  * * @param data Referencia constante a la estructura con los datos crudos.
  */
 inline void print_data_raw(const data_raw_t *data) {
+#if defined(DEBUG_DATOS_CRUDOS)
     // Verificación de seguridad para evitar cuelgues si el puntero es nulo
     if (data == NULL) {
         Serial.printf("Error: Puntero de telemetría nulo.\n");
@@ -188,15 +199,56 @@ inline void print_data_raw(const data_raw_t *data) {
 
     // --- Datos del GPS (nav_pvt_t) ---
     Serial.printf("[GPS]     Latitud: %ld | Longitud: %ld | Satelites: %d\n",
-                  (long)data->gps.lat,
+                  (long)data->gps.latitude,
                   (long)data->gps.lon,
                   (int)data->gps.numSV);
 
     Serial.printf("==========================================\n");
+    return;
+#endif
 }
+
+#if defined(PLOT_MPU_ONLY) || defined(PLOT_BMP_ONLY) || defined(PLOT_GPS_ONLY) || defined(PLOT_ALL)
+
+inline void print_plotter_data_raw(const data_raw_t *data) {
+    if (data == NULL) return;
+
+#if defined(PLOT_MPU_ONLY)
+    // Ideal para calibrar offsets, ver ruido y probar el filtro complementario
+    Serial.printf("AccX_g:%f,AccY_g:%f,AccZ_g:%f,"
+                  "GyroX_rads:%f,GyroY_rads:%f,GyroZ_rads:%f\r\n",
+                  data->mpu.accel_x_g, data->mpu.accel_y_g, data->mpu.accel_z_g,
+                  data->mpu.gyro_x_rad_s, data->mpu.gyro_y_rad_s, data->mpu.gyro_z_rad_s);
+
+#elif defined(PLOT_BMP_ONLY)
+    // Restamos un offset aproximado (ej. 1000 hPa) a la presión si quieres ver variaciones
+    // pequeñas de altura junto con la temperatura sin que se aplasten mutuamente:
+    Serial.printf("Presion_hPa:%f,Temp_C:%f\r\n",
+                  data->bmp.presion_hpa,
+                  data->bmp.temp_deg_c);
+
+#elif defined(PLOT_GPS_ONLY)
+    Serial.printf("Lat:%ld,Lon:%ld,Sats:%d\r\n",
+                  (long)data->gps.latitude,
+                  (long)data->gps.longitude,
+                  (int)data->gps.satellites);
+
+#elif defined(PLOT_ALL)
+    Serial.printf("Presion:%f,Temp:%f,AccX:%f,AccY:%f,AccZ:%f,GyroX:%f,GyroY:%f,GyroZ:%f,Lat:%ld,Lon:%ld,Sats:%d\r\n",
+                  data->bmp.presion_hpa, data->bmp.temp_deg_c,
+                  data->mpu.accel_x_g, data->mpu.accel_y_g, data->mpu.accel_z_g,
+                  data->mpu.gyro_x_rad_s, data->mpu.gyro_y_rad_s, data->mpu.gyro_z_rad_s,
+                  (long)data->gps.lat, (long)data->gps.lon, (int)data->gps.numSV);
+#endif
+    return;
+}
+
+#endif
+
 
 // TODO: poner "printear_data" en un lugar mejor
 inline void print_data(const data_all_t *data) {
+#if defined(DEBUG_DATOS_FILTRADOS)
     // Verificación de seguridad para evitar cuelgues si el puntero es nulo
     if (data == NULL) {
         Serial.printf("Error: Puntero de telemetría nulo.\n");
@@ -223,6 +275,8 @@ inline void print_data(const data_all_t *data) {
     Serial.printf("Densidad Aire:      %.4f kg/m^3\n", data->densidad_aire_kg_m3);
 
     Serial.printf("======================================================\n\n");
+#endif
+    return;
 }
 
 // Estructura del payload que viajará por la cola RTOS

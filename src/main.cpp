@@ -43,18 +43,11 @@ void setup() {
     ESP_LOGI("SETUP", "Comenzando SETUP.");
 
 //     esp_log_level_set("*", ESP_LOG_INFO); // TODO: INVESTIGAR XQ esp_log_level_set NO HACE NADA EN ABSOLUTO.
-// #ifdef DEBUG_ESP32
 //     esp_log_level_set("*", ESP_LOG_DEBUG);
-// #endif
 
-    // DESCOMENTAR DURANTE DESARROLLO SI TODAVIA NO TE DUELE LO SUFICIENTE LA CABEZA.
-    buzzer.init();
-    // buzzer.beep(500);
-
-    // Initialize the kinematic filter (Adjust mass and pad offset as needed for your launch)
-    // TODO: FALTA MODIFICAR DATAFILTER DE FORMA ACORDE A LOS REQUERIMIENTOS.
-    DataFilter::init();
+    // DataFilter::init(); // TODO: Encapsular lógica de filtros de kalman dentro de DataFilter. Ahora mismo no se usa esta clase. Pero debería utilizarse para ocultar complejidad de filtros de kalman y afines.
     Sensors::init();
+    Actuators::init();
     GSE::init();
 
     cmdDispatcher.init();
@@ -127,8 +120,6 @@ void vTaskReadSensors(void *pvParameters) {
     // const TickType_t xFrequency = pdMS_TO_TICKS(7); // TODO: ~6.7 ms → 150 Hz --> frecuencia de rafagas --> es en realidad req de vTaskLora
     // TickType_t xLastWakeTime = xTaskGetTickCount();
 
-
-
     // ---------------------------------------------------------------------------------
     // Timer de muestreo
     // ---------------------------------------------------------------------------------
@@ -140,19 +131,16 @@ void vTaskReadSensors(void *pvParameters) {
 
     (void)pvParameters;
     while (true) {
-        // Espera estricta y precisa hasta el próximo ciclo de 10ms
+        // Espera estricta y precisa hasta el próximo ciclo de 10ms --> ademas nos permite procesar a las otras Tasks
         vTaskDelayUntil(&xLastWakeTime, xPeriodo);
 
         ESP_LOGD(TAG_TASK_SENSORS, "Core ID: %d", xPortGetCoreID());
 
         // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
         data_raw_t raw = Sensors::get_raw_data();
-
-        // Timestamp con esp nativo
-        raw.timestamp_us = esp_timer_get_time();
         // print_data_raw(&raw);
 
-        // TODO: Por qué se utiliza una Queue en lugar de un Ringbuffer ?
+        // TODO: Curiosidad: Por qué se utiliza una Queue en lugar de un Ringbuffer ?
 
         // 3. Enviar a la cola del Filtro de Kalman de forma NO bloqueante (Timeout = 0)
         // Si la cola se llena porque la se retrasó, preferimos perder una muestra
@@ -179,7 +167,7 @@ void vTaskReadSensors(void *pvParameters) {
 
 
 
-
+// acá se realiza la depuración de los datos.
 void vTaskDataFilter(void *pvParameters)
 {
     static Kalman2D kalmanAlt;
@@ -199,6 +187,8 @@ void vTaskDataFilter(void *pvParameters)
     while (true)
     {
         if (xQueueReceive(xColaSensores, &raw, portMAX_DELAY) == pdTRUE){
+
+            print_data_raw(&raw);
 
             //----------------------------------------------------------------------
             // Primera muestra: solamente inicializa el tiempo
@@ -230,10 +220,18 @@ void vTaskDataFilter(void *pvParameters)
             const float gyroYaw_rad_s   = raw.mpu.gyro_x_rad_s;     // Rotación sobre el eje vertical
 
             //----------------------------------------------------------------------
-            // Ángulos obtenidos del acelerómetro.
+            // Ángulos obtenidos del acelerómetro (Trigonometría 3D Esférica)
+            // Eje vertical en reposo: +X
             //----------------------------------------------------------------------
-            const float accelPitch_rad = atan2f(accelX_g, accelZ_g);
-            const float accelYaw_rad   = atan2f(accelY_g, accelZ_g);
+
+            // Calcula las magnitudes adyacentes usando Pitágoras
+            const float adj_pitch = sqrtf((accelX_g * accelX_g) + (accelY_g * accelY_g));
+            const float adj_yaw   = sqrtf((accelX_g * accelX_g) + (accelZ_g * accelZ_g));
+
+            // Extraemos los ángulos en radianes usando atan2f(opuesto, adyacente)
+            const float accelPitch_rad = atan2f(accelZ_g, adj_pitch);
+            const float accelYaw_rad   = atan2f(accelY_g, adj_yaw);
+
 
             //----------------------------------------------------------------------
             // Kalman 1D
@@ -274,7 +272,7 @@ void vTaskDataFilter(void *pvParameters)
                 kalmanAltInit = true;
             }
 
-            kalmanAlt.update(dt, accelVertical_m_s2, raw.bmp.altitud_m);
+            kalmanAlt.update(dt, accelVertical_m_s2, raw.bmp.altitud_snm_m);
 
             //----------------------------------------------------------------------
             // EMPAQUETADO
@@ -297,13 +295,22 @@ void vTaskDataFilter(void *pvParameters)
 
             // Cinemática vertical
             out.altitud_filtrada_m  = kalmanAlt.getAltitude();
-            out.vel_z_filtrada_m_s   = kalmanAlt.getVelocity();
+            out.vel_z_filtrada_m_s   = kalmanAlt.getVelocity(); // TODO: Tomar a Y como eje vertical. Por ahora, para testeos Z es eje vertical. DEBEMOS CAMBIARLO.
             out.aceleracion_z_m_s2  = accelVertical_m_s2;
 
             // Ambientales
             out.temperatura_amb_c   = raw.bmp.temp_deg_c;
             out.densidad_aire_kg_m3 = emaDensidad.actualizar(calcularDensidadAire(raw.bmp.presion_hpa, raw.bmp.temp_deg_c));
-           
+
+            // GPS
+            out.gps_is_valid = raw.gps.is_valid;
+            out.gps_hdop = raw.gps.hdop;
+            out.gps_nro_satelites = raw.gps.satellites;
+            out.gps_latitud = raw.gps.latitude;
+            out.gps_longitud = raw.gps.longitude;
+
+            print_data(&out);
+
             //----------------------------------------------------------------------
             // Distribución (MdE, Lora)
             //----------------------------------------------------------------------
@@ -403,6 +410,7 @@ void vTaskStateMachine(void *pvParameters) {
             if (item_size == sizeof(data_all_t)) {
 
                 data_all_t *datos_sensores = static_cast<data_all_t *>(item);
+
 
                 // NOTA: Asegurarse de que mde_cohete_actualizar acepte un puntero a data_all_t
                 Cohete::mde_cohete_actualizar(datos_sensores);

@@ -1,34 +1,43 @@
 //
 // Created by lucaz on 11/7/2026.
+// Modificado: JoJoe 18/7/2026
 //
 
 #ifndef ACEMA_CTLR_MFLASH_H
 #define ACEMA_CTLR_MFLASH_H
-#include <stdbool.h>
-#include <stdint.h>
-
+#include <SPIMemory.h>
 
 class mFlash {
-public:
-    // Constructor: Por defecto usa el GPIO 4 para el pin CS_FLASH
-    explicit mFlash(uint8_t csPin = 4) : _csPin(csPin) {}
-
-    // Inicializa los pines y el bus SPI estándar del ESP32
-    void init() const;
-
-    // Ejecuta la prueba de lectura e imprime el diagnóstico en el puerto Serial
-    // bool testConnection(Stream &serialPort = Serial) const;
-    bool testConnection(Stream &serialPort);
-
 private:
-    uint8_t _csPin = 0;
+    SPIFlash _flash;
+    const uint32_t ADDR_CONFIG = 0x000000; // Sector 0
+    const uint32_t ADDR_LOG    = 0x001000; // Sector 1
+    const uint32_t FLASH_LIMIT = 0x1000000; // 16 MB (Límite físico de la W25Q128)
+    uint32_t _currentLogAddr;
 
-    // Comandos y configuraciones internas (Ocultas al usuario)
-    const uint8_t _CMD_READ_JEDEC_ID = 0x9F;
-    const uint32_t _SPI_SPEED = 10000000; // 10 MHz por seguridad
+public:
+    explicit mFlash(uint8_t csPin);
+    
+    // Al arrancar, le pasamos el tamaño del struct de log para que calcule los offsets
+    bool begin(size_t lenDatos);
 
-    // Método privado de bajo nivel para interactuar con el bus SPI
-    void _leerChipID(uint8_t &manufacturerID, uint8_t &memoryTypeID, uint8_t &capacityID);
+    // --- SECCIÓN CONFIGURACIÓN (PREVUELO) ---
+    void guardarConfig(const void* config, size_t lenConfig);
+
+    bool cargarConfig(void* config, size_t lenConfig);
+
+    // --- SECCIÓN TELEMETRÍA / FILTRADO ---
+    void resetearLog();
+
+    bool guardarPuntoLog(const void* datos, size_t lenDatos);
+
+    // --- MÉTODOS DE LECTURA POST-VUELO ---
+
+    // Al ser genérico, el cálculo depende del tamaño del struct 
+    uint32_t getCantidadRegistros(size_t lenDatos);
+
+    // Lee un registro calculando el offset según el tamaño indexado
+    bool leerPuntoLog(uint32_t index, void* datos, size_t lenDatos);
 };
 
 
