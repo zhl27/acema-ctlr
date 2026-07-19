@@ -22,17 +22,48 @@
 namespace ConfigInit {
 
     /*************************/
+    /*    Buses de Datos     */
+    /*************************/
+    // Bus I2C_0 (Sensores)
+    constexpr int WIRE_SDA_0 =  21; // D21 (Pin físico 11)
+    constexpr int WIRE_SCL_0 =  22; // D22 (Pin físico 14)
+
+    // Bus SPI Nativo (LoRa, Flash, SD)
+    constexpr uint8_t SPI_SCK   = 18; // D18 (Pin físico 9)
+    constexpr uint8_t SPI_MISO  = 19; // D19 (Pin físico 10)
+    constexpr uint8_t SPI_MOSI  = 23; // D23 (Pin físico 15)
+
+    // Bus UART GPS
+    constexpr int GPS_RX_PIN =  16; // Conectar al pin TX del módulo NEO-7M
+    constexpr int GPS_TX_PIN =  17; // Conectar al pin RX del módulo NEO-7M
+
+    /*************************/
+    /*   Chip Selects (CS)   */
+    /*************************/
+    constexpr uint8_t LORA_CS   = 5;  // D5  (Pin físico 8  -> NSS_LoRa)
+    constexpr uint8_t FLASH_CS  = 4;  // D4  (Pin físico 5  -> CS_FLASH)
+    constexpr uint8_t SD_CS     = 15; // D15 (Pin físico 3  -> CS_SD)
+
+    /*************************/
+    /*  Pines de Control RF  */
+    /*************************/
+    constexpr uint8_t LORA_DIO0 = 2;  // D2  (Pin físico 4  -> DIO0 / Rx-Tx Done)
+    
+    // Nota: Si el Reset del LoRa está atado al Reset general de la ESP32 por hardware,
+    // o a un pin específico, definilo acá. Si no se usa, se puede pasar como "NC".
+    constexpr uint8_t LORA_RST  = 14;
+
+    // Usamos el equivalente numérico de RADIOLIB_NC (uint32_t max)
+    // para indicar que eléctricamente no está conectado a ningún GPIO.
+    constexpr uint32_t LORA_DIO1 = 0xFFFFFFFF;
+    /*************************/
     /*         GPIOs         */
     /*************************/
     constexpr int BUZZER_PIN =  25;
     
-    constexpr int WIRE_SDA_0 =  21;
-    constexpr int WIRE_SCL_0 =  22;
-    
     constexpr int SERVO_PIN  =  27;  
     
-    constexpr int GPS_RX_PIN =  16; // Conectar al pin TX del módulo NEO-7M
-    constexpr int GPS_TX_PIN =  17; // Conectar al pin RX del módulo NEO-7M
+
     // TODO: CAMBIAR LOS PINES POR LOS REALES
     constexpr uint8_t PIRO_PRINCIPAL_PIN                = 13;
     constexpr uint8_t CONTINUIDAD_PIRO_PRINCIPAL_PIN    = 39;
@@ -40,8 +71,6 @@ namespace ConfigInit {
     constexpr uint8_t PIRO_DROGUE_PIN                   = 12;
     constexpr uint8_t CONTINUIDAD_PIRO_DROGUE_PIN       = 39;
     
-    constexpr uint8_t FLASH_CS_PIN                      = 4;
-
 
     /*************************/
     /*    DIRECCIONES I2C    */

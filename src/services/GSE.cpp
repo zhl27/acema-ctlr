@@ -7,10 +7,11 @@
 #include <esp32-hal.h>
 
 #include "esp_log.h"
+#include "config.h"
 
 static const char *TAG_GSE = "CONEXIÓN GSE";
 
-LoraWrapped GSE::_lora(LORA_CS, LORA_RST, LORA_DIO0, LORA_DIO1, SPI);
+LoraWrapped GSE::_lora(ConfigInit::LORA_CS, ConfigInit::LORA_RST, ConfigInit::LORA_DIO0, ConfigInit::LORA_DIO1, SPI);
 EstadoConexionGSE GSE::_currentState = EstadoConexionGSE::ROCKET_INIT;             // Assuming an int or an enum
 unsigned long GSE::_previousMillis = 0; // Standard type for millis()
 int GSE::_cicloContador = 0;
@@ -19,9 +20,16 @@ float GSE::_simuladorAltitud = 0.0f;
 
 void GSE::init() {
 #if defined(MICRO_ESP32)
-    // El ESP32 mapea el SPI por software en las patas elegidas
-    SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_CS);
-    ESP_LOGI(TAG_GSE, "Inicializando SPI en modo ESP32...");
+// 1. FORZAR APAGADO de los otros dispositivos del bus SPI
+    // Esto evita que la Flash y la SD interfieran en la línea MISO
+    pinMode(ConfigInit::FLASH_CS, OUTPUT);
+    digitalWrite(ConfigInit::FLASH_CS, HIGH); // HIGH = Desactivada
+
+    pinMode(ConfigInit::SD_CS, OUTPUT);
+    digitalWrite(ConfigInit::SD_CS, HIGH);    // HIGH = Desactivada
+// Inicializa el bus SPI compartible. El -1 previene el secuestro del CS por hardware.
+    SPI.begin(ConfigInit::SPI_SCK, ConfigInit::SPI_MISO, ConfigInit::SPI_MOSI, -1);
+    ESP_LOGI(TAG_GSE, "Inicializando SPI compartido en modo ESP32...");
 #elif defined(MICRO_NANO)
     // El Nano usa sus pines fijos de hardware por defecto
     // 1. Configurar Chip Select

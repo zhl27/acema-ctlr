@@ -39,7 +39,7 @@ static const char *TAG_TASK_LORA = "TASK LORA";
 
 
 
-mFlash cajaNegra(FLASH_CS_PIN);
+mFlash cajaNegra(FLASH_CS);
 
 int contadorMde = 0;
 int contadorFlash = 0;
