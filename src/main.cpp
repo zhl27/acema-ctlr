@@ -1,9 +1,38 @@
 #include <SPI.h>
 #include "LoraWrapped.h"
 
-#include "main.cpp.h"
+#include "main.h"
 
-#include "services/Actuators.h"
+enum comandosGlobale {
+    CMD_ON_PIRO,
+    CMD_OFF_PIRO,
+    CMD_DISPARAR_PIRO,
+    CMD_DEPLEGAR_DROGE
+};
+
+CmdResult comandoOnPiro(float value, void* context){
+    return {1, 0.0f}; // Status OK temporal
+}
+
+CmdResult comandoOffPiro(float value, void* context){
+    return {1, 0.0f}; // Status OK temporal
+}
+
+CmdResult comando_disparar_piro(float value, void* context){
+    mPyro* p = static_cast<mPyro*>(context);
+    
+    bool ok = p->disparar((uint32_t)value);
+    
+    CmdResult res;
+    res.status = ok ? 1 : 0;
+    res.data = 0.0f; // No hay dato que devolver en un disparo
+    
+    return res;
+}
+
+CmdResult comandoDesplegarDrogue(float value, void* context){
+    return {1, 0.0f}; // Status OK temporal
+}
 
 void setup() {
     Serial.begin(115200); // TODO: Para la Compu de vuelo no se usa Serial
@@ -21,9 +50,8 @@ void setup() {
     Actuators::init();
     GSE::init();
 
-    // DESCOMENTAR DURANTE DESARROLLO SI TODAVIA NO TE DUELE LO SUFICIENTE LA CABEZA.
-    // Actuators::getBuzzer().beep(500);
-
+    cmdDispatcher.init();
+    cmdDispatcher.registerCommand(CMD_DISPARAR_PIRO, comando_disparar_piro, &pirotecnico);
 
     // --- DATA DISTRIBUTOR ---
     // Crea una cola capaz de alojar hasta BUF_Q_SENSOR_SIZE muestras de tipo data_raw_t.
@@ -58,6 +86,7 @@ void setup() {
         ESP_LOGI(TAG_TASK_LORA, "xLoraRingbuf creado");
     }
 
+    EnlaceGSE::inicializar(xLoraRingbuf);
     // FLASH
     // xFlashRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
     // if (xFlashRingbuf == NULL) {
@@ -73,6 +102,7 @@ void setup() {
 
     // xTaskCreatePinnedToCore(vTaskFlash, "Flash", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskFlashHandle), 0);
     xTaskCreatePinnedToCore(vTaskLora, "Lora", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskLoraHandle), 0);
+
 
     vTaskDelete(NULL); // NULL hace referencia al task default que maneja a "void loop()"
 
@@ -293,14 +323,7 @@ void vTaskDataFilter(void *pvParameters)
                     0);
             }
 
-            if (xLoraRingbuf != NULL)
-            {
-                xRingbufferSend(
-                    xLoraRingbuf,
-                    &out,
-                    sizeof(data_all_t),
-                    0);
-            }
+            EnlaceGSE::enviarTelemetria(out);
         }
         else {
             ESP_LOGI(TAG_TASK_DATA_FILTER, "No messages (timeout)");
@@ -440,32 +463,64 @@ void vTaskFlash(void *pvParameters) {
     }
 }
 
-// Mock implementation of the Lora task: consumes items and "sends" them over LoRa
+
 void vTaskLora(void *pvParameters) {
     (void)pvParameters;
+    pkt_t rxPacket; // Para almacenar paquetes entrantes
+
     while (true) {
-
-        ESP_LOGD(TAG_TASK_LORA, "Core ID: %d", xPortGetCoreID());
-
         size_t item_size = 0;
-        void *item = xRingbufferReceive(xLoraRingbuf, &item_size, pdMS_TO_TICKS(3000));
+        void *item = xRingbufferReceive(xLoraRingbuf, &item_size, pdMS_TO_TICKS(10)); // Timeout bajo para no bloquear Rx
 
         if (item != NULL) {
-            if (item_size == sizeof(data_all_t)) {
+            // Validamos que sea el tamaño de nuestro envoltorio
+            if (item_size == sizeof(TxEnvelope_t)) {
+                
+                TxEnvelope_t *sobre = static_cast<TxEnvelope_t *>(item);
 
-                data_all_t *datos_sensores = static_cast<data_all_t *>(item);
+                // Solo pasamos a GSE::actualizar si el enlace está CONNECTED
+                if (GSE::estado_conexion_gse() == ROCKET_CONNECTED) {
+                    
+                    switch(sobre->tipo) {
+                        case lora_protocol::C_PLOT:
+                            GSE::actualizar_graficas(&(sobre->payload.telemetria));
+                            break;
+                        
+                        case lora_protocol::C_MGS:
+                            GSE::enviar_mensaje(sobre->payload.texto);
+                            break;
+                            
+                        case lora_protocol::C_ERR:
+                            GSE::enviar_error(sobre->payload.texto);
+                            break;
 
-                // Print a specific member of the struct instead of %s
-                // Serial.printf("[Lora] Sending (%d bytes). Time: %lu\n", static_cast<int>(item_size), micros());
-                GSE::actualizar(datos_sensores);
-                // SerialPrint::plot("contadorLora", contadorLora);
-                // contadorLora++;
+                        // case Protocolo::C_ACK:
+                        //     GSE::enviar_ack(&(sobre->payload.ack));
+                        //     break;
+                    }
+                }
             }
             vRingbufferReturnItem(xLoraRingbuf, item);
-        } else {
-            ESP_LOGI(TAG_TASK_LORA, "No messages to send (timeout)");
         }
 
-        // vTaskDelay(pdMS_TO_TICKS(1000)); // importante ceder tiempo si hay task priorities diferentes para que no se produzca inanicion en otras tasks
+        // Aquí también iría la lógica (explicada en el mensaje anterior) 
+        // para lora.read_paquete() y recibir comandos (G_CMD) sin bloqueos.
+        // ---------------------------------------------------------
+        // 1. FASE RX: Escuchar comandos desde la estación terrena
+        // ---------------------------------------------------------
+        if (GSE::leer_paquete(&rxPacket)) {
+            if (rxPacket.protocol == lora_protocol::G_CMD) {
+                // Casteamos el payload a nuestra estructura de comando
+                // Asumiendo que el GSE envió un CommandPayload { uint32_t opCode; float value; }
+                CommandPayload* cmd = static_cast<CommandPayload*>(rxPacket.payload);
+                
+                ESP_LOGI(TAG_TASK_LORA, "[Lora] Comando Recibido: OP=%d, VAL=%.2f\n", cmd->opCode, cmd->value);
+                
+                // Encolamos el comando en el CmdDispatcher
+                cmdDispatcher.enqueueCommand(cmd->opCode, cmd->value);
+            }
+        }
+        // GSE::mantener_conexion() // Podrías extraer el switch(ROCKET_INIT...) a un método que se llame cíclicamente aquí.
     }
 }
+

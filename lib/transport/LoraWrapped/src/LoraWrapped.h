@@ -1,8 +1,8 @@
-/*
-
-* @details: c_: funciones o comandos que utiliza el Cohete/CPU/Copm...
-			g_: Funciones o comandos que utiliza el GSE
-*/ 
+/** 
+ *
+ * @details: c_: funciones o comandos que utiliza el Cohete/CPU/Copm...
+ *			 g_: Funciones o comandos que utiliza el GSE
+ */ 
 #ifndef LORAWRAPPED_H
 #define LORAWRAPPED_H
 
@@ -10,9 +10,8 @@
 
 #include "LoraConfig.h"
 #include <RadioLib.h>
-
 #include "data.h"
-
+#include "LoraProtocols.h"
 
 #define DEFAULT_SPI_LORA SPI
 
@@ -30,18 +29,6 @@ union pay_u {
     data_all_t data;
 };
 
-enum lora_protocol: uint8_t {
-    // CPU --> GSE
-    C_PLOT    = 0X01,
-    C_MGS     = 0X02,
-    C_ERR     = 0X03,
-    PING    = 0X04,
-
-    // GSE --> CPU
-    G_START   = 0X10,
-    G_END     = 0X20,
-    PONG    = 0X30
-};
 
 /* estados de la conexion, para mejorar la reconexion, proximamente*/
 typedef enum CONNECTION_STATUS: uint8_t {DISCONNECTED = 0x00, CONNECTED} connSts_t; /*CONNECTION_LOST */
@@ -116,6 +103,11 @@ public:
      * @brief Envía un PONG(ERR)
      */
     bool send_pong();
+
+    /**
+     * @brief Envia un comando al cohete. Lo usa el GSE
+     */
+    bool g_send_command(CommandPayload);
 
     bool read_packet(pkt_t* pPkt);
 };

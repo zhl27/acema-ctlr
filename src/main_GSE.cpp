@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <LoraWrapped.h>
+#include <SPI.h>
 
 // ============================================================================
 // CONFIGURACIÓN DE DEPURACIÓN Y HARDWARE
@@ -8,6 +9,22 @@
 
 
 // Definís los pines específicos que ruteaste en la PCB de tu ESP32
+
+#ifdef ESP32C3
+
+// Pines del bus SPI y control adaptados al ESP32-C3 SuperMini
+#define ESP32_LORA_SCK   4
+#define ESP32_LORA_MISO  5
+#define ESP32_LORA_MOSI  6
+#define ESP32_LORA_CS    7
+#define ESP32_LORA_RST   0
+#define ESP32_LORA_DIO1  1  // Interrupción principal (RxDone / TxDone)
+#define ESP32_LORA_BUSY  3  // Línea de estado obligatoria en el SX1262 (reemplaza a DIO0)
+
+#endif
+
+#ifndef ESP32C3
+
 #define ESP32_LORA_SCK  18
 #define ESP32_LORA_MISO 19
 #define ESP32_LORA_MOSI 23
@@ -15,6 +32,8 @@
 #define ESP32_LORA_RST  14
 #define ESP32_LORA_DIO0 2
 #define ESP32_LORA_DIO1 4
+
+#endif
 
 
 // Instanciamos pasándole los pines correspondientes
