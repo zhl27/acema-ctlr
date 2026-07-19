@@ -143,19 +143,23 @@ namespace Cohete {
         //    COHETE.vuelo_en_silencio_radio = true;
         //    Transición forzada a ST_ESPERA_DESPEGUE (el despegue es prioridad).
         if (entrando_a_estado()) {
-            if (GSE::estado_conexion_gse() == ROCKET_DISCONNECTED || GSE::estado_conexion_gse() == ROCKET_INIT) {
-                timestamp_millis_inicio_timeout = millis();
-                ESP_LOGI(TAG_BASE, " -> [CONEXIÓN GSE] Esperando conexión con GSE...");
-            }
+            timestamp_millis_inicio_timeout = millis();
+            ESP_LOGI(TAG_BASE, " -> [CONEXIÓN GSE] Esperando conexión con GSE...");
+        }
 
+        // TODO: Qué hacemos mientras cohete espera conexión con GSE ?
+        else if ((millis() - timestamp_millis_inicio_timeout) >= CONEXION_GSE_TIMEOUT_MILLIS) { // TODO: Revisar si el timeout del gse es conveniente
+            // transicion_error(ERR_TIMEOUT_CONEXION_GSE, datos_sensores); // TODO: empiezo a considerar que la función "transicion_error" genera un nivel de indirección innecesario. Se podría poner la lógica del error acá mismo.
+            ESP_LOGE(TAG_BASE, "Timeout de conexión con GSE.");
+            // matamos el proceso GSE asi no nos gasta recursos del cohete, o bajamos su frecuencia.
+            vTaskSuspend(SYSTEM.procesos.xTaskLoraHandle);
+            SYSTEM.procesos.flujos.Sensors_a_Lora_enabled = false;
+            ESP_LOGI(TAG_BASE, "Suspendido el Task Lora, ya que no nos comunicaremos con la GSE.");
+            // continuamos con la siguiente etapa.
+            transicionar_hacia(ST_ESPERA_GPS_PRECISO);
         }
-        else if (GSE::estado_conexion_gse() == ROCKET_WAITING_PONG) {
-            // TODO: Qué hacemos mientras cohete espera conexión con GSE ?
-            if ((millis() - timestamp_millis_inicio_timeout) >= CONEXION_GSE_TIMEOUT_MILLIS) { // TODO: Revisar si el timeout del gse es conveniente
-                transicion_error(ERR_TIMEOUT_CONEXION_GSE, datos_sensores);
-            }
-        }
-        else if (GSE::estado_conexion_gse() == ROCKET_CONNECTED) {
+
+        if (GSE::estado_conexion_gse() == ROCKET_CONNECTED) {
             ESP_LOGI(TAG_BASE, " -> [CONEXIÓN GSE] Nos conectamos a la GSE.");
             transicionar_hacia(ST_ESPERA_GPS_PRECISO);
         }
@@ -168,7 +172,10 @@ namespace Cohete {
             timestamp_millis_inicio_timeout = millis();
         }
         else if ((millis() - timestamp_millis_inicio_timeout) >= GPS_TIMEOUT_MILLIS) {
-            transicion_error(ERR_GPS_TIMEOUT, datos_sensores);
+            // transicion_error(ERR_GPS_TIMEOUT, datos_sensores);
+            ESP_LOGE(TAG_BASE, "Timeout de GPS.");
+            // TODO: QUÉ HACEMOS SI SE DA EL TIMEOUT DEL GPS ?
+            transicionar_hacia(ST_ESPERA_IGNICION);
         }
         if (datos_sensores->gps_nro_satelites < 4) {
             if (millis() % 200 == 0)
@@ -210,7 +217,9 @@ namespace Cohete {
             }
         }
         else if (Eventos::hay_boost(datos_sensores)) { // detectamos boost a pesar de no estar en condiciones para volar, KEEEEE!!!!!!
-            transicion_error(ERR_DESPEGUE_PROHIBIDO, datos_sensores);
+            // transicion_error(ERR_DESPEGUE_PROHIBIDO, datos_sensores);
+            ESP_LOGE(TAG_BASE, "FALTA IMPLEMENTAR. ERR_DESPEGUE_PROHIBIDO");
+            // TODO: Qué hacemos si realmente detectamos un despegue, pero el cohete no estaba en condiciones de volar? Pienso que: ya que esta en vuelo, mucho no podemos hacer al respecto, hay que continuar con lo que se tiene. Ver qué hacemos a partir de ahí.
         }
     }
 
@@ -228,7 +237,10 @@ namespace Cohete {
         // TODO: Revisar esta lógica
         else if ((datos_sensores->altitud_filtrada_m - altura_entrada_st_boost) >= 2) {
             // si la diferencia no es considerable como para respaldar que estamos definitivamente en modo BOOST...
-            transicion_error(ERR_DESPEGUE_FALSO_ZARANDEO, datos_sensores);
+            // transicion_error(ERR_DESPEGUE_FALSO_ZARANDEO, datos_sensores);
+            ESP_LOGE(TAG_BASE, "ERR_DESPEGUE_FALSO_ZARANDEO. Volvemos a ST_ESPERA_IGNICION.");
+            SYSTEM.timestamp_millis_inicio_pico_g = 0;
+            transicionar_hacia(ST_ESPERA_IGNICION);
             return;
         }
 

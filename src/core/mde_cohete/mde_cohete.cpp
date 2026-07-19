@@ -106,30 +106,28 @@ namespace Cohete {
 
         switch (error) {
             case ERR_TIMEOUT_CONEXION_GSE:
-                ESP_LOGE(TAG_BASE, "Timeout de conexión con GSE.");
-                // matamos el proceso GSE asi no nos gasta recursos del cohete, o bajamos su frecuencia.
-                vTaskSuspend(SYSTEM.procesos.xTaskLoraHandle);
-                SYSTEM.procesos.flujos.Sensors_a_Lora_enabled = false;
-                ESP_LOGI(TAG_BASE, "Suspendido el Task Lora, ya que no nos comunicaremos con la GSE.");
-                // continuamos con la siguiente etapa.
-                transicionar_hacia(ST_ESPERA_GPS_PRECISO);
+                // ESP_LOGE(TAG_BASE, "Timeout de conexión con GSE.");
+                // // matamos el proceso GSE asi no nos gasta recursos del cohete, o bajamos su frecuencia.
+                // vTaskSuspend(SYSTEM.procesos.xTaskLoraHandle);
+                // SYSTEM.procesos.flujos.Sensors_a_Lora_enabled = false;
+                // ESP_LOGI(TAG_BASE, "Suspendido el Task Lora, ya que no nos comunicaremos con la GSE.");
+                // // continuamos con la siguiente etapa.
+                // transicionar_hacia(ST_ESPERA_GPS_PRECISO);
                 return;
             case ERR_GPS_TIMEOUT:
-                // TODO: QUÉ HACEMOS SI SE DA EL TIMEOUT DEL GPS ?
-                ESP_LOGE(TAG_BASE, "Timeout de GPS.");
-                transicionar_hacia(ST_ESPERA_IGNICION);
+                // // TODO: QUÉ HACEMOS SI SE DA EL TIMEOUT DEL GPS ?
+                // ESP_LOGE(TAG_BASE, "Timeout de GPS.");
+                // transicionar_hacia(ST_ESPERA_IGNICION);
                 return;
             case ERR_MPU_CALIBRACION_FALLIDA:
                 ESP_LOGE(TAG_BASE, "FALTA IMPLEMENTAR. ERR_MPU_CALIBRACION_FALLIDA");
                 return;
             case ERR_DESPEGUE_FALSO_ZARANDEO:
-                ESP_LOGE(TAG_BASE, "ERR_DESPEGUE_FALSO_ZARANDEO. Volvemos a ST_ESPERA_IGNICION.");
-                SYSTEM.timestamp_millis_inicio_pico_g = 0;
-                transicionar_hacia(ST_ESPERA_IGNICION);
+                // ESP_LOGE(TAG_BASE, "ERR_DESPEGUE_FALSO_ZARANDEO. Volvemos a ST_ESPERA_IGNICION.");
+                // SYSTEM.timestamp_millis_inicio_pico_g = 0;
+                // transicionar_hacia(ST_ESPERA_IGNICION);
                 return;
             case ERR_DESPEGUE_PROHIBIDO:
-                ESP_LOGE(TAG_BASE, "FALTA IMPLEMENTAR. ERR_DESPEGUE_PROHIBIDO");
-                // TODO: Qué hacemos si realmente detectamos un despegue, pero el cohete no estaba en condiciones de volar? Pienso que: ya que esta en vuelo, mucho no podemos hacer al respecto, hay que continuar con lo que se tiene. Ver qué hacemos a partir de ahí.
                 return;
             case ERR_TRAYECTORIA_NO_VERTICAL:
                 ESP_LOGE(TAG_BASE, "FALTA IMPLEMENTAR. ERR_TRAYECTORIA_NO_VERTICAL");
