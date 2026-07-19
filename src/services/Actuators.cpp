@@ -6,7 +6,7 @@
 
 #include "config.h"
 
-
+using namespace ConfigInit;
 // ====================================================================
 // Inicialización de los miembros estáticos de la clase Actuators
 // ====================================================================
@@ -25,10 +25,18 @@ mServo Actuators::_servo(&config_airbrake);
 
 // Inicializamos los pirotécnicos basándonos en los pines sugeridos en mPyro.h
 // Drogue: Activar en D12, Continuidad en D35, Umbral 1000
-mPyro Actuators::_pyro_pcaidas_drogue(12, 35, 1000);
+mPyro Actuators::_pyro_pcaidas_drogue(
+    PIRO_DROGUE_PIN,
+    CONTINUIDAD_PIRO_DROGUE_PIN,
+    UMBRAL_MIN_CONTINUIDAD_PIRO_mV
+);
 
 // Principal (Ppal): Activar en D13, Continuidad en VN (39), Umbral 1000
-mPyro Actuators::_pyro_pcaidas_ppal(13, 39, 1000);
+mPyro Actuators::_pyro_pcaidas_ppal(
+    PIRO_PRINCIPAL_PIN, 
+    CONTINUIDAD_PIRO_PRINCIPAL_PIN, 
+    UMBRAL_MIN_CONTINUIDAD_PIRO_mV
+);
 
 
 // ====================================================================
