@@ -28,7 +28,7 @@ bool LoraWrapped::begin(int sw, char ew, float frec){
     this->_syncWord = sw;
 
     // Inicializar el chip físico
-    int state = _radio->begin(frec);
+    int16_t state = _radio->begin(frec);
     if (state == RADIOLIB_ERR_NONE) {
         _radio->setSyncWord(sw);
         
@@ -36,6 +36,8 @@ bool LoraWrapped::begin(int sw, char ew, float frec){
         _radio->startReceive(); 
         return true;
     }
+    Serial.println(state);
+    ESP_LOGE("LORA WRAPPED", "Radio lib no pudo inicializar, codigo de erro %d", &state);
     return false;
 }
 

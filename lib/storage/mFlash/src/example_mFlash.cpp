@@ -1,8 +1,12 @@
 #include "mFlash.h"
 #include "data.h"
 #include <freertos/ringbuf.h>
+#include <esp_log.h>
 
-
+#include "config.h"
+#ifdef EXAMPLE_FLASH
+using namespace ConfigInit;
+static const char *TAG_TASK_FLASH = "TASK FLASH";
 
 // ============================================================
 //DEFINICIONES A NO IMPLEMENTAR PARA QUE NO HAYA ERRORES
@@ -117,12 +121,12 @@ CmdResult cmd_commit_config(float value, void* context) {
     return {1, 0.0f}; // Retornamos OK a la estación terrena
 }
 
-void setup() {
+//void setup() {
     // ... inicialización ...
 //    cmdDispatcher.registerCommand(CMD_SET_OFFSET_X, cmd_set_offset_x, nullptr);
 //    cmdDispatcher.registerCommand(CMD_SET_OFFSET_Y, cmd_set_offset_y, nullptr);
 //    cmdDispatcher.registerCommand(CMD_COMMIT_CONFIG, cmd_commit_config, &memFlash);
-}
+//}
 /* Secuencia en tierra: El operador ajusta todo lo que necesita.
  * Cuando el software de la PC muestra que todo está en orden, 
  * se aprieta un botón "Guardar en Cohete" 
@@ -238,3 +242,4 @@ void vTaskFlash(void *pvParameters) {
         // vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
+#endif

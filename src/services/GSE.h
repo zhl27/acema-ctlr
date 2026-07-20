@@ -10,14 +10,7 @@
 #include "LoraConfig.h"
 #include "LoraWrapped.h"
 
-// TODO: DEBEMOS DECLARAR ESTAS MACROS DENTRO DE LoraWrapped ?
-#define LORA_SCK  18
-#define LORA_MISO 19
-#define LORA_MOSI 23
-#define LORA_CS   5
-#define LORA_RST  14
-#define LORA_DIO0 2
-#define LORA_DIO1 4
+
 
 enum EstadoConexionGSE : std::uint8_t {
     ROCKET_INIT,
