@@ -294,6 +294,8 @@ inline void print_data(const data_all_t *data) {
     return;
 }
 
+
+
 // Estructura del payload que viajará por la cola RTOS
 struct CommandPayload {
     uint32_t opCode;

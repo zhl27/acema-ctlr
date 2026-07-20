@@ -15,8 +15,8 @@
 /************************/
 /*       FREERTOS       */
 /************************/
-
-#define configSUPPORT_STATIC_ALLOCATION 1;
+// Ya está definida con el mismo valor en rtos
+//#define configSUPPORT_STATIC_ALLOCATION 1;
 
 
 namespace ConfigInit {
