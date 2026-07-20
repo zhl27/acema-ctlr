@@ -53,9 +53,9 @@ data_all_t DataFilter::process(const data_raw_t& raw) {
     // ==========================================
     // STEP 1: FILTRADO DE DATOS CRUDOS (EMA)
     // ==========================================
-    float raw_accel_x_f = filter_accel_x.actualizar((float)raw.mpu.accel_x_g);
-    float raw_accel_y_f = filter_accel_y.actualizar((float)raw.mpu.accel_y_g);
-    float raw_accel_z_f = filter_accel_z.actualizar((float)raw.mpu.accel_z_g);
+    float raw_accel_x_f = filter_accel_x.actualizar((float)raw.mpu.accel_x_m_s2);
+    float raw_accel_y_f = filter_accel_y.actualizar((float)raw.mpu.accel_y_m_s2);
+    float raw_accel_z_f = filter_accel_z.actualizar((float)raw.mpu.accel_z_m_s2);
 
     // Filtrar giroscopio (Cinemática Angular directa)
     out.vel_angular_x_deg_s = filter_gyro_x.actualizar((float)raw.mpu.gyro_x_rad_s);

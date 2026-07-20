@@ -9,7 +9,7 @@
 #include <cstdint>
 #include <cstdio>
 
-
+ 
 /**
  * @struct data_raw_mpu_t
  * @brief Estructura de datos crudos de la MPU6050.
@@ -17,9 +17,9 @@
  * Contiene los datos sin procesar del acelerómetro y giroscopio.
  */
 typedef struct {
-    float accel_x_g; // Aceleración X (Raw) (TODO: Ver de obtener 16 bits)
-    float accel_y_g; // Aceleración Y (Raw)
-    float accel_z_g; // Aceleración Z (Raw)
+    float accel_x_m_s2; // Aceleración X (Raw) (TODO: Ver de obtener 16 bits)
+    float accel_y_m_s2; // Aceleración Y (Raw)
+    float accel_z_m_s2; // Aceleración Z (Raw)
     // float temp;    // Temperatura (Raw) --> No usamos el dato temp (temperatura) de la mpu5060 (mpu) porque es del chip y no del ambiente. La mpu usa la temp porque afecta a sus mediciones.
     float gyro_x_rad_s;  // Velocidad angular X (Raw)
     float gyro_y_rad_s;  // Velocidad angular Y (Raw)
@@ -192,16 +192,17 @@ inline void print_data_raw(const data_raw_t *data) {
     // --- Datos del MPU6050 ---
     // Usamos %d para los int16_t (se promueven automáticamente a int en C++)
     Serial.printf("[MPU6050] Accel X: %f | Y: %f | Z: %f\n",
-                  data->mpu.accel_x_g, data->mpu.accel_y_g, data->mpu.accel_z_g);
+                  data->mpu.accel_x_m_s2, data->mpu.accel_y_m_s2, data->mpu.accel_z_m_s2);
 
+    
     Serial.printf("[MPU6050] Gyro  X: %f | Y: %f | Z: %f\n",
                   data->mpu.gyro_x_rad_s, data->mpu.gyro_y_rad_s, data->mpu.gyro_z_rad_s);
 
     // --- Datos del GPS (nav_pvt_t) ---
     Serial.printf("[GPS]     Latitud: %ld | Longitud: %ld | Satelites: %d\n",
                   (long)data->gps.latitude,
-                  (long)data->gps.lon,
-                  (int)data->gps.numSV);
+                  (long)data->gps.longitude,
+                  (int)data->gps.satellites);
 
     Serial.printf("==========================================\n");
     return;
@@ -217,7 +218,7 @@ inline void print_plotter_data_raw(const data_raw_t *data) {
     // Ideal para calibrar offsets, ver ruido y probar el filtro complementario
     Serial.printf("AccX_g:%f,AccY_g:%f,AccZ_g:%f,"
                   "GyroX_rads:%f,GyroY_rads:%f,GyroZ_rads:%f\r\n",
-                  data->mpu.accel_x_g, data->mpu.accel_y_g, data->mpu.accel_z_g,
+                  data->mpu.accel_x_m_s2, data->mpu.accel_y_m_s2, data->mpu.accel_z_m_s2,
                   data->mpu.gyro_x_rad_s, data->mpu.gyro_y_rad_s, data->mpu.gyro_z_rad_s);
 
 #elif defined(PLOT_BMP_ONLY)
@@ -258,21 +259,35 @@ inline void print_data(const data_all_t *data) {
     Serial.printf("\n=============== DATA_ALL_T (micros=%lu) ===============\n", micros());
 
     Serial.printf("--- CINEMÁTICA LINEAL ---\n");
-    Serial.printf("Altura:             %.2f m\n", data->altitud_filtrada_m);
+    Serial.printf("Altura AGL:         %.2f m\n", data->altitud_filtrada_m);
     Serial.printf("Velocidad Z:        %.2f m/s\n", data->vel_z_filtrada_m_s);
     Serial.printf("Aceleración Z:      %.2f m/s^2\n", data->aceleracion_z_m_s2);
-
-    Serial.printf("--- DINÁMICA ---\n");
-    Serial.printf("Momentum:           %.2f kg*m/s\n", data->momentum_kg_m_s);
+    // Serial.printf("Altitud Rampa ASL:  %.2f m\n", data->altitud_rampa_asl_m);
 
     Serial.printf("--- CINEMÁTICA ANGULAR ---\n");
     Serial.printf("Vel Angular X:      %.2f °/s (Pitch)\n", data->vel_angular_x_deg_s);
     Serial.printf("Vel Angular Y:      %.2f °/s (Roll)\n", data->vel_angular_y_deg_s);
     Serial.printf("Vel Angular Z:      %.2f °/s (Yaw)\n", data->vel_angular_z_deg_s);
 
+    Serial.printf("--- ACTITUD ---\n");
+    Serial.printf("Pitch:              %.2f °\n", data->angulo_pitch_deg);
+    Serial.printf("Yaw:                %.2f °\n", data->angulo_yaw_deg);
+    Serial.printf("Inclinación Z:      %.2f °\n", data->angulo_respecto_z_deg);
+
     Serial.printf("--- AMBIENTALES PROCESADOS ---\n");
     Serial.printf("Temperatura Amb:    %.2f °C\n", data->temperatura_amb_c);
     Serial.printf("Densidad Aire:      %.4f kg/m^3\n", data->densidad_aire_kg_m3);
+
+    Serial.printf("--- GPS ---\n");
+    if (data->gps_is_valid) {
+        Serial.printf("Estado:             VÁLIDO\n");
+        Serial.printf("Satélites:          %d\n", data->gps_nro_satelites);
+        Serial.printf("HDOP:               %.2f\n", data->gps_hdop);
+        Serial.printf("Latitud:            %.6f\n", data->gps_latitud);
+        Serial.printf("Longitud:           %.6f\n", data->gps_longitud);
+    } else {
+        Serial.printf("Estado:             INVÁLIDO (Buscando...)\n");
+    }
 
     Serial.printf("======================================================\n\n");
 #endif

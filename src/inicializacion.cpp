@@ -89,7 +89,7 @@ constexpr float R_AIR = 287.05f;
 
 inline float calcularDensidadAire(const float pressure_hpa, const float temperature_deg_c)
 {
-    return (pressure_hpa * 100.0f) / (R_AIR * (temperature_deg_c + 273.15f));
+    return (pressure_hpa ) / (R_AIR * (temperature_deg_c + 273.15f));
 }
 
 
@@ -120,7 +120,7 @@ void vTaskReadSensors(void *pvParameters) {
 
         // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
         data_raw_t raw = Sensors::get_raw_data();
-        // print_data_raw(&raw);
+        print_data_raw(&raw);
 
         // TODO: Curiosidad: Por qué se utiliza una Queue en lugar de un Ringbuffer ?
 
@@ -155,17 +155,25 @@ void vTaskDataFilter(void *pvParameters)
 {
 
     (void) pvParameters;
+    // ----------------------------------------------------------------------
+    // 1. VARIABLES DE ESTADO PARA CALIBRACIÓN 
+    // ----------------------------------------------------------------------
     static bool kalmanAltInit = false;
+    static uint16_t baro_calib_muestras = 0;
+    static float suma_altitud_snm = 0.0f;
+    static float altitud_rampa_m = 0.0f;
+    constexpr uint16_t MUESTRAS_CALIBRACION_BARO = 100; // Ej: 100 muestras a 10ms = 1 segundo de calibración
+    constexpr float G_TO_MS2 = 9.80665f;
+
     data_raw_t raw;
     int64_t timestampAnterior = 0;
     bool primeraMuestra = true;
 
-    constexpr float G_TO_MS2 = 9.80665f;
     while (true)
     {
         if (xQueueReceive(xColaSensores, &raw, portMAX_DELAY) == pdTRUE){
 
-            print_data_raw(&raw);
+            //print_data_raw(&raw);
 
             //----------------------------------------------------------------------
             // Primera muestra: solamente inicializa el tiempo
@@ -188,10 +196,15 @@ void vTaskDataFilter(void *pvParameters)
             // MAPEO DE EJES (Sensor MPU -> Cohete Físico)
             // Todo permanece en las unidades nativas
             //----------------------------------------------------------------------
-            const float accelX_g = raw.mpu.accel_z_g;
-            const float accelY_g = raw.mpu.accel_y_g;
-            const float accelZ_g = raw.mpu.accel_x_g;
-
+            #ifdef DEBUG_DATOS_CRUDOS
+            const float accelX_m_s2 = raw.mpu.accel_x_m_s2;
+            const float accelY_m_s2 = raw.mpu.accel_y_m_s2;
+            const float accelZ_m_s2 = raw.mpu.accel_z_m_s2;
+            #else 
+            const float accelX_m_s2 = raw.mpu.accel_x_m_s2;
+            const float accelY_m_s2 = raw.mpu.accel_z_m_s2;
+            const float accelZ_m_s2 = raw.mpu.accel_y_m_s2;
+            #endif
             const float gyroRoll_rad_s  = raw.mpu.gyro_z_rad_s;     // Alabeo
             const float gyroPitch_rad_s = raw.mpu.gyro_y_rad_s;     // Cabeceo
             const float gyroYaw_rad_s   = raw.mpu.gyro_x_rad_s;     // Rotación sobre el eje vertical
@@ -202,54 +215,68 @@ void vTaskDataFilter(void *pvParameters)
             //----------------------------------------------------------------------
 
             // Calcula las magnitudes adyacentes usando Pitágoras
-            const float adj_pitch = sqrtf((accelX_g * accelX_g) + (accelY_g * accelY_g));
-            const float adj_yaw   = sqrtf((accelX_g * accelX_g) + (accelZ_g * accelZ_g));
+            const float adj_pitch = sqrtf((accelX_m_s2 * accelX_m_s2) + (accelY_m_s2 * accelY_m_s2));
+            const float adj_yaw   = sqrtf((accelX_m_s2 * accelX_m_s2) + (accelZ_m_s2 * accelZ_m_s2));
 
-            // Extraemos los ángulos en radianes usando atan2f(opuesto, adyacente)
-            const float accelPitch_rad = atan2f(accelZ_g, adj_pitch);
-            const float accelYaw_rad   = atan2f(accelY_g, adj_yaw);
-
-
-            //----------------------------------------------------------------------
-            // Kalman 1D
-            //
-            // Todo el filtro trabaja en: rad, rad/s, G
-            //----------------------------------------------------------------------
-            const float pitch_rad = kalmanPitch.update( gyroPitch_rad_s, accelPitch_rad, dt, accelZ_g);
-
-            const float yaw_rad = kalmanYaw.update( gyroYaw_rad_s, accelYaw_rad, dt, accelZ_g);
+            // Cuando X e Y sean 0, atan2f devolverá 0 radianes (perfectamente vertical).
+            const float accelPitch_rad = atan2f(accelX_m_s2, accelZ_m_s2);
+            const float accelYaw_rad   = atan2f(accelY_m_s2, accelZ_m_s2);
 
             //----------------------------------------------------------------------
-            // Inclinación total respecto de la vertical. (Inclinación respecto a la vertical del cielo)
+            // Kalman 1D (Trabaja en rad, rad/s, m/s^2)
             //----------------------------------------------------------------------
-            const float inclinacion_rad = acosf(cosf(pitch_rad) * cosf(yaw_rad));
+            const float pitch_rad = kalmanPitch.update(gyroPitch_rad_s, accelPitch_rad, dt, accelZ_m_s2);
+            const float yaw_rad   = kalmanYaw.update(gyroYaw_rad_s, accelYaw_rad, dt, accelZ_m_s2);
 
             //----------------------------------------------------------------------
-            // Proyección de la aceleración longitudinal sobre el eje vertical global.
-            //
-            // El sensor lee: A_leida = A_real + gravedad_en_eje_z
-            // Entonces: A_real = A_leida - gravedad_en_eje_z
-            // Donde la gravedad proyectada en el eje longitudinal es 1g * cos(inclinacion)
-            // accelVertical_g continúa estando en G.
+            // Inclinación total respecto de la vertical
             //----------------------------------------------------------------------
-            float accelVertical_g = accelZ_g * cosf(pitch_rad) * cosf(yaw_rad) - cosf(inclinacion_rad);
-            accelVertical_g = emaAccelVertical.actualizar(accelVertical_g);
+            const float cos_inc = cosf(pitch_rad) * cosf(yaw_rad); 
+            const float inclinacion_rad = acosf(cos_inc);
+
+            //----------------------------------------------------------------------
+            // Proyección de la aceleración longitudinal sobre el eje vertical global
+            //----------------------------------------------------------------------
+            // Corrección matemática de doble proyección y ajuste de unidades (G a m/s^2)
+            float accelVertical_m_s2 = (accelZ_m_s2 * cos_inc) - (9.80665f * cos_inc * cos_inc);
+
+            // Suavizado por filtro de media móvil exponencial
+            accelVertical_m_s2 = emaAccelVertical.actualizar(accelVertical_m_s2);
+
 
             //----------------------------------------------------------------------
             // Kalman 2D
             //
             // Este filtro trabaja naturalmente en SI.
             //----------------------------------------------------------------------
-
-
-            const float accelVertical_m_s2 = accelVertical_g * G_TO_MS2;
+            //const float accelVertical_m_s2 = accelVertical_g * G_TO_MS2;
 
             if (!kalmanAltInit) {
-                kalmanAlt.init(0.0f, 0.0f, 0.5f, 0.1f);  // Ajusta sigma según tus pruebas (ruido acel, ruido baro)
-                kalmanAltInit = true;
+                // Fase de acumulación: Promedia la altitud antes del vuelo
+                if (baro_calib_muestras < MUESTRAS_CALIBRACION_BARO) {
+                    suma_altitud_snm += raw.bmp.altitud_snm_m;
+                    baro_calib_muestras++;
+                    
+                    // Evita que el resto de la tarea envíe basura mientras calibra
+                    continue;
+                } 
+                // Fase de inicialización del filtro
+                else {
+                    altitud_rampa_m = suma_altitud_snm / (float)MUESTRAS_CALIBRACION_BARO;
+                    
+                    // El filtro arranca estrictamente en 0 metros (AGL) y 0 m/s
+                    kalmanAlt.init(0.0f, 0.0f, VARIANZA_INICIAL_ACELEROMETRO, VARIANZA_INICIAL_GIROSCOPIO);  
+                    kalmanAltInit = true;
+                    
+                    Serial.printf("[Filtro] Calibración de rampa lista. Altitud ASL: %.2f m\n", altitud_rampa_m);
+                }
             }
 
-            kalmanAlt.update(dt, accelVertical_m_s2, raw.bmp.altitud_snm_m);
+            // Calculamos la altitud relativa al nivel del suelo (AGL)
+            const float altitud_agl_m = raw.bmp.altitud_snm_m - altitud_rampa_m;
+
+            // Le inyectamos la altitud AGL al filtro
+            kalmanAlt.update(dt, accelVertical_m_s2, altitud_agl_m);
 
             //----------------------------------------------------------------------
             // EMPAQUETADO
@@ -272,7 +299,7 @@ void vTaskDataFilter(void *pvParameters)
 
             // Cinemática vertical
             out.altitud_filtrada_m  = kalmanAlt.getAltitude();
-            out.vel_z_filtrada_m_s   = kalmanAlt.getVelocity(); // TODO: Tomar a Y como eje vertical. Por ahora, para testeos Z es eje vertical. DEBEMOS CAMBIARLO.
+            out.vel_z_filtrada_m_s  = kalmanAlt.getVelocity(); // TODO: Tomar a Y como eje vertical. Por ahora, para testeos Z es eje vertical. DEBEMOS CAMBIARLO.
             out.aceleracion_z_m_s2  = accelVertical_m_s2;
 
             // Ambientales
@@ -285,6 +312,8 @@ void vTaskDataFilter(void *pvParameters)
             out.gps_nro_satelites = raw.gps.satellites;
             out.gps_latitud = raw.gps.latitude;
             out.gps_longitud = raw.gps.longitude;
+
+            // out.altitud_rampa_asl_m = altitud_rampa_m;
 
             print_data(&out);
 
