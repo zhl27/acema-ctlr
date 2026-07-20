@@ -5,7 +5,8 @@ Kalman1D::Kalman1D(float initial_var_gyro, float initial_var_accel_rad) {
     angle_rad = 0.0f;
     P = 2.0f;
     var_gyro_rad_s = initial_var_gyro;
-    var_accel_angle = initial_var_accel_rad; 
+    var_accel_angle = initial_var_accel_rad;
+    var_dinamica_accel_angle = false; 
 }
 
 float Kalman1D::update(float gyro_rate, float accel_angle_rad, float dt, float accel_z_m_s2) {
@@ -22,9 +23,9 @@ float Kalman1D::update(float gyro_rate, float accel_angle_rad, float dt, float a
 
     // Si la aceleración Z sale de la ventana de reposo (0.8G a 1.2G), significa que el 
     // motor encendió o estamos en caída libre. Elevamos la varianza para confiar solo en el gyro.
-    /*if (accel_z_g > 1.2f || accel_z_g < 0.8f) {
+    if (var_dinamica_accel_angle == true && (accel_z_g > 1.2f || accel_z_g < 0.8f)) {
         current_var_accel = 1000.0f; 
-    }*/
+    }
 
     // --- 3. CORRECCIÓN ---
     float K = P_pred / (P_pred + current_var_accel);

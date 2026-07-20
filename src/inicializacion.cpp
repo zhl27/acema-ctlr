@@ -169,6 +169,11 @@ void vTaskDataFilter(void *pvParameters)
     int64_t timestampAnterior = 0;
     bool primeraMuestra = true;
 
+    // HABILITA LA CORRECIÓN DEL SENSOR IMU POR LA ACCELERACIÓN EN LA ETAPA DE BOOST
+    // DESABILITAR SI SE QUIERE TESTEAR EN BANCO
+    kalmanPitch.habilitarVarianzaDinamica();
+    kalmanYaw.habilitarVarianzaDinamica();
+
     while (true)
     {
         if (xQueueReceive(xColaSensores, &raw, portMAX_DELAY) == pdTRUE){
