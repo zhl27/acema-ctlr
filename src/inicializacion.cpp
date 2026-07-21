@@ -120,7 +120,7 @@ void vTaskReadSensors(void *pvParameters) {
 
         // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
         data_raw_t raw = Sensors::get_raw_data();
-        print_data_raw(&raw);
+        //print_data_raw(&raw);
 
         // TODO: Curiosidad: Por qué se utiliza una Queue en lugar de un Ringbuffer ?
 
@@ -171,8 +171,8 @@ void vTaskDataFilter(void *pvParameters)
 
     // HABILITA LA CORRECIÓN DEL SENSOR IMU POR LA ACCELERACIÓN EN LA ETAPA DE BOOST
     // DESABILITAR SI SE QUIERE TESTEAR EN BANCO
-    kalmanPitch.habilitarVarianzaDinamica();
-    kalmanYaw.habilitarVarianzaDinamica();
+    kalmanPitch.deshabilitarVarianzaDinamica();
+    kalmanYaw.deshabilitarVarianzaDinamica();
 
     while (true)
     {
@@ -320,8 +320,10 @@ void vTaskDataFilter(void *pvParameters)
 
             // out.altitud_rampa_asl_m = altitud_rampa_m;
 
-            print_data(&out);
-
+//            print_data(&out);
+//            plot_all_processed(&out);
+            plot_actitud_filtrada(&out);
+            plot_cinematica_filtrada(&out);
             //----------------------------------------------------------------------
             // Distribución (MdE, Lora)
             //----------------------------------------------------------------------

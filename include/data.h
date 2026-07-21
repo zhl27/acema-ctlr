@@ -169,6 +169,106 @@ typedef struct {
 
 #include <Arduino.h>
 
+// ============================================================================
+// 1. FUNCIONES ATÓMICAS - DATOS CRUDOS (RAW)
+// ============================================================================
+
+inline void plot_mpu_raw(const data_raw_t *data) {
+    if (data == nullptr) return;
+    Serial.printf(">ax_m_s2:%f\n>ay_m_s2:%f\n>az_m_s2:%f\n>gx_rad_s:%f\n>gy_rad_s:%f\n>gz_rad_s:%f\n",
+                  data->mpu.accel_x_m_s2, data->mpu.accel_y_m_s2, data->mpu.accel_z_m_s2,
+                  data->mpu.gyro_x_rad_s, data->mpu.gyro_y_rad_s, data->mpu.gyro_z_rad_s);
+}
+
+inline void plot_bmp_raw(const data_raw_t *data) {
+    if (data == nullptr) return;
+    Serial.printf(">presion_hpa:%f\n>temp_c:%f\n",
+                  data->bmp.presion_hpa,
+                  data->bmp.temp_deg_c);
+}
+
+inline void plot_gps_raw(const data_raw_t *data) {
+    if (data == nullptr) return;
+    Serial.printf(">lat:%ld\n>lon:%ld\n>sats:%d\n",
+                  (long)data->gps.latitude,
+                  (long)data->gps.longitude,
+                  (int)data->gps.satellites);
+}
+
+// ============================================================================
+// 2. FUNCIONES ATÓMICAS - DATOS FILTRADOS / PROCESADOS
+// ============================================================================
+
+inline void plot_cinematica_filtrada(const data_all_t *data) {
+    if (data == nullptr) return;
+    Serial.printf(">alt_agl_m:%.2f\n>vel_z_m_s:%.2f\n>accel_z_m_s2:%.2f\n",
+                  data->altitud_filtrada_m,
+                  data->vel_z_filtrada_m_s,
+                  data->aceleracion_z_m_s2);
+}
+
+inline void plot_actitud_filtrada(const data_all_t *data) {
+    if (data == nullptr) return;
+    Serial.printf(">pitch_deg:%.2f\n>yaw_deg:%.2f\n>incl_z_deg:%.2f\n",
+                  data->angulo_pitch_deg,
+                  data->angulo_yaw_deg,
+                  data->angulo_respecto_z_deg);
+}
+
+inline void plot_giroscopio_filtrado(const data_all_t *data) {
+    if (data == nullptr) return;
+    Serial.printf(">vel_ang_x_deg_s:%.2f\n>vel_ang_y_deg_s:%.2f\n>vel_ang_z_deg_s:%.2f\n",
+                  data->vel_angular_x_deg_s,
+                  data->vel_angular_y_deg_s,
+                  data->vel_angular_z_deg_s);
+}
+
+inline void plot_ambiental_procesado(const data_all_t *data) {
+    if (data == nullptr) return;
+    Serial.printf(">temp_amb_c:%.2f\n>densidad_aire:%.4f\n",
+                  data->temperatura_amb_c,
+                  data->densidad_aire_kg_m3);
+}
+
+inline void plot_gps_procesado(const data_all_t *data) {
+    if (data == nullptr) return;
+    Serial.printf(">lat:%.6f\n>lon:%.6f\n>hdop:%.2f\n>sats:%d\n",
+                  data->gps_latitud,
+                  data->gps_longitud,
+                  data->gps_hdop,
+                  data->gps_nro_satelites);
+}
+
+// ============================================================================
+// 3. WRAPPERS QUE ENGLOBAN TODO (ALL IN ONE)
+// ============================================================================
+
+/**
+ * @brief Imprime en una sola línea del plotter todos los sensores en estado CRUDO
+ */
+inline void plot_all_raw(const data_raw_t *data) {
+    if (data == nullptr) return;
+    Serial.printf(">presion_hpa:%f\n>temp_c:%f\n>ax_m_s2:%f\n>ay_m_s2:%f\n>az_m_s2:%f\n>gx_rad_s:%f\n>gy_rad_s:%f\n>gz_rad_s:%f\n>lat:%ld\n>lon:%ld\n>sats:%d\n",
+                  data->bmp.presion_hpa, data->bmp.temp_deg_c,
+                  data->mpu.accel_x_m_s2, data->mpu.accel_y_m_s2, data->mpu.accel_z_m_s2,
+                  data->mpu.gyro_x_rad_s, data->mpu.gyro_y_rad_s, data->mpu.gyro_z_rad_s,
+                  (long)data->gps.latitude, (long)data->gps.longitude, (int)data->gps.satellites);
+}
+
+/**
+ * @brief Imprime en una sola línea del plotter todas las variables PROCESADAS / FILTRADAS
+ */
+inline void plot_all_processed(const data_all_t *data) {
+    if (data == nullptr) return;
+    Serial.printf(">alt_agl:%.2f\n>vel_z:%.2f\n>accel_z:%.2f\n>pitch:%.2f\n>yaw:%.2f\n>incl_z:%.2f\n>vel_ang_x:%.2f\n>vel_ang_y:%.2f\n>vel_ang_z:%.2f\n>temp_amb:%.2f\n>rho:%.4f\n>lat:%.6f\n>lon:%.6f\n>hdop:%.2f\n>sats:%d\n",
+                  data->altitud_filtrada_m, data->vel_z_filtrada_m_s, data->aceleracion_z_m_s2,
+                  data->angulo_pitch_deg, data->angulo_yaw_deg, data->angulo_respecto_z_deg,
+                  data->vel_angular_x_deg_s, data->vel_angular_y_deg_s, data->vel_angular_z_deg_s,
+                  data->temperatura_amb_c, data->densidad_aire_kg_m3,
+                  data->gps_latitud, data->gps_longitud, data->gps_hdop, data->gps_nro_satelites);
+}
+
+
 /**
  * @brief Imprime por el puerto serie todos los valores de la estructura data_raw_t.
  * * @param data Referencia constante a la estructura con los datos crudos.
