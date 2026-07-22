@@ -69,12 +69,12 @@ void setup() {
     
     // Core 1: Operaciones críticas de lectura y filtrado
     xTaskCreatePinnedToCore(vTaskReadSensors, "ReadSensors", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskReadSensorsHandle), 1);
-    xTaskCreatePinnedToCore(vTaskDataFilter, "DataFilter", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskDataFilterHandle), 1);
+    xTaskCreatePinnedToCore(vTaskDataFilter, "DataFilter", 8192, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskDataFilterHandle), 1);
     xTaskCreatePinnedToCore(vTaskStateMachine, "StateMachine", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskStateMachineHandle), 1);
 
     // Core 0: Operaciones de comunicación y persistencia (WiFi/LoRa/Flash viven mejor acá)
     // xTaskCreatePinnedToCore(vTaskFlash, "Flash", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskFlashHandle), 0);
-    xTaskCreatePinnedToCore(vTaskLora, "Lora", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskLoraHandle), 0);
+    xTaskCreatePinnedToCore(vTaskLora, "Lora", 8192, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskLoraHandle), 0);
 
     ESP_LOGI(TAG_MAIN, "===========================================");
     ESP_LOGI(TAG_MAIN, "🚀 BOOT SEQUENCE COMPLETADA. Entregando control a FreeRTOS.");
