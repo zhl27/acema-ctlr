@@ -19,14 +19,22 @@ mMPU6050 Sensors::_mpu6050;
 using namespace ConfigInit; 
 
 bool Sensors::init() {
-    Wire.begin(WIRE_SDA_0, WIRE_SCL_0);
+    if(!Wire.begin(WIRE_SDA_0, WIRE_SCL_0)){
+        ESP_LOGE(TAG_TASK_SENSORS, "Falló la inicialización del I2C.");
+        return false;
+    }
     // Wire.setClock(400000); // Set I2C clock to 400kHz Fast Mode
 
     if (!_mpu6050.init(MPU_ADDR)) {
         ESP_LOGE(TAG_TASK_SENSORS, "Falló la inicialización de mMPU6050.");
         return false;
     }
-    ESP_LOGI(TAG_TASK_SENSORS, "mMPU6050 inicializada correctamente!");
+
+    // TODO: Se define desde acá si esta en banco (+Z) o en cohete (+Y)
+    _mpu6050.calibrar(mMPU6050::GravityAxis::PLUS_Z);
+    ESP_LOGI(TAG_TASK_SENSORS, "mMPU6050 inicializada y calibrada!");
+    //print_calibration_result(_mpu6050.get_calibration_result());
+    //vTaskDelay(pdMS_TO_TICKS(3000));
 
     if (!_bmp280.init(BMP280_ADDR, BMP280_CHIPID)) {
         ESP_LOGE(TAG_TASK_SENSORS, "Falló la inicialización de mBMP280.");

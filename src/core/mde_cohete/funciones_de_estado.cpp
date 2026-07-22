@@ -34,8 +34,9 @@ namespace Cohete {
         // typedef void (* TimerCallbackFunction_t)( TimerHandle_t xTimer );
         void calibrar_mpu_callback(TimerHandle_t xTimer) {
             ESP_LOGI(TAG_BASE, "Temporizador xTimerRecalibrarMPU disparado!");
-            int res = Sensors::getMPU6050().calibrar();
-            if (res==0) {
+            mMPU6050::CalibrationStatus res;
+            res = Sensors::getMPU6050().calibrar();
+            if (res==  mMPU6050::CalibrationStatus::Ok ) {
                 flag_recalibrarMPU_disparado = true;
                 ESP_LOGI(TAG_BASE, "Calibración de MPU6050 exitosa.");
             }

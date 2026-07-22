@@ -2,6 +2,118 @@
 // Created by zhl on 6/3/26.
 //
 
+
+#include "mMPU6050.h"
+#include <Arduino.h>
+
+mMPU6050::mMPU6050() 
+    : m_accel_bias(math::zero()), m_gyro_bias(math::zero()) {
+    m_calib_result.valid = false;
+}
+
+bool mMPU6050::init(const uint8_t addr) {
+    // Nota de hardware: La dirección 0x69 está dada por el divisor de 
+    // tensión a la mitad con R18 y R19 en el pin ADO.
+    if (!_mpu.begin(addr)) {
+        return false;
+    }
+
+    _mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
+    _mpu.setGyroRange(MPU6050_RANGE_2000_DEG);
+    _mpu.setFilterBandwidth(MPU6050_BAND_10_HZ);
+    _mpu.setSampleRateDivisor(0);
+
+    _mpu.setInterruptPinPolarity(false);          
+    _mpu.setInterruptPinLatch(false);             
+    _mpu.setMotionInterrupt(false);               
+
+    return true; 
+}
+
+mMPU6050::CalibrationStatus mMPU6050::calibrar(GravityAxis gravity_axis, int num_muestras) {
+    math::RunningStatistics3D acc_stats;
+    math::RunningStatistics3D gyro_stats;
+    sensors_event_t a, g, t;
+
+    // Descartar primeras muestras para estabilización
+    for (int i = 0; i < 100; i++) {
+        _mpu.getEvent(&a, &g, &t);
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+
+    // Acumular estadísticas dinámicamente usando Welford
+    for (int i = 0; i < num_muestras; i++) {
+        _mpu.getEvent(&a, &g, &t);
+        acc_stats.push({a.acceleration.x, a.acceleration.y, a.acceleration.z});
+        gyro_stats.push({g.gyro.x, g.gyro.y, g.gyro.z});
+        vTaskDelay(pdMS_TO_TICKS(5)); 
+    }
+
+    // Gyro Bias (asume 0 en reposo absoluto)
+    m_gyro_bias = gyro_stats.mean();
+
+    // Accel Bias: Construimos un vector con la gravedad esperada según la orientación física
+    math::Vector3f expected_gravity = math::zero();
+    constexpr float g_val = 9.80665f;
+    
+    switch (gravity_axis) {
+        case GravityAxis::PLUS_X:  expected_gravity.x = g_val; break;
+        case GravityAxis::MINUS_X: expected_gravity.x = -g_val; break;
+        case GravityAxis::PLUS_Y:  expected_gravity.y = g_val; break;
+        case GravityAxis::MINUS_Y: expected_gravity.y = -g_val; break;
+        case GravityAxis::PLUS_Z:  expected_gravity.z = g_val; break;
+        case GravityAxis::MINUS_Z: expected_gravity.z = -g_val; break;
+        case GravityAxis::NONE:    break;
+    }
+
+    // El error sistemático (Bias) es la lectura media menos la gravedad teórica presente.
+    m_accel_bias = acc_stats.mean() - expected_gravity;
+
+    // Empaquetar todo en la estructura CalibrationResult
+    m_calib_result.status = CalibrationStatus::Ok;
+    m_calib_result.accel_bias = m_accel_bias;
+    m_calib_result.gyro_bias = m_gyro_bias;
+    m_calib_result.accel_variance = acc_stats.variance();
+    m_calib_result.gyro_variance = gyro_stats.variance();
+    m_calib_result.accel_stddev = acc_stats.stddev();
+    m_calib_result.gyro_stddev = gyro_stats.stddev();
+    m_calib_result.samples = acc_stats.samples();
+    m_calib_result.valid = true;
+
+    #ifdef DEBUG_DATOS_CRUDOS
+    Serial.println("======================================================================");
+    Serial.printf("[mMPU6050 : calibrar()] BIAS ACCEL X: %f | Y: %f | Z: %f\n", m_accel_bias.x, m_accel_bias.y, m_accel_bias.z);
+    Serial.printf("[mMPU6050 : calibrar()] BIAS GYRO  X: %f | Y: %f | Z: %f\n", m_gyro_bias.x, m_gyro_bias.y, m_gyro_bias.z);
+    Serial.println("======================================================================");
+    #endif
+
+    return m_calib_result.status;
+}
+
+mMPU6050::CalibrationResult mMPU6050::get_calibration_result() const {
+    return m_calib_result;
+}
+
+data_raw_mpu_t mMPU6050::get_mpu_raw_data() {
+    data_raw_mpu_t raw_mpu = {};
+    sensors_event_t a, g, t;
+    
+    _mpu.getEvent(&a, &g, &t);
+
+    // Aplicar el bias de forma unificada. Todo lo que no sea gravedad en el eje elegido, será 0.
+    raw_mpu.accel_x_m_s2 = a.acceleration.x - m_accel_bias.x;
+    raw_mpu.accel_y_m_s2 = a.acceleration.y - m_accel_bias.y;
+    raw_mpu.accel_z_m_s2 = a.acceleration.z - m_accel_bias.z;
+    
+    raw_mpu.gyro_x_rad_s  = g.gyro.x - m_gyro_bias.x;
+    raw_mpu.gyro_y_rad_s  = g.gyro.y - m_gyro_bias.y;
+    raw_mpu.gyro_z_rad_s  = g.gyro.z - m_gyro_bias.z;
+
+    return raw_mpu;
+}
+
+
+/*
 #include "mMPU6050.h"
 
 #include "SerialPrint.h"
@@ -37,7 +149,6 @@ bool mMPU6050::init(const uint8_t addr) {
 
     // Calibra el sensor asumiendo que está en la rampa de lanzamiento --> podemos calibrar en otras instancias --> desde GSE se podria mandar comando.
     calibrar();
-
     return true;
 }
 
@@ -51,7 +162,7 @@ int mMPU6050::calibrar() {
     // Descartar las primeras lecturas (estabilización)
     for (int i = 0; i < 100; i++) {
         _mpu.getEvent(&a, &g, &t);
-        vTaskDelay(pdMS_TO_TICKS(2));
+        vTaskDelay(pdMS_TO_TICKS(5));
     }
 
     // Tomar N muestras
@@ -63,21 +174,36 @@ int mMPU6050::calibrar() {
         sum_gx += g.gyro.x;
         sum_gy += g.gyro.y;
         sum_gz += g.gyro.z;
-        vTaskDelay(pdMS_TO_TICKS(2)); // cada 2 ms tomar muestras --> debe estar quieto en todo este proceso
+        vTaskDelay(pdMS_TO_TICKS(5)); // cada 2 ms tomar muestras --> debe estar quieto en todo este proceso
     }
 
     // Promediar giroscopios (Deberían ser 0 en reposo)
-    offset_gyroX = sum_gx / num_muestras;
-    offset_gyroY = sum_gy / num_muestras;
-    offset_gyroZ = sum_gz / num_muestras;
+    offset_gyroX = sum_gx / (float)num_muestras;
+    offset_gyroY = sum_gy / (float)num_muestras;
+    offset_gyroZ = sum_gz / (float)num_muestras;
 
     // Promediar acelerómetros
     // NOTA: El eje Y apunta hacia el cielo cuando la compu de vuelo esté instalado en el cohete.
     // Debe medir 1G (9.81 m/s^2) positivo o negativo dependiendo de la convención física.
     // Asumimos que la gravedad empuja hacia abajo, por lo que el sensor siente una aceleración normal hacia arriba de +9.81 m/s^2. --> esto se resuelve automáticamente poniendo en cero los valores de salida final de nuestra mMPU6050
-    offset_accelX = (sum_ax / num_muestras);
-    offset_accelY = (sum_ay / num_muestras); // Debería ser 0
-    offset_accelZ = (sum_az / num_muestras); // Debería ser 0
+    offset_accelX = (sum_ax / (float)num_muestras);
+    #ifdef DEBUG_DATOS_CRUDOS
+    // Para el banco de pruebas
+    offset_accelY = (sum_ay / (float)num_muestras);
+    offset_accelZ = (sum_az / (float)num_muestras)- 9.80665f; 
+    #else
+    // Para el cohete
+    offset_accelY = (sum_ay / (float)num_muestras)- 9.80665f;  
+    offset_accelZ = (sum_az / (float)num_muestras;
+    #endif
+
+    #ifdef DEBUG_DATOS_CRUDOS
+    Serial.println("======================================================================");
+    // FIX: Eliminados los '&' para pasar los valores reales y evitar corrupción de memoria
+    Serial.printf("[mMPU6050 : calibrar()] BIAS ACCEL X: %f | Y: %f | Z: %f\n", offset_accelX, offset_accelY, offset_accelZ);
+    Serial.printf("[mMPU6050 : calibrar()] BIAS GYRO  X: %f | Y: %f | Z: %f\n", offset_gyroX, offset_gyroY, offset_gyroZ);
+    Serial.println("======================================================================");
+    #endif
 
     return 0; // Éxito
 }
@@ -89,9 +215,9 @@ data_raw_mpu_t mMPU6050::get_mpu_raw_data() {
     _mpu.getEvent(&a, &g, &t);
 
     // Aplicamos el offset calculado en la calibración
-    raw_mpu.accel_x_g = a.acceleration.x - offset_accelX;
-    raw_mpu.accel_y_g = a.acceleration.y - offset_accelY;
-    raw_mpu.accel_z_g = a.acceleration.z - offset_accelZ;
+    raw_mpu.accel_x_m_s2 = a.acceleration.x - offset_accelX;
+    raw_mpu.accel_y_m_s2 = a.acceleration.y - offset_accelY;
+    raw_mpu.accel_z_m_s2 = a.acceleration.z - offset_accelZ;
     
     raw_mpu.gyro_x_rad_s  = g.gyro.x - offset_gyroX;
     raw_mpu.gyro_y_rad_s  = g.gyro.y - offset_gyroY;
@@ -100,3 +226,4 @@ data_raw_mpu_t mMPU6050::get_mpu_raw_data() {
     return raw_mpu;
 }
 
+*/

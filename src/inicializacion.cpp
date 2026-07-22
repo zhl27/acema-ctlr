@@ -89,7 +89,7 @@ constexpr float R_AIR = 287.05f;
 
 inline float calcularDensidadAire(const float pressure_hpa, const float temperature_deg_c)
 {
-    return (pressure_hpa * 100.0f) / (R_AIR * (temperature_deg_c + 273.15f));
+    return (pressure_hpa ) / (R_AIR * (temperature_deg_c + 273.15f));
 }
 
 
@@ -120,7 +120,7 @@ void vTaskReadSensors(void *pvParameters) {
 
         // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
         data_raw_t raw = Sensors::get_raw_data();
-        // print_data_raw(&raw);
+        //print_data_raw(&raw);
 
         // TODO: Curiosidad: Por qué se utiliza una Queue en lugar de un Ringbuffer ?
 
@@ -150,22 +150,45 @@ void vTaskReadSensors(void *pvParameters) {
 
 //============================================================
 
-// acá se realiza la depuración de los datos.
+// Función inline para acotar valores (reemplazo de std::clamp)
+inline float mi_clamp(float val, float min_val, float max_val) {
+    if (val < min_val) return min_val;
+    if (val > max_val) return max_val;
+    return val;
+}
+
+// ----------------------------------------------------------------------
+// Tarea de filtrado modificada
+// ----------------------------------------------------------------------
 void vTaskDataFilter(void *pvParameters)
 {
-
     (void) pvParameters;
+    // ----------------------------------------------------------------------
+    // 1. VARIABLES DE ESTADO PARA CALIBRACIÓN 
+    // ----------------------------------------------------------------------
     static bool kalmanAltInit = false;
+    static uint16_t baro_calib_muestras = 0;
+    static float suma_altitud_snm = 0.0f;
+    static float altitud_rampa_m = 0.0f;
+    constexpr uint16_t MUESTRAS_CALIBRACION_BARO = 100; // Ej: 100 muestras a 10ms = 1 segundo de calibración
+    constexpr float G_TO_MS2 = 9.80665f;
+
     data_raw_t raw;
     int64_t timestampAnterior = 0;
     bool primeraMuestra = true;
 
-    constexpr float G_TO_MS2 = 9.80665f;
+    // HABILITA LA CORRECIÓN DEL SENSOR IMU POR LA ACCELERACIÓN EN LA ETAPA DE BOOST
+    // DESABILITAR SI SE QUIERE TESTEAR EN BANCO
+    // kalmanPitch.deshabilitarVarianzaDinamica();
+    // kalmanYaw.deshabilitarVarianzaDinamica();
+
+    kalmanPitch.habilitarVarianzaDinamica();
+    kalmanYaw.habilitarVarianzaDinamica();
     while (true)
     {
         if (xQueueReceive(xColaSensores, &raw, portMAX_DELAY) == pdTRUE){
 
-            print_data_raw(&raw);
+            //print_data_raw(&raw);
 
             //----------------------------------------------------------------------
             // Primera muestra: solamente inicializa el tiempo
@@ -188,10 +211,15 @@ void vTaskDataFilter(void *pvParameters)
             // MAPEO DE EJES (Sensor MPU -> Cohete Físico)
             // Todo permanece en las unidades nativas
             //----------------------------------------------------------------------
-            const float accelX_g = raw.mpu.accel_z_g;
-            const float accelY_g = raw.mpu.accel_y_g;
-            const float accelZ_g = raw.mpu.accel_x_g;
-
+            #ifdef DEBUG_DATOS_CRUDOS
+            const float accelX_m_s2 = raw.mpu.accel_x_m_s2;
+            const float accelY_m_s2 = raw.mpu.accel_y_m_s2;
+            const float accelZ_m_s2 = raw.mpu.accel_z_m_s2;
+            #else 
+            const float accelX_m_s2 = raw.mpu.accel_x_m_s2;
+            const float accelY_m_s2 = raw.mpu.accel_z_m_s2;
+            const float accelZ_m_s2 = raw.mpu.accel_y_m_s2;
+            #endif
             const float gyroRoll_rad_s  = raw.mpu.gyro_z_rad_s;     // Alabeo
             const float gyroPitch_rad_s = raw.mpu.gyro_y_rad_s;     // Cabeceo
             const float gyroYaw_rad_s   = raw.mpu.gyro_x_rad_s;     // Rotación sobre el eje vertical
@@ -202,63 +230,81 @@ void vTaskDataFilter(void *pvParameters)
             //----------------------------------------------------------------------
 
             // Calcula las magnitudes adyacentes usando Pitágoras
-            const float adj_pitch = sqrtf((accelX_g * accelX_g) + (accelY_g * accelY_g));
-            const float adj_yaw   = sqrtf((accelX_g * accelX_g) + (accelZ_g * accelZ_g));
+            const float adj_pitch = sqrtf((accelX_m_s2 * accelX_m_s2) + (accelY_m_s2 * accelY_m_s2));
+            const float adj_yaw   = sqrtf((accelX_m_s2 * accelX_m_s2) + (accelZ_m_s2 * accelZ_m_s2));
 
-            // Extraemos los ángulos en radianes usando atan2f(opuesto, adyacente)
-            const float accelPitch_rad = atan2f(accelZ_g, adj_pitch);
-            const float accelYaw_rad   = atan2f(accelY_g, adj_yaw);
-
-
-            //----------------------------------------------------------------------
-            // Kalman 1D
-            //
-            // Todo el filtro trabaja en: rad, rad/s, G
-            //----------------------------------------------------------------------
-            const float pitch_rad = kalmanPitch.update( gyroPitch_rad_s, accelPitch_rad, dt, accelZ_g);
-
-            const float yaw_rad = kalmanYaw.update( gyroYaw_rad_s, accelYaw_rad, dt, accelZ_g);
+            // Cuando X e Y sean 0, atan2f devolverá 0 radianes (perfectamente vertical).
+            const float accelPitch_rad = atan2f(accelX_m_s2, accelZ_m_s2);
+            const float accelYaw_rad   = atan2f(accelY_m_s2, accelZ_m_s2);
 
             //----------------------------------------------------------------------
-            // Inclinación total respecto de la vertical. (Inclinación respecto a la vertical del cielo)
+            // Kalman 1D (Trabaja en rad, rad/s, m/s^2)
             //----------------------------------------------------------------------
-            const float inclinacion_rad = acosf(cosf(pitch_rad) * cosf(yaw_rad));
+            const float pitch_rad = kalmanPitch.update(gyroPitch_rad_s, accelPitch_rad, dt, accelZ_m_s2);
+            const float yaw_rad   = kalmanYaw.update(gyroYaw_rad_s, accelYaw_rad, dt, accelZ_m_s2);
 
             //----------------------------------------------------------------------
-            // Proyección de la aceleración longitudinal sobre el eje vertical global.
-            //
-            // El sensor lee: A_leida = A_real + gravedad_en_eje_z
-            // Entonces: A_real = A_leida - gravedad_en_eje_z
-            // Donde la gravedad proyectada en el eje longitudinal es 1g * cos(inclinacion)
-            // accelVertical_g continúa estando en G.
+            // Inclinación total respecto de la vertical
             //----------------------------------------------------------------------
-            float accelVertical_g = accelZ_g * cosf(pitch_rad) * cosf(yaw_rad) - cosf(inclinacion_rad);
-            accelVertical_g = emaAccelVertical.actualizar(accelVertical_g);
+            float cos_inc = cosf(pitch_rad) * cosf(yaw_rad); 
+            
+            // Forzamos a que el valor nunca salga del rango [-1.0, 1.0] de forma segura
+            cos_inc = mi_clamp(cos_inc, -1.0f, 1.0f);
+            
+            const float inclinacion_rad = acosf(cos_inc);
+
+            //----------------------------------------------------------------------
+            // Proyección de la aceleración longitudinal sobre el eje vertical global
+            //----------------------------------------------------------------------
+            // Corrección matemática de doble proyección y ajuste de unidades (G a m/s^2)
+            float accelVertical_m_s2 = (accelZ_m_s2 * cos_inc) - (9.80665f * cos_inc * cos_inc);
+
+            // Suavizado por filtro de media móvil exponencial
+            accelVertical_m_s2 = emaAccelVertical.actualizar(accelVertical_m_s2);
+
 
             //----------------------------------------------------------------------
             // Kalman 2D
             //
             // Este filtro trabaja naturalmente en SI.
             //----------------------------------------------------------------------
-
-
-            const float accelVertical_m_s2 = accelVertical_g * G_TO_MS2;
-
             if (!kalmanAltInit) {
-                kalmanAlt.init(0.0f, 0.0f, 0.5f, 0.1f);  // Ajusta sigma según tus pruebas (ruido acel, ruido baro)
-                kalmanAltInit = true;
+                // Fase de acumulación: Promedia la altitud antes del vuelo
+                if (baro_calib_muestras < MUESTRAS_CALIBRACION_BARO) {
+                    suma_altitud_snm += raw.bmp.altitud_snm_m;
+                    baro_calib_muestras++;
+                    
+                    // Evita que el resto de la tarea envíe basura mientras calibra
+                    continue;
+                } 
+                // Fase de inicialización del filtro
+                else {
+                    altitud_rampa_m = suma_altitud_snm / (float)MUESTRAS_CALIBRACION_BARO;
+                    
+                    // El filtro arranca estrictamente en 0 metros (AGL) y 0 m/s
+                    kalmanAlt.init(0.0f, 0.0f, VARIANZA_INICIAL_ACELEROMETRO, VARIANZA_INICIAL_GIROSCOPIO);  
+                    kalmanAltInit = true;
+                    
+                    Serial.printf("[Filtro] Calibración de rampa lista. Altitud ASL: %f m\n", altitud_rampa_m);
+                }
             }
 
-            kalmanAlt.update(dt, accelVertical_m_s2, raw.bmp.altitud_snm_m);
+            // Calculamos la altitud relativa al nivel del suelo (AGL)
+            const float altitud_agl_m = raw.bmp.altitud_snm_m - altitud_rampa_m;
+
+            // Le inyectamos la altitud AGL al filtro
+            kalmanAlt.update(dt, accelVertical_m_s2, altitud_agl_m);
 
             //----------------------------------------------------------------------
             // EMPAQUETADO
             //
             // Recién acá convertimos a las unidades públicas de data_all_t.
             //----------------------------------------------------------------------
-            //constexpr float RAD_TO_DEG = 57.2957795131f;
-
             data_all_t out = {};
+            int64_t t = raw.timestamp_us;
+            
+            Serial.print(">heap_libre:"); 
+            Serial.println(ESP.getFreeHeap());
 
             // Velocidades angulares
             out.vel_angular_x_deg_s = gyroPitch_rad_s * RAD_TO_DEG;
@@ -272,7 +318,7 @@ void vTaskDataFilter(void *pvParameters)
 
             // Cinemática vertical
             out.altitud_filtrada_m  = kalmanAlt.getAltitude();
-            out.vel_z_filtrada_m_s   = kalmanAlt.getVelocity(); // TODO: Tomar a Y como eje vertical. Por ahora, para testeos Z es eje vertical. DEBEMOS CAMBIARLO.
+            out.vel_z_filtrada_m_s  = kalmanAlt.getVelocity(); 
             out.aceleracion_z_m_s2  = accelVertical_m_s2;
 
             // Ambientales
@@ -286,7 +332,12 @@ void vTaskDataFilter(void *pvParameters)
             out.gps_latitud = raw.gps.latitude;
             out.gps_longitud = raw.gps.longitude;
 
-            print_data(&out);
+            plot_actitud_filtrada(&out);
+            plot_cinematica_filtrada(&out);
+            
+            // Timestamp corregido para evitar fugas de memoria o punteros fantasma
+            Serial.print(">timestamp_ms:");
+            Serial.println((uint32_t)(t / 1000));
 
             //----------------------------------------------------------------------
             // Distribución (MdE, Lora)
@@ -305,9 +356,11 @@ void vTaskDataFilter(void *pvParameters)
         else {
             ESP_LOGI(TAG_TASK_DATA_FILTER, "No messages (timeout)");
         }
+
+        // Le permite al scheduler del RTOS resetear el WATCHDOG
+        vTaskDelay(pdMS_TO_TICKS(5));
     }
 }
-
 // Mock implementation of the State Machine task: consumes sensor messages and forwards/acts on them
 void vTaskStateMachine(void *pvParameters) {
     (void)pvParameters;
@@ -389,23 +442,26 @@ void vTaskLora(void *pvParameters) {
         if (item != NULL) {
             // Validamos que sea el tamaño de nuestro envoltorio
             if (item_size == sizeof(TxEnvelope_t)) {
-                
+                Serial.println("--> div: 1");
                 TxEnvelope_t *sobre = static_cast<TxEnvelope_t *>(item);
 
                 // Solo pasamos a GSE::actualizar si el enlace está CONNECTED
                 if (GSE::estado_conexion_gse() == ROCKET_CONNECTED) {
-                    
+                Serial.println("--> div: 2");                    
                     switch(sobre->tipo) {
                         case lora_protocol::C_PLOT:
                             GSE::actualizar_graficas(&(sobre->payload.telemetria));
+                            Serial.println("--> div: 3");
                             break;
                         
                         case lora_protocol::C_MGS:
                             GSE::enviar_mensaje(sobre->payload.texto);
+                            Serial.println("--> div: 4");
                             break;
                             
                         case lora_protocol::C_ERR:
                             GSE::enviar_error(sobre->payload.texto);
+                            Serial.println("--> div: 5");
                             break;
 
                         // case Protocolo::C_ACK:
@@ -414,7 +470,9 @@ void vTaskLora(void *pvParameters) {
                     }
                 }
             }
+            Serial.println("--> div: 6");
             vRingbufferReturnItem(xLoraRingbuf, item);
+            Serial.println("--> div: 7");
         }
 
         // Aquí también iría la lógica (explicada en el mensaje anterior) 
@@ -423,18 +481,23 @@ void vTaskLora(void *pvParameters) {
         // 1. FASE RX: Escuchar comandos desde la estación terrena
         // ---------------------------------------------------------
         if (GSE::leer_paquete(&rxPacket)) {
+                            Serial.println("--> div: 8");
             if (rxPacket.protocol == lora_protocol::G_CMD) {
                 // Casteamos el payload a nuestra estructura de comando
                 // Asumiendo que el GSE envió un CommandPayload { uint32_t opCode; float value; }
                 CommandPayload* cmd = static_cast<CommandPayload*>(rxPacket.payload);
-                
-                ESP_LOGI(TAG_TASK_LORA, "[Lora] Comando Recibido: OP=%d, VAL=%.2f\n", cmd->opCode, cmd->value);
+                                Serial.println("--> div: 9");
+                ESP_LOGI(TAG_TASK_LORA, "[Lora] Comando Recibido: OP=%d, VAL=%f\n", cmd->opCode, cmd->value);
                 
                 // Encolamos el comando en el CmdDispatcher
                 cmdDispatcher.enqueueCommand(cmd->opCode, cmd->value);
+                                Serial.println("--> div: 10");
             }
         }
+                        Serial.println("--> div: 11");
         // GSE::mantener_conexion() // Podrías extraer el switch(ROCKET_INIT...) a un método que se llame cíclicamente aquí.
+        // CRUCIAL: Libera el Core 0 y evita el colapso del stack y del Watchdog
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 

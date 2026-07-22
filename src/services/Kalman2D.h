@@ -30,7 +30,7 @@ public:
     Kalman2D();
     
     // Inicializa el filtro con varianzas y estado inicial
-    void init(float init_alt, float init_vel, float sigma_accel, float sigma_baro);
+    void init(float init_alt, float init_vel, float varianza_accel, float varianza_baro);
     
     // Actualiza el filtro con el dt dinámico, la aceleración Z inercial (sin gravedad) y la altitud barométrica
     void update(float dt, float accel_z_inertial, float baro_alt);

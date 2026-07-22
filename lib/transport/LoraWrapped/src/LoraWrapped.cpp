@@ -41,7 +41,100 @@ bool LoraWrapped::begin(int sw, char ew, float frec){
     return false;
 }
 
+bool LoraWrapped::_send_packet(pkt_t *ptrPkt) const {
+    if (ptrPkt == nullptr) return false;
 
+    // Validación estricta: el tamaño no puede superar la estructura más grande permitida
+    constexpr size_t MAX_PACKET_SIZE = sizeof(data_all_t);
+    if (ptrPkt->len > MAX_PACKET_SIZE) {
+        ESP_LOGE("LORA", "Error: Intento de enviar paquete mayor al permitido (%d bytes)", ptrPkt->len);
+        return false;
+    }
+
+    // Búfer dimensionado de forma segura para soportar tanto strings como data_all_t
+    static uint8_t txBuffer[MAX_PACKET_SIZE + 2];
+        memset((void*)txBuffer, 0, sizeof(txBuffer));
+        
+    txBuffer[0] = _encrypt_byte(ptrPkt->len);
+    txBuffer[1] = _encrypt_byte(ptrPkt->protocol);
+
+    // Encriptación y copia segura
+    for (size_t i = 0; i < ptrPkt->len; i++) {
+        txBuffer[2 + i] = _encrypt_byte(((uint8_t*)ptrPkt->payload)[i]);
+    }
+
+    // RadioLib transmite todo el búfer de un solo golpe
+    const int state = _radio->transmit(txBuffer, ptrPkt->len + 2);
+
+    // OBLIGATORIO: Volver a activar el modo escucha inmediatamente después de transmitir
+    _radio->startReceive();
+
+    return (state == RADIOLIB_ERR_NONE);
+}
+
+bool LoraWrapped::_read_packet(pkt_t *ptrPkt) {
+    if (ptrPkt == nullptr) return false;
+
+    // Consulta el pin físico de interrupción para saber si realmente hay un paquete en el aire
+    #if defined(MODULE_SX1278)
+        const bool packetReady = (digitalRead(_pinPacketReady) == HIGH);
+    #elif defined(MODULE_SX1262)
+        bool packetReady = (digitalRead(_pinPacketReady) == HIGH);
+    #endif
+
+    if (!packetReady)
+        return false;
+
+    // Lee la longitud real del paquete físico recibido
+    const size_t length = _radio->getPacketLength();
+    
+    // El tamaño máximo permitido no puede superar la estructura más grande (data_all_t) más los 2 bytes de cabecera
+    constexpr size_t max_allowed_len = sizeof(data_all_t);
+    
+    if (length < 2 || length > (max_allowed_len + 2)) {
+        // Paquete mal formado o de un tamaño no soportado: descartamos y liberamos radio
+        _radio->startReceive();
+        return false;
+    }
+
+    // Búfer dimensionado de forma segura para soportar la estructura completa de telemetría
+    static uint8_t rxBuffer[max_allowed_len + 2];
+    memset((void*)rxBuffer, 0, sizeof(rxBuffer));
+    // Lectura segura sin riesgo de desbordamiento de pila
+    const int state = _radio->readData(rxBuffer, length);
+    
+    // OBLIGATORIO: Volver a activar la escucha de inmediato
+    _radio->startReceive();
+
+    if (state != RADIOLIB_ERR_NONE)
+        return false;
+
+    // Desencripta encabezados primarios
+    ptrPkt->len = _encrypt_byte(static_cast<char>(rxBuffer[0]));
+    ptrPkt->protocol = _encrypt_byte(static_cast<char>(rxBuffer[1]));
+
+    // Validaciones estrictas de integridad
+    if (ptrPkt->len > max_allowed_len || ptrPkt->len != (length - 2)) {
+        return false;
+    }
+
+    // Asigna el puntero de la unión según el protocolo 
+    if (ptrPkt->protocol == lora_protocol::C_PLOT) {
+        memset((void*)&_internalPayload_rx.data, 0, sizeof(data_all_t));
+        ptrPkt->payload = (data_all_t*)&_internalPayload_rx.data;
+    } else {
+        memset((void*)_internalPayload_rx.msg, 0, sizeof(_internalPayload_rx.msg));
+        ptrPkt->payload = static_cast<char *>(_internalPayload_rx.msg);
+    }
+
+    // Desencriptar y rellenar el payload final de forma segura
+    for (size_t i = 0; i < ptrPkt->len; i++) {
+        static_cast<uint8_t *>(ptrPkt->payload)[i] = _encrypt_byte(static_cast<char>(rxBuffer[2 + i]));
+    }
+
+    return true;
+}
+/*
 bool LoraWrapped::_send_packet(pkt_t *ptrPkt) const {
     if (ptrPkt == nullptr) return false;
 
@@ -63,8 +156,9 @@ bool LoraWrapped::_send_packet(pkt_t *ptrPkt) const {
 
     return (state == RADIOLIB_ERR_NONE);
 }
+*/
 
-
+/*
 bool LoraWrapped::_read_packet(pkt_t *ptrPkt) {
     if (ptrPkt == nullptr) return false;
 
@@ -112,7 +206,7 @@ bool LoraWrapped::_read_packet(pkt_t *ptrPkt) {
 
     return true;
 }
-
+*/
 bool LoraWrapped::c_connect_to_GSE() const {
     pkt_t packet;
     const char *msg = "PING_COHETE"; // TODO: redundante

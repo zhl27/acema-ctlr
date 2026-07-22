@@ -9,7 +9,7 @@
 #include <cstdint>
 #include <cstdio>
 
-
+ 
 /**
  * @struct data_raw_mpu_t
  * @brief Estructura de datos crudos de la MPU6050.
@@ -17,9 +17,9 @@
  * Contiene los datos sin procesar del acelerómetro y giroscopio.
  */
 typedef struct {
-    float accel_x_g; // Aceleración X (Raw) (TODO: Ver de obtener 16 bits)
-    float accel_y_g; // Aceleración Y (Raw)
-    float accel_z_g; // Aceleración Z (Raw)
+    float accel_x_m_s2; // Aceleración X (Raw) (TODO: Ver de obtener 16 bits)
+    float accel_y_m_s2; // Aceleración Y (Raw)
+    float accel_z_m_s2; // Aceleración Z (Raw)
     // float temp;    // Temperatura (Raw) --> No usamos el dato temp (temperatura) de la mpu5060 (mpu) porque es del chip y no del ambiente. La mpu usa la temp porque afecta a sus mediciones.
     float gyro_x_rad_s;  // Velocidad angular X (Raw)
     float gyro_y_rad_s;  // Velocidad angular Y (Raw)
@@ -169,6 +169,117 @@ typedef struct {
 
 #include <Arduino.h>
 
+// ============================================================================
+// 1. FUNCIONES ATÓMICAS - DATOS CRUDOS (RAW)
+// ============================================================================
+
+inline void plot_mpu_raw(const data_raw_t *data) {
+    if (data == nullptr) return;
+
+    Serial.print(">ax_m_s2:");   Serial.println(data->mpu.accel_x_m_s2, 4);
+    Serial.print(">ay_m_s2:");   Serial.println(data->mpu.accel_y_m_s2, 4);
+    Serial.print(">az_m_s2:");   Serial.println(data->mpu.accel_z_m_s2, 4);
+    Serial.print(">gx_rad_s:");  Serial.println(data->mpu.gyro_x_rad_s, 4);
+    Serial.print(">gy_rad_s:");  Serial.println(data->mpu.gyro_y_rad_s, 4);
+    Serial.print(">gz_rad_s:");  Serial.println(data->mpu.gyro_z_rad_s, 4);
+}
+
+inline void plot_bmp_raw(const data_raw_t *data) {
+    if (data == nullptr) return;
+    Serial.printf(">presion_hpa:%f\n>temp_c:%f\n",
+                  data->bmp.presion_hpa,
+                  data->bmp.temp_deg_c);
+}
+
+inline void plot_gps_raw(const data_raw_t *data) {
+    if (data == nullptr) return;
+    Serial.printf(">lat:%ld\n>lon:%ld\n>sats:%d\n",
+                  (long)data->gps.latitude,
+                  (long)data->gps.longitude,
+                  (int)data->gps.satellites);
+}
+
+// ============================================================================
+// 2. FUNCIONES ATÓMICAS - DATOS FILTRADOS / PROCESADOS
+// ============================================================================
+// ============================================================================
+// FUNCIONES ATÓMICAS REFACTORIZADAS (Anti-Crash Heap)
+// ============================================================================
+
+inline void plot_cinematica_filtrada(const data_all_t *data) {
+    if (data == nullptr) return;
+    
+    Serial.print(">alt_agl_m:");    Serial.println(data->altitud_filtrada_m, 2);
+    Serial.print(">vel_z_m_s:");    Serial.println(data->vel_z_filtrada_m_s, 2);
+    Serial.print(">accel_z_m_s2:"); Serial.println(data->aceleracion_z_m_s2, 2);
+}
+
+
+
+inline void plot_actitud_filtrada(const data_all_t *data) {
+    if (data == nullptr) return;
+    
+    Serial.print(">pitch_deg:");  Serial.println(data->angulo_pitch_deg, 2);
+    Serial.print(">yaw_deg:");    Serial.println(data->angulo_yaw_deg, 2);
+    Serial.print(">incl_z_deg:"); Serial.println(data->angulo_respecto_z_deg, 2);
+}
+
+inline void plot_gps_procesado(const data_all_t *data) {
+    if (data == nullptr) return;
+    
+    Serial.print(">lat:");  Serial.println(data->gps_latitud, 6);
+    Serial.print(">lon:");  Serial.println(data->gps_longitud, 6);
+    Serial.print(">hdop:"); Serial.println(data->gps_hdop, 2);
+    Serial.print(">sats:"); Serial.println(data->gps_nro_satelites);
+}
+
+
+inline void plot_giroscopio_filtrado(const data_all_t *data) {
+    if (data == nullptr) return;
+    Serial.printf(">vel_ang_x_deg_s:%f\n>vel_ang_y_deg_s:%f\n>vel_ang_z_deg_s:%f\n",
+                  data->vel_angular_x_deg_s,
+                  data->vel_angular_y_deg_s,
+                  data->vel_angular_z_deg_s);
+}
+
+inline void plot_ambiental_procesado(const data_all_t *data) {
+    if (data == nullptr) return;
+    Serial.printf(">temp_amb_c:%f\n>densidad_aire:%f\n",
+                  data->temperatura_amb_c,
+                  data->densidad_aire_kg_m3);
+}
+
+
+// ============================================================================
+// 3. WRAPPERS QUE ENGLOBAN TODO (ALL IN ONE)
+// ============================================================================
+
+/**
+ * @brief Imprime en una sola línea del plotter todos los sensores en estado CRUDO
+ */
+inline void plot_all_raw(const data_raw_t *data) {
+    if (data == nullptr) return;
+    Serial.printf(">presion_hpa:%f\n>temp_c:%f\n>ax_m_s2:%f\n>ay_m_s2:%f\n>az_m_s2:%f\n>gx_rad_s:%f\n>gy_rad_s:%f\n>gz_rad_s:%f\n>lat:%ld\n>lon:%ld\n>sats:%d\n",
+                  data->bmp.presion_hpa, data->bmp.temp_deg_c,
+                  data->mpu.accel_x_m_s2, data->mpu.accel_y_m_s2, data->mpu.accel_z_m_s2,
+                  data->mpu.gyro_x_rad_s, data->mpu.gyro_y_rad_s, data->mpu.gyro_z_rad_s,
+                  (long)data->gps.latitude, (long)data->gps.longitude, (int)data->gps.satellites);
+}
+
+/**
+ * @brief Imprime en una sola línea del plotter todas las variables PROCESADAS / FILTRADAS
+ */
+inline void plot_all_processed(const data_all_t *data) {
+    if (data == nullptr) return;
+    Serial.printf(">alt_agl:%f\n>vel_z:%f\n>accel_z:%f\n>pitch:%f\n>yaw:%f\n>incl_z:%f\n>vel_ang_x:%f\n>vel_ang_y:%f\n>vel_ang_z:%f\n>temp_amb:%f\n>rho:%f\n>lat:%f\n>lon:%f\n>hdop:%f\n>sats:%d\n",
+                  data->altitud_filtrada_m, data->vel_z_filtrada_m_s, data->aceleracion_z_m_s2,
+                  data->angulo_pitch_deg, data->angulo_yaw_deg, data->angulo_respecto_z_deg,
+                  data->vel_angular_x_deg_s, data->vel_angular_y_deg_s, data->vel_angular_z_deg_s,
+                  data->temperatura_amb_c, data->densidad_aire_kg_m3,
+                  data->gps_latitud, data->gps_longitud, data->gps_hdop, data->gps_nro_satelites);
+}
+
+
 /**
  * @brief Imprime por el puerto serie todos los valores de la estructura data_raw_t.
  * * @param data Referencia constante a la estructura con los datos crudos.
@@ -192,16 +303,17 @@ inline void print_data_raw(const data_raw_t *data) {
     // --- Datos del MPU6050 ---
     // Usamos %d para los int16_t (se promueven automáticamente a int en C++)
     Serial.printf("[MPU6050] Accel X: %f | Y: %f | Z: %f\n",
-                  data->mpu.accel_x_g, data->mpu.accel_y_g, data->mpu.accel_z_g);
+                  data->mpu.accel_x_m_s2, data->mpu.accel_y_m_s2, data->mpu.accel_z_m_s2);
 
+    
     Serial.printf("[MPU6050] Gyro  X: %f | Y: %f | Z: %f\n",
                   data->mpu.gyro_x_rad_s, data->mpu.gyro_y_rad_s, data->mpu.gyro_z_rad_s);
 
     // --- Datos del GPS (nav_pvt_t) ---
     Serial.printf("[GPS]     Latitud: %ld | Longitud: %ld | Satelites: %d\n",
                   (long)data->gps.latitude,
-                  (long)data->gps.lon,
-                  (int)data->gps.numSV);
+                  (long)data->gps.longitude,
+                  (int)data->gps.satellites);
 
     Serial.printf("==========================================\n");
     return;
@@ -217,7 +329,7 @@ inline void print_plotter_data_raw(const data_raw_t *data) {
     // Ideal para calibrar offsets, ver ruido y probar el filtro complementario
     Serial.printf("AccX_g:%f,AccY_g:%f,AccZ_g:%f,"
                   "GyroX_rads:%f,GyroY_rads:%f,GyroZ_rads:%f\r\n",
-                  data->mpu.accel_x_g, data->mpu.accel_y_g, data->mpu.accel_z_g,
+                  data->mpu.accel_x_m_s2, data->mpu.accel_y_m_s2, data->mpu.accel_z_m_s2,
                   data->mpu.gyro_x_rad_s, data->mpu.gyro_y_rad_s, data->mpu.gyro_z_rad_s);
 
 #elif defined(PLOT_BMP_ONLY)
@@ -258,26 +370,42 @@ inline void print_data(const data_all_t *data) {
     Serial.printf("\n=============== DATA_ALL_T (micros=%lu) ===============\n", micros());
 
     Serial.printf("--- CINEMÁTICA LINEAL ---\n");
-    Serial.printf("Altura:             %.2f m\n", data->altitud_filtrada_m);
+    Serial.printf("Altura AGL:         %.2f m\n", data->altitud_filtrada_m);
     Serial.printf("Velocidad Z:        %.2f m/s\n", data->vel_z_filtrada_m_s);
     Serial.printf("Aceleración Z:      %.2f m/s^2\n", data->aceleracion_z_m_s2);
-
-    Serial.printf("--- DINÁMICA ---\n");
-    Serial.printf("Momentum:           %.2f kg*m/s\n", data->momentum_kg_m_s);
+    // Serial.printf("Altitud Rampa ASL:  %.2f m\n", data->altitud_rampa_asl_m);
 
     Serial.printf("--- CINEMÁTICA ANGULAR ---\n");
     Serial.printf("Vel Angular X:      %.2f °/s (Pitch)\n", data->vel_angular_x_deg_s);
     Serial.printf("Vel Angular Y:      %.2f °/s (Roll)\n", data->vel_angular_y_deg_s);
     Serial.printf("Vel Angular Z:      %.2f °/s (Yaw)\n", data->vel_angular_z_deg_s);
 
+    Serial.printf("--- ACTITUD ---\n");
+    Serial.printf("Pitch:              %.2f °\n", data->angulo_pitch_deg);
+    Serial.printf("Yaw:                %.2f °\n", data->angulo_yaw_deg);
+    Serial.printf("Inclinación Z:      %.2f °\n", data->angulo_respecto_z_deg);
+
     Serial.printf("--- AMBIENTALES PROCESADOS ---\n");
     Serial.printf("Temperatura Amb:    %.2f °C\n", data->temperatura_amb_c);
     Serial.printf("Densidad Aire:      %.4f kg/m^3\n", data->densidad_aire_kg_m3);
+
+    Serial.printf("--- GPS ---\n");
+    if (data->gps_is_valid) {
+        Serial.printf("Estado:             VÁLIDO\n");
+        Serial.printf("Satélites:          %d\n", data->gps_nro_satelites);
+        Serial.printf("HDOP:               %.2f\n", data->gps_hdop);
+        Serial.printf("Latitud:            %.6f\n", data->gps_latitud);
+        Serial.printf("Longitud:           %.6f\n", data->gps_longitud);
+    } else {
+        Serial.printf("Estado:             INVÁLIDO (Buscando...)\n");
+    }
 
     Serial.printf("======================================================\n\n");
 #endif
     return;
 }
+
+
 
 // Estructura del payload que viajará por la cola RTOS
 struct CommandPayload {

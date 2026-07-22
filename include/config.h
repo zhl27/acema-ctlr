@@ -15,8 +15,8 @@
 /************************/
 /*       FREERTOS       */
 /************************/
-
-#define configSUPPORT_STATIC_ALLOCATION 1;
+// Ya está definida con el mismo valor en rtos
+//#define configSUPPORT_STATIC_ALLOCATION 1;
 
 
 namespace ConfigInit {
@@ -106,8 +106,8 @@ namespace ConfigInit {
     /**********************/
     /*   FILTROS KALMAN   */
     /**********************/
-    constexpr float VARIANZA_INICIAL_GIROSCOPIO     =   0.001f;
-    constexpr float VARIANZA_INICIAL_ACELEROMETRO   =   0.01f;
+    constexpr float VARIANZA_INICIAL_GIROSCOPIO     =   0.0048f; // (4°)^2
+    constexpr float VARIANZA_INICIAL_ACELEROMETRO   =   0.0027f; // (2°)^2
 
     /**********************/
     /*     FILTROS EMA    */
@@ -127,7 +127,7 @@ namespace ConfigInit {
     /**********************/
     /*     FRECUENCIAS    */
     /**********************/
-    constexpr float PERIOD_SAMPLING_SENSORS_MS = 10.0f; // Muestreo cada 10 ms
+    constexpr float PERIOD_SAMPLING_SENSORS_MS = 100.0f; // Muestreo cada 10 ms
     constexpr float FREC_SAMPLING_SENSORS_HZ = 1.0f / (PERIOD_SAMPLING_SENSORS_MS * 1e-3f);
 }
 

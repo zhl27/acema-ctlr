@@ -13,13 +13,13 @@ Kalman2D::Kalman2D() {
          0, 1}; 
 }
 
-void Kalman2D::init(float init_alt, float init_vel, float sigma_accel, float sigma_baro) {
+void Kalman2D::init(float init_alt, float init_vel, float varianza_accel, float varianza_baro) {
     S(0, 0) = init_alt;
     S(1, 0) = init_vel;
     
     // La varianza es esencialmente el cuadrado de la desviación estándar 
-    var_accel = sigma_accel * sigma_accel; 
-    var_baro = sigma_baro * sigma_baro;
+    var_accel = varianza_accel; 
+    var_baro = varianza_baro;
 }
 
 void Kalman2D::update(float dt, float accel_z_inertial, float baro_alt) {
