@@ -176,7 +176,12 @@ void vTaskSerialCommands(void *pvParameters) {
 					Serial.print(opCode); Serial.print(F(" | VALOR: ")); Serial.println(value);
 					CommandPayload cmd = {.opCode = opCode, .value = value};
 					// Envío por RF usando la librería base
-					lora.g_send_command(cmd);
+					if(lora.g_send_command(cmd)){
+                        ESP_LOGI("[SEND_CMD]", "COMANDO ENVIADO CON EXITO");
+                    }
+                    else{
+                        ESP_LOGI("[SEND_CMD]", "\n ERROR: NO SE PUDO ENVIAR\n");
+                    }
 				} else {
 					Serial.println(F("[GSE-ERR] Formato de comando inválido. Use 'COMANDO:VALOR'"));
 				}
@@ -232,6 +237,7 @@ void loop() {
                 Serial.println(F("[ERROR] Falló inicialización de LoRa. Reintentando en 2s..."));
                 #endif
                 delay(2000);
+                currentState = GSE_INIT;
             }
             break;
 

@@ -191,7 +191,7 @@ namespace Cohete {
      * @brief Dispara un timer de 5 min para calentar la IMU
      */
     void f_st_init(data_all_t* datos_sensores, uint32_t ms_en_estado) {
-        ESP_LOGI(TAG_BASE, "INIT");
+        ESP_LOGI(TAG_BASE, "\nINIT\n");
 
         //TODO: LÓGICA DE LECTURA DE FLASH = X
         // Note: Delegado en main, máxima prioridad 
@@ -229,6 +229,9 @@ namespace Cohete {
     }
 
     void f_st_espera_conexion_gse(data_all_t* datos_sensores, uint32_t ms_en_estado) {
+        ESP_LOGI(TAG_BASE, "\n ESPERA CONEXION \n");
+
+       
         //  Condición de éxito: ¿Se conectó por LoRa?
         if (SYSTEM.flags.gse_conectado) {
             ESP_LOGI(TAG_BASE, " -> [CONEXIÓN GSE] Nos conectamos exitosamente.");
@@ -285,6 +288,9 @@ namespace Cohete {
     */
 
 void f_st_espera_gps_preciso(data_all_t* datos_sensores, uint32_t ms_en_estado) {
+            ESP_LOGI(TAG_BASE, "\n ESPERA CONEXION \n");
+
+    
     // Timeout
     if (ms_en_estado >= GPS_TIMEOUT_MILLIS) {
         ESP_LOGE(TAG_BASE, "Timeout de GPS. Avanzando a espera de ignición.");

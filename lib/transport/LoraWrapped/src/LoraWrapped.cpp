@@ -10,7 +10,19 @@ LoraWrapped::LoraWrapped(uint32_t nss, uint32_t rst, uint32_t pin3, uint32_t pin
 
     #if defined(MODULE_SX1278)
         _mod = new Module(nss, pin3, rst, pin4, spi);
+        if(_mod){
+            ESP_LOGI("CONSTRUCTOR", "MODULO INICIALIZADO");
+        }
+        else{
+            ESP_LOGI("CONSTRUCTOR", "MODULO ERROR");
+        }
         _radio = new SX1278(_mod);
+        if(_radio){
+            ESP_LOGI("CONSTRUCTOR", "RADIO INICIALIZADO");
+        }
+        else{
+            ESP_LOGI("CONSTRUCTOR", "RADIO ERROR");
+        }
     #elif defined(MODULE_SX1262)
         // Ahora sí, pin4 acepta RADIOLIB_NC (-1) de forma segura sin overflow
         _mod = new Module(nss, pin3, rst, pin4, spi); 
@@ -42,7 +54,10 @@ bool LoraWrapped::begin(int sw, char ew, float frec){
 }
 
 bool LoraWrapped::_send_packet(pkt_t *ptrPkt) const {
-    if (ptrPkt == nullptr) return false;
+    if (ptrPkt == nullptr) {
+        ESP_LOGE("SENDPACKET", "PUNTERO NULO");
+        return false;
+    }
 
     // Validación estricta: el tamaño no puede superar la estructura más grande permitida
     constexpr size_t MAX_PACKET_SIZE = sizeof(data_all_t);
@@ -65,7 +80,7 @@ bool LoraWrapped::_send_packet(pkt_t *ptrPkt) const {
 
     // RadioLib transmite todo el búfer de un solo golpe
     const int state = _radio->transmit(txBuffer, ptrPkt->len + 2);
-
+    ESP_LOGI("SENDPACKET", "---> estado: %i", state);
     // OBLIGATORIO: Volver a activar el modo escucha inmediatamente después de transmitir
     _radio->startReceive();
 
@@ -334,8 +349,8 @@ bool LoraWrapped::g_send_command(CommandPayload comando)
 {
     pkt_t packet;
     // Verifica conexion
-    if(_st !=CONNECTION_STATUS::CONNECTED)
-        return false;
+    // if(_st !=CONNECTION_STATUS::CONNECTED)
+    //     return false;
     
     // Prepara el paquete
     packet.protocol = lora_protocol::G_CMD;
