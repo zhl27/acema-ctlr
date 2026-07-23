@@ -47,6 +47,12 @@ public:
     // Retorna las métricas sin romper el flujo de uso habitual
     CalibrationResult get_calibration_result() const;
 
+    void setAccelBias(math::Vector3f &biasAccel) {m_accel_bias = biasAccel;}
+    void setGyroBias(math::Vector3f &biasGyro) {m_gyro_bias = biasGyro;}
+    void setBias(math::Vector3f &biasAccel, math::Vector3f &biasGyro){
+        this->setAccelBias(biasAccel);
+        this->setGyroBias(biasGyro);
+    } 
 private:
     Adafruit_MPU6050 _mpu;
 

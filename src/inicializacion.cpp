@@ -124,6 +124,9 @@ bool initHardware() {
 void puntoDeInicio() {
     ESP_LOGI("BOOT_LOGIC", "Evaluando estado de vuelo post-reinicio...");
 
+    // Todo, cambiar segun prubea
+    mMPU6050::GravityAxis ejeZ = mMPU6050::GravityAxis::PLUS_Y;
+    
     // INTERLOCK 1: ¿La misión había sido armada/iniciada antes del reinicio?
     if (g_configActual.mision_activa == true) {
         
@@ -145,18 +148,25 @@ void puntoDeInicio() {
             
             // Aquí NO se llama a Sensors::calibrar(). El filtro dependerá de los offsets guardados 
             // previamente en la flash, o usará valores por defecto seguros.
+            Sensors::getMPU6050().setBias(g_configActual.bias.accel, g_configActual.bias.gyro);
+            // NOTE: no importa setear el eje de gravedad pues eso se quedó guardado en la bias
+
         } else {
             // Falsa alarma. Se armó, pero nunca despegó (o ya aterrizó).
             ESP_LOGI("BOOT_LOGIC", "Misión activa pero en tierra. Calibrando sensores...");
             g_configActual.estado_cohete_actual = Cohete::ST_INIT;
-            Sensors::getMPU6050().calibrar(); // <-- Calibración segura en tierra
+            mMPU6050::CalibrationStatus result = Sensors::getMPU6050().calibrar(ejeZ); // <-- Calibración segura en tierra
+            g_configActual.bias.accel = Sensors::getMPU6050().get_calibration_result().accel_bias;
+            g_configActual.bias.gyro = Sensors::getMPU6050().get_calibration_result().gyro_bias;
         }
         
     } else {
         // No hay misión activa. Arranque normal.
         ESP_LOGI("BOOT_LOGIC", "Arranque normal de prevuelo. Calibrando sensores...");
         g_configActual.estado_cohete_actual = Cohete::ST_INIT;
-        Sensors::getMPU6050().calibrar(); // <-- Calibración segura en tierra
+        mMPU6050::CalibrationStatus result =  Sensors::getMPU6050().calibrar(ejeZ); // <-- Calibración segura en tierra
+        g_configActual.bias.accel = Sensors::getMPU6050().get_calibration_result().accel_bias;
+        g_configActual.bias.gyro = Sensors::getMPU6050().get_calibration_result().gyro_bias;
     }
 }
 

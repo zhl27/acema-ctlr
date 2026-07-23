@@ -20,7 +20,6 @@
 
 #include <cmath>
 #include <cstdint>
-
 namespace math
 {
 
@@ -62,6 +61,9 @@ struct Vector3f
 
 [[nodiscard]] constexpr inline Vector3f zero()
 {
+    // static_assert(std::is_trivial<math::Vector3f>::value, "Vector3f debe ser Trivial");
+    //static_assert(std::is_standard_layout<math::Vector3f>::value, "Vector3f debe ser Standard-Layout");
+
     return Vector3f{0.0f, 0.0f, 0.0f};
 }
 
@@ -357,5 +359,6 @@ inline void normalize(
 }
 
 } // namespace math
+
 
 #endif // VECTOR3F_H
