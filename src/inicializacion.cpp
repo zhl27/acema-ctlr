@@ -2,7 +2,8 @@
 #include "config.h"
 #include <freertos/projdefs.h>
 
-
+static const char *TAG_MAIN = "MAIN_SETUP";
+bool DEBUG_SERIAL = true;
 using namespace ConfigInit;
 
 // Instancias globales de los filtros (Ajustar las varianzas empíricamente. Ej: Gyro=0.001, Accel=0.01)
@@ -123,7 +124,11 @@ bool initHardware() {
 // Se esperaría en algun momento, limpiar el logger antes de despegar,
 // mas no, que sea condición para el depegue
 // LOGICA DE MAQUINA DE ESTADOS: Esto puede ir en la FSM para prevenir los reinicios
-void puntoDeInicio() {
+void puntoDeInicio(bool sensoresInit) {
+    if(!sensoresInit){
+        g_configActual.estado_cohete_actual = Cohete::ST_INIT;
+        return;
+    }
     ESP_LOGI("BOOT_LOGIC", "Evaluando estado de vuelo post-reinicio...");
 
     // Todo, cambiar segun prubea
@@ -227,8 +232,15 @@ void vTaskReadSensors(void *pvParameters) {
 
         ESP_LOGD(TAG_TASK_SENSORS, "Core ID: %d", xPortGetCoreID());
 
+        data_raw_t raw={1.0f };
+        if(!DEBUG_SERIAL){
+                // POR SERIAL
+        }
+        else{
+            raw= Sensors::get_raw_data();
+
+        }
         // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
-        data_raw_t raw = Sensors::get_raw_data();
         //print_data_raw(&raw);
 
         // TODO: Curiosidad: Por qué se utiliza una Queue en lugar de un Ringbuffer ?
@@ -460,6 +472,14 @@ void vTaskDataFilter(void *pvParameters)
                     0);
             }
 
+            if (xFlashRingbuf != NULL)
+            {
+                xRingbufferSend(
+                    xFlashRingbuf,
+                    &out,
+                    sizeof(data_all_t),
+                    0);
+            }
             EnlaceGSE::enviarTelemetria(out);
         }
         else {
@@ -475,13 +495,13 @@ void vTaskStateMachine(void *pvParameters) {
     (void)pvParameters;
     while (true) {
 
-        ESP_LOGD(TAG_TASK_STATE_MACHINE, "Core ID: %d", xPortGetCoreID());
+        ESP_LOGI(TAG_TASK_STATE_MACHINE, "Core ID: %d", xPortGetCoreID());
 
         size_t item_size = 0;
         // 1. Receive as a generic void pointer
-        void *item = xRingbufferReceive(xStateMachineRingbuf, &item_size, pdMS_TO_TICKS(2000));
+        void *item = xRingbufferReceive(xStateMachineRingbuf, &item_size, pdMS_TO_TICKS(5000));
 
-        if (item != NULL) {
+        if (item != nullptr) {
             if (item_size == sizeof(data_all_t)) {
 
                 data_all_t *datos_sensores = static_cast<data_all_t *>(item);
