@@ -132,10 +132,12 @@ namespace ConfigInit {
 }
 
 enum comandosGlobale {
-    CMD_ON_PIRO,
-    CMD_OFF_PIRO,
-    CMD_DISPARAR_PIRO,
-    CMD_DEPLEGAR_DROGE
+    CMD_CLEAR_LOG = 1,
+    CMD_DUMP_DATA,
+    CMD_COMMIT,
+    CMD_DESPLEGAR_DROGUE,
+    CMD_DESPLEGAR_MAIN,
+    CMD_SET_SERVO
 };
 
 #endif //ACEMA_CTLR_CONFIG_H

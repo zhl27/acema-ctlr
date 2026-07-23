@@ -692,6 +692,43 @@ void vTaskLora(void *pvParameters) {
 // LÓGICA DE COMANDOS
 // ==========================================
 
+// ==========================================
+// LÓGICA DE COMANDOS
+// ==========================================
+
+// Callback unificado para apertura de paracaídas (Drogue o Principal)
+CmdResult cmd_apertura_paracaidas(float value, void* context) {
+    mPyro* piro = static_cast<mPyro*>(context);
+    
+    // 1. Evaluar estado de salud (continuidad) sin que sea condición bloqueante
+    bool tiene_continuidad = piro->tieneContinuidad();
+    
+    // 2. Enviar reporte (ACK) explícito del estado de salud
+    // Si la continuidad es OK devuelve 1, si falla devuelve 0.
+    // (Ajusta el método según tu clase, ej: EnlaceGSE::enviar_ack() o EnlaceGSE::enviarACK())
+    // EnlaceGSE::enviar_ack(tiene_continuidad ? 1 : 0);
+    
+    // 3. Ejecutar la mini rutina de despliegue incondicionalmente
+    piro->armar();
+    piro->disparar((uint32_t)value); // Usamos el value recibido como tiempo de ignición (ms)
+    
+    // 4. Retornar el resultado para que el dispatcher cierre la transacción
+    int8_t stat =( tiene_continuidad ? (int8_t)1 : (int8_t)0);
+    return CmdResult{.status = stat, .data = value};
+}
+
+// Callback para ajustar el ángulo del servo (Clamp 0° - 30°)
+CmdResult cmd_set_angulo_servo(float value, void* context) {
+    // Limitamos el rango para proteger la estructura mecánicamente
+    float angulo_seguro = mi_clamp(value, 0.0f, 30.0f);
+    
+    // Actuamos directamente sobre el actuador
+    Actuators::getServo().sendAngulo(angulo_seguro);
+    
+    // Devolvemos status 1 (Éxito) y el ángulo final aplicado
+    return CmdResult{.status = 1, .data = angulo_seguro};
+}
+
 CmdResult comandoOnPiro(float value, void* context){
     return {1, 0.0f}; // Status OK temporal
 }
@@ -733,11 +770,16 @@ CmdResult cmd_borrar_log(float value, void* context) {
 
 bool registrarComandos(){
 
-    bool state;
-    state = cmdDispatcher.registerCommand(
-        CMD_DISPARAR_PIRO, 
-        comando_disparar_piro, 
-        &Actuators::getPyroDrogue() 
-    );
+    bool state = true;
+    state &= cmdDispatcher.registerCommand(CMD_CLEAR_LOG, cmd_borrar_log, nullptr);
+
+    // Nuevos comandos
+    // Pasamos las instancias correctas a través del puntero de contexto (void* context)
+    state &= cmdDispatcher.registerCommand(CMD_DESPLEGAR_DROGUE, cmd_apertura_paracaidas, &Actuators::getPyroDrogue());
+    state &= cmdDispatcher.registerCommand(CMD_DESPLEGAR_MAIN, cmd_apertura_paracaidas, &Actuators::getPyroPpal());
+    
+    // El servo no necesita pasar por contexto si se accede vía singleton o getter estático
+    state &= cmdDispatcher.registerCommand(CMD_SET_SERVO, cmd_set_angulo_servo, nullptr);
+
     return state;
 }
