@@ -29,15 +29,18 @@ namespace math
  */
 constexpr float kEpsilon = 1e-6f;
 
+
 /**
- * @brief Vector tridimensional de precisión simple.
- *
- * Es un tipo POD (Plain Old Data), por lo que puede copiarse,
- * serializarse y almacenarse directamente.
+ * @brief Vector3f como POD Puro (Standard-Layout y Trivial)
+ * Sin constructores de usuario, sin inicializadores in-class.
  */
-/**
- * @brief Vector tridimensional de precisión simple.
- */
+struct Vector3f
+{
+    float x;
+    float y;
+    float z;
+};
+/*
 struct Vector3f
 {
     float x{0.0f};
@@ -52,28 +55,29 @@ struct Vector3f
     constexpr Vector3f(float x_, float y_, float z_) noexcept 
         : x(x_), y(y_), z(z_) {}
 };
+*/
 // -----------------------------------------------------------------------------
 // Constantes
 // -----------------------------------------------------------------------------
 
 [[nodiscard]] constexpr inline Vector3f zero()
 {
-    return {0.0f, 0.0f, 0.0f};
+    return Vector3f{0.0f, 0.0f, 0.0f};
 }
 
 [[nodiscard]] constexpr inline Vector3f unitX()
 {
-    return {1.0f, 0.0f, 0.0f};
+    return Vector3f{1.0f, 0.0f, 0.0f};
 }
 
 [[nodiscard]] constexpr inline Vector3f unitY()
 {
-    return {0.0f, 1.0f, 0.0f};
+    return Vector3f{0.0f, 1.0f, 0.0f};
 }
 
 [[nodiscard]] constexpr inline Vector3f unitZ()
 {
-    return {0.0f, 0.0f, 1.0f};
+    return Vector3f{0.0f, 0.0f, 1.0f};
 }
 
 // -----------------------------------------------------------------------------

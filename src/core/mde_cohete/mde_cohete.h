@@ -20,6 +20,9 @@
  * En aeronáutica el estándar inercial suele ser el eje Z (Z-Down o Z-Up).
  * Si su vertical física calibrada es Z, hay que cambiar los '.y' por '.z'.
  *
+ * Solución: Se configura en código que eje del sensor representa el eje +Z del cohete. 
+ * Un cambio de sistemas de referencia. 
+ * 
  * 2. SOBRE EL SHOCK ESTRUCTURAL DEL PARACAÍDAS PRINCIPAL:
  * Si el drogue falla y venimos a -35 m/s (o peor), abrir el principal de
  * golpe genera un "Opening Shock" brutal. ¿La cuerda de retención (shock cord)
@@ -50,7 +53,9 @@ namespace Cohete {
     void mde_cohete_actualizar(data_all_t* datos_sensores);
     void transicion_error(error_cohete_t error, data_all_t* datos_sensores);
 
+
 }
+
 
 
 

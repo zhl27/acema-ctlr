@@ -5,7 +5,7 @@
 #include "mde_cohete.h"
 
 #include "esp_log.h"
-
+#include "data.h"
 
 
 namespace Cohete {
@@ -79,13 +79,17 @@ namespace Cohete {
 
     void mde_cohete_actualizar(data_all_t* datos_sensores) {
         if (SYSTEM._estado >= ST_NULL) {
-            transicion_error(ERR_ESTADO_INVALIDO, datos_sensores);
+            // Nota: Si hubo un error, A qué estado vamos, idealmente al reset o entry point. 
+            // Pero como importa muchísimo conocer el estado actual, necesitamos una copia de respaldo
+            
+            //transicion_error(ERR_ESTADO_INVALIDO, datos_sensores);
             return;
         }
 
         // actualizar datos de COHETE con datos nuevos de los sensores
-        SYSTEM.ctx_fisico.altitud_m_relativa_al_pad = datos_sensores->altitud_filtrada_m - SYSTEM.ctx_fisico.altitud_m_pad; // TODO: chequear que altitud_filtrada_m sea altitud del bmp280 y que represente altitud al nivel del mar
-
+        SYSTEM.ctx_fisico.altitud_m_relativa_al_pad = datos_sensores->altitud_filtrada_m - SYSTEM.ctx_fisico.altitud_m_pad;
+        // TODO: chequear que altitud_filtrada_m sea altitud del bmp280 y que represente altitud al nivel del mar
+        // NOTE: Es una altura respecto de la base de despegue.
 
         MDE_COHETE[SYSTEM._estado](datos_sensores); // Ejecuta la función que corresponde al estado actual
     }

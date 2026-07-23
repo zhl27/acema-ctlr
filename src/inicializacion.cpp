@@ -40,6 +40,9 @@ static const char *TAG_TASK_LORA = "TASK LORA";
 
 
 mFlash cajaNegra(FLASH_CS);
+// !< Acá se guardan los datos de configuración inicial
+ConfigDatos g_configActual = {}; // <--- DEBE SER GLOBA U EN UNA STRUCT GLOBAL (SYSTEM)
+
 
 int contadorMde = 0;
 int contadorFlash = 0;
@@ -50,38 +53,130 @@ int contadorLora = 0;
 static CmdDispatcher cmdDispatcher;
 // int muestreo_datos_crudos_ms = 500; // cada 0,5 segundos
 
+//>! Orden
 
+// 1. Para comunicación serial
 void initSerialLog(){
     Serial.begin(115200); // TODO: Para la Compu de vuelo no se usa Serial
 
     while (!Serial)
-        delay(1000);
+        delay(10);
 
     ESP_LOGI("SETUP", "Comenzando SETUP.");
 }
 
-bool initHardware(){
+// 2. Para cargar datos de configuración
+bool initBlackBox()
+{
+    if(!cajaNegra.begin(sizeof(data_all_t))){
+        if(EnlaceGSE::enviarError("Not load blackBox")) 
+        {
+            ESP_LOGI("INIT BLACK BOX","Not load blackBox");
+        }
+        else {
+            ESP_LOGE("INIT BLACK BOX", "EnlaceGSE roto");
+        }
+        return false; // false?
+    }
+
+    if(!cajaNegra.cargarConfig(&g_configActual, sizeof(g_configActual))){
+        if(EnlaceGSE::enviarError("Not load config")) 
+        {
+            ESP_LOGI("INIT BLACK BOX","Not load config");
+        }
+        else {
+            ESP_LOGE("INIT BLACK BOX", "EnlaceGSE roto");
+        }
+        return false; // false?
+    }
+    return true;
+}
+
+bool initHardware() {
     bool inicializacion = false;
-    // Inicializa internamente mpu y bpm, + la calibración
+    
+    // NOTA: Sensors::init() AHORA SOLO DEBE INICIALIZAR LOS BUSES Y OBJETOS (begin). 
+    // LA CALIBRACIÓN DEBE HABER SIDO EXTRAÍDA DE ESTE MÉTODO.
     inicializacion = Sensors::init();
-    if(inicializacion){
-        ESP_LOGI("init hard", "Inicialización de Sensors exitosa");
-    }else{
-        ESP_LOGE("init hard", "ERROR en la inicializacion de sensors");
+    if(inicializacion) {
+        ESP_LOGI("INIT_HARD", "Inicialización de Sensors exitosa (Sin calibrar)");
+    } else {
+        ESP_LOGE("INIT_HARD", "ERROR en la inicializacion de sensors");
+        return false;
     }
 
     inicializacion = Actuators::init();
-    
-    if(inicializacion){
-        ESP_LOGI("init hard", "Inicialización de Actuators exitosa");
-    }else{
-        ESP_LOGE("init hard", "ERROR en la inicializacion de Actuators");
+    if(inicializacion) {
+        ESP_LOGI("INIT_HARD", "Inicialización de Actuators exitosa");
+    } else {
+        ESP_LOGE("INIT_HARD", "ERROR en la inicializacion de Actuators");
+        return false;
     }
-    GSE::init();
+    
     cmdDispatcher.init();
-
-    return inicializacion;
+    return true;
 }
+
+
+// Se esperaría en algun momento, limpiar el logger antes de despegar,
+// mas no, que sea condición para el depegue
+// LOGICA DE MAQUINA DE ESTADOS: Esto puede ir en la FSM para prevenir los reinicios
+void puntoDeInicio() {
+    ESP_LOGI("BOOT_LOGIC", "Evaluando estado de vuelo post-reinicio...");
+
+    // INTERLOCK 1: ¿La misión había sido armada/iniciada antes del reinicio?
+    if (g_configActual.mision_activa == true) {
+        
+        // INTERLOCK 2: Validación por sensores (se asume que Sensors::get_raw_data obtiene una lectura válida)
+        data_raw_t raw_data = {};
+        float altitud_actual = {};
+        // Descarta ruido inicial 
+        for (size_t i = 0; i < 50; i++)
+        {
+            raw_data = Sensors::get_raw_data();
+            altitud_actual = raw_data.bmp.altitud_snm_m; 
+        }
+        
+        // Comparamos la altitud actual con la altitud base guardada en flash
+        if ((altitud_actual - g_configActual.altitud_base_agl) > 20.0f) {
+            // ¡ESTAMOS EN EL AIRE REALMENTE! Recuperando vuelo.
+            ESP_LOGW("BOOT_LOGIC", "¡Reinicio en vuelo detectado! Saltando calibración IMU.");
+            g_configActual.estado_cohete_actual = Cohete::ST_BOOST; 
+            
+            // Aquí NO se llama a Sensors::calibrar(). El filtro dependerá de los offsets guardados 
+            // previamente en la flash, o usará valores por defecto seguros.
+        } else {
+            // Falsa alarma. Se armó, pero nunca despegó (o ya aterrizó).
+            ESP_LOGI("BOOT_LOGIC", "Misión activa pero en tierra. Calibrando sensores...");
+            g_configActual.estado_cohete_actual = Cohete::ST_INIT;
+            Sensors::getMPU6050().calibrar(); // <-- Calibración segura en tierra
+        }
+        
+    } else {
+        // No hay misión activa. Arranque normal.
+        ESP_LOGI("BOOT_LOGIC", "Arranque normal de prevuelo. Calibrando sensores...");
+        g_configActual.estado_cohete_actual = Cohete::ST_INIT;
+        Sensors::getMPU6050().calibrar(); // <-- Calibración segura en tierra
+    }
+}
+
+
+void initLora(){
+    // Crea el buffer de telemetria
+    xLoraRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
+    if (xLoraRingbuf == NULL) ESP_LOGE(TAG_MAIN, "Error crítico: No se pudo crear xLoraRingbuf");
+
+    // xFlashRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
+    // if (xFlashRingbuf == NULL) ESP_LOGE(TAG_MAIN, "Error crítico: No se pudo crear xFlashRingbuf");
+
+    // 5Inicializar la capa de enlace GSE
+    ESP_LOGI(TAG_MAIN, "Enlace LoRa/GSE configurado.");
+    
+    GSE::init();
+    EnlaceGSE::inicializar(xLoraRingbuf);
+}
+
+
 
 
 

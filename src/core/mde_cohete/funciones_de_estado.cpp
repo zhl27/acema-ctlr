@@ -1,14 +1,16 @@
 #include "funciones_de_estado.h"
 
-#include "mde_cohete.h"
+//#include "mde_cohete.h"
 #include "SerialPrint.h"
 #include "esp_log.h"
+/*
 #include "services/Actuators.h"
-
 #include "services/GSE.h"
 #include "services/Sensors.h"
-#include  "include.h"
-
+*/
+#include "main.h"
+//#include "include.h"
+#include "inicializacion.h"
 
 // TODO: Integrar con la variable global COHETE para transiciones de estado
 
@@ -115,6 +117,9 @@ namespace Cohete {
 
     void f_st_init(data_all_t* datos_sensores) {
         ESP_LOGI(TAG_BASE, "INIT");
+
+        //TODO: LÓGICA DE LECTURA DE FLASH
+
 
         // Esperar 5 minutos para que la mpu entre en calor, luego calibrarla.
         Timers::xTimerRecalibrarMPU =

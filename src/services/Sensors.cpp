@@ -31,7 +31,7 @@ bool Sensors::init() {
     }
 
     // TODO: Se define desde acá si esta en banco (+Z) o en cohete (+Y)
-    _mpu6050.calibrar(mMPU6050::GravityAxis::PLUS_Z);
+    //_mpu6050.calibrar(mMPU6050::GravityAxis::PLUS_Z);
     ESP_LOGI(TAG_TASK_SENSORS, "mMPU6050 inicializada y calibrada!");
     //print_calibration_result(_mpu6050.get_calibration_result());
     //vTaskDelay(pdMS_TO_TICKS(3000));

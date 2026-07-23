@@ -20,70 +20,66 @@ using namespace ConfigInit;
 
 void setup() {
     // 1. Inicialización de la consola y logs
-    Serial.begin(SERIAL_BAUDRATE_LOG); 
-    while (!Serial) { delay(100); }
-
-    // Por defecto ESP-IDF loguea en INFO, si querés DEBUG descomenta:
-    // esp_log_level_set("*", ESP_LOG_DEBUG);
-
+    initSerialLog(); // Utiliza tu función de inicializacion.cpp en lugar de duplicar código
+    
     ESP_LOGI(TAG_MAIN, "===========================================");
     ESP_LOGI(TAG_MAIN, "🚀 BOOT SEQUENCE INICIADA");
     ESP_LOGI(TAG_MAIN, "===========================================");
 
-    // 2. Inicialización del Hardware y Sensores
-    if (initHardware()) {
-        ESP_LOGI(TAG_MAIN, "Hardware inicializado correctamente.");
+    // 2. Recuperación de memoria y configuración (Caja Negra)
+    if (initBlackBox()) {
+        ESP_LOGI(TAG_MAIN, "Configuración previa recuperada de la Flash.");
     } else {
-        ESP_LOGE(TAG_MAIN, "CRITICAL ERROR: Fallo en initHardware(). Posible fallo en I2C o sensores.");
-        // Podrías poner un bucle infinito aquí si el cohete no debe volar sin sensores
+        ESP_LOGW(TAG_MAIN, "No se pudo recuperar la configuración. Cargando defaults.");
     }
 
-    // 3. Registro de Comandos Bidireccionales
+    // 3. Inicialización de Hardware Base (I2C, SPI, Sensores sin calibrar)
+    if (initHardware()) {
+        ESP_LOGI(TAG_MAIN, "Hardware base inicializado.");
+    } else {
+        ESP_LOGE(TAG_MAIN, "CRITICAL ERROR: Fallo en initHardware(). Posible fallo en I2C.");
+        while(true) { vTaskDelay(100); } // Bucle infinito de seguridad
+    }
+
+    // 4. Lógica de Boot y Diagnóstico de Vuelo (Decide estado y si calibra o no)
+    puntoDeInicio(); 
+
+    // 5. Inicialización de Comunicaciones RF y Comandos
+    initLora();
     if (registrarComandos()) {
         ESP_LOGI(TAG_MAIN, "Comandos de GSE registrados exitosamente.");
     } else {
         ESP_LOGW(TAG_MAIN, "Atención: Fallo al registrar algunos comandos.");
     }
 
-    // 4. Creación de Colas y RingBuffers
+    // 6. Creación de Colas y RingBuffers de FreeRTOS
     ESP_LOGI(TAG_MAIN, "Asignando memoria para Buffers de FreeRTOS...");
-
     xColaSensores = xQueueCreate(BUF_Q_SENSOR_SIZE, sizeof(data_raw_t));
     if (xColaSensores == NULL) ESP_LOGE(TAG_MAIN, "Error crítico: No se pudo crear xColaSensores");
 
     xStateMachineRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
     if (xStateMachineRingbuf == NULL) ESP_LOGE(TAG_MAIN, "Error crítico: No se pudo crear xStateMachineRingbuf");
 
-    xLoraRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
-    if (xLoraRingbuf == NULL) ESP_LOGE(TAG_MAIN, "Error crítico: No se pudo crear xLoraRingbuf");
-
-    // xFlashRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
-    // if (xFlashRingbuf == NULL) ESP_LOGE(TAG_MAIN, "Error crítico: No se pudo crear xFlashRingbuf");
-
-    // 5. Inicializar la capa de enlace GSE
-    EnlaceGSE::inicializar(xLoraRingbuf);
-    ESP_LOGI(TAG_MAIN, "Enlace LoRa/GSE configurado.");
-
-    // 6. Lanzamiento de las Tareas (Threads)
+    // 7. Lanzamiento de las Tareas (Threads)
     ESP_LOGI(TAG_MAIN, "Desplegando Tareas de FreeRTOS en Cores...");
     
-    // Core 1: Operaciones críticas de lectura y filtrado
+    // Core 1: Operaciones críticas
     xTaskCreatePinnedToCore(vTaskReadSensors, "ReadSensors", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskReadSensorsHandle), 1);
     xTaskCreatePinnedToCore(vTaskDataFilter, "DataFilter", 8192, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskDataFilterHandle), 1);
     xTaskCreatePinnedToCore(vTaskStateMachine, "StateMachine", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskStateMachineHandle), 1);
 
-    // Core 0: Operaciones de comunicación y persistencia (WiFi/LoRa/Flash viven mejor acá)
-    // xTaskCreatePinnedToCore(vTaskFlash, "Flash", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskFlashHandle), 0);
+    // Core 0: Operaciones de comunicación
     xTaskCreatePinnedToCore(vTaskLora, "Lora", 8192, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskLoraHandle), 0);
+    // xTaskCreatePinnedToCore(vTaskFlash, "Flash", 4096, NULL, 4, &(SYSTEM.procesos.xTaskFlashHandle), 0);
 
     ESP_LOGI(TAG_MAIN, "===========================================");
     ESP_LOGI(TAG_MAIN, "🚀 BOOT SEQUENCE COMPLETADA. Entregando control a FreeRTOS.");
     ESP_LOGI(TAG_MAIN, "===========================================");
 
-    // 7. Borrar la tarea "setup/loop" predeterminada de Arduino para liberar RAM
+    // 8. Borrar la tarea "setup/loop" predeterminada
     vTaskDelete(NULL); 
 }
 
 void loop() {
-    // Intencionalmente vacío. Borrado en setup mediante vTaskDelete.
+    // Vacío
 }

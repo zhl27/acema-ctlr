@@ -26,6 +26,41 @@ extern RingbufHandle_t xFlashRingbuf;
 extern QueueHandle_t xColaSensores;
 
 // ---------------------------------------------------------
+// Prototipos de Secuencias de arranque
+// ---------------------------------------------------------
+/**
+ * @brief Inicializa el puerto serial 
+ */
+void initSerialLog();
+
+/**
+ * @brief Inicializa la memria flash y carga la configuración
+ */
+bool initBlackBox();
+
+/**
+ * @brief Inicializa el hardware (sensores, actuadores, bus I2C) 
+ * @return true si todo inició correctamente, false en caso de error.
+ */
+bool initHardware(); // Corregí el typo de "initHarware" a "initHardware"
+
+ /**
+ * @brief Aplica la lógica de boot y decide el estado de inicio
+ */
+void puntoDeInicio();
+
+ /**
+ * @brief Inicializa el lora y canal de comunicaciones 
+ */
+void initLora();
+
+/**
+ * @brief Registra los callbacks en el CmdDispatcher
+ * @return true si se registraron correctamente
+ */
+bool registrarComandos();
+
+// ---------------------------------------------------------
 // Prototipos de Tareas de FreeRTOS
 // ---------------------------------------------------------
 /**
@@ -56,16 +91,7 @@ void vTaskLora(void *pvParameters);
 // ---------------------------------------------------------
 // Prototipos de Inicialización
 // ---------------------------------------------------------
-/**
- * @brief Inicializa el hardware (sensores, actuadores, bus I2C) y el log de consola.
- * @return true si todo inició correctamente, false en caso de error.
- */
-bool initHardware(); // Corregí el typo de "initHarware" a "initHardware"
 
-/**
- * @brief Registra los callbacks en el CmdDispatcher
- * @return true si se registraron correctamente
- */
-bool registrarComandos();
+
 
 #endif // INICIALIZACION_H
