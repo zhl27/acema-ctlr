@@ -8,12 +8,13 @@
 #include "data.h"
 
 
-#if defined(SENSORES_MOCK)
+#ifdef SENSORES_MOCK
     #include "mockBMP280.h"
     using SensorBMP280 = mockBMP280;
-#elif
+#else
     #include "Adafruit_BMP280.h"
     using SensorBMP280 = Adafruit_BMP280;
+    // using namespace Adafruit_BMP280; // es una clase, no un namespace, no se puede usar "using namespace X;"
 #endif
 
 

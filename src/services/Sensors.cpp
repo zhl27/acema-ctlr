@@ -19,9 +19,9 @@ mMPU6050 Sensors::_mpu6050;
 using namespace ConfigInit; 
 
 bool Sensors::init() {
-#if defined(SENSORES_MOCK)
+#ifdef  SENSORES_MOCK
     ESP_LOGI(TAG_TASK_SENSORS, "Inicializando Mock de Sensores.");
-#elif
+#else
     if(!Wire.begin(WIRE_SDA_0, WIRE_SCL_0)){
         ESP_LOGE(TAG_TASK_SENSORS, "Falló la inicialización del I2C.");
         return false;

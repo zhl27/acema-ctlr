@@ -9,10 +9,10 @@
 #include "../../../../src/core/math/RunningStatistics3D.h"  // API Estadística
 
 
-#if defined(SENSORES_MOCK)
+#ifdef  SENSORES_MOCK
     #include "mockMPU6050.h"
     using SensorMPU6050 = mockMPU6050;
-#elif
+#else
     #include "Adafruit_MPU6050.h"
     using SensorMPU6050 = Adafruit_MPU6050;
 #endif

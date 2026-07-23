@@ -186,6 +186,7 @@ void vTaskDataFilter(void *pvParameters)
 
     kalmanPitch.habilitarVarianzaDinamica();
     kalmanYaw.habilitarVarianzaDinamica();
+
     while (true)
     {
         if (xQueueReceive(xColaSensores, &raw, portMAX_DELAY) == pdTRUE){
@@ -213,15 +214,11 @@ void vTaskDataFilter(void *pvParameters)
             // MAPEO DE EJES (Sensor MPU -> Cohete Físico)
             // Todo permanece en las unidades nativas
             //----------------------------------------------------------------------
-            #ifdef DEBUG_DATOS_CRUDOS
-            const float accelX_m_s2 = raw.mpu.accel_x_m_s2;
-            const float accelY_m_s2 = raw.mpu.accel_y_m_s2;
-            const float accelZ_m_s2 = raw.mpu.accel_z_m_s2;
-            #else 
+
             const float accelX_m_s2 = raw.mpu.accel_x_m_s2;
             const float accelY_m_s2 = raw.mpu.accel_z_m_s2;
             const float accelZ_m_s2 = raw.mpu.accel_y_m_s2;
-            #endif
+
             const float gyroRoll_rad_s  = raw.mpu.gyro_z_rad_s;     // Alabeo
             const float gyroPitch_rad_s = raw.mpu.gyro_y_rad_s;     // Cabeceo
             const float gyroYaw_rad_s   = raw.mpu.gyro_x_rad_s;     // Rotación sobre el eje vertical
