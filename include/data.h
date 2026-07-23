@@ -223,7 +223,7 @@ namespace Cohete {
         ST_DROGUE_DESPLEGADO,      // Derivada de altura nula. Disparo Drogue + Corte cámara. Luego de 3 segundos post-drogue testear salud
         ST_PCAIDAS_PPAL_DESPLEGADO,
         ST_CAIDA_CATASTROFICA,     // Falla total de retención. Pánico -> Volcado a Flash
-        ST_ATERRIZAJE,             // Reposo en suelo. Emisión de coordenadas GPS
+        ST_ATERRIZADO,             // Reposo en suelo. Emisión de coordenadas GPS
         ST_NULL
     } estado_cohete_t;
 
@@ -252,7 +252,6 @@ namespace Cohete {
         bool _entrando_estado;
         // bool es_estado_salida;
 
-        bool drogue_disparado;
 
         struct {
             TaskHandle_t xTaskReadSensorsHandle;
@@ -286,6 +285,25 @@ namespace Cohete {
 
         // PEGAMENTO FEO, NECESITO ACCESO A LA FLASH
         // void* blackBox; 
+        struct{
+            bool gse_conectado;
+            bool flash_log_borrado;
+            bool gps_preciso;
+            bool drogue_disparado;
+            bool paracaidas_principal_disparado;
+            bool emergencia_fatal;
+        } flags;
+        
+        // Permite interconexión entre comandos y tareas
+        struct{
+            bool borrar_log;
+            bool volcar_ram_a_flash;
+        } accion;
+
+        struct{
+            float gps_latitud;
+            float gps_longitud;
+        }datos_actuales;
     } system_data_t;
 
     extern system_data_t SYSTEM; // SOLAMENTE DEBE SER MODIFICADA POR LA MDE DEL COHETE. LOS DEMÁS PROCESOS SOLO DEBERÍAN LEERLA, PERO NO DEBEN MODIFICARLA. // TODO: FORZAR SOLO LECTURA PARA OBJETOS EXTERNOS A LA MDE.

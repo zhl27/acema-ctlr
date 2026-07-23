@@ -21,5 +21,10 @@ enum lora_protocol: uint8_t {
     G_CMD     = 0X40 
 };
 
-
+// Estructura para el Acuse de Recibo (ACK)
+struct CmdAck_t {
+    uint32_t opCode;
+    int8_t status;
+    float datoOpcional;
+};
 #endif /* LORA_PROTOCOLS_H */

@@ -46,16 +46,19 @@ void GSE::init() {
     SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
     ESP_LOGI(TAG_GSE, "Inicializando SPI en modo Arduino Nano...");
 #endif
-    if(_lora.begin()) {
+
+
+    if(_lora.begin(DEFAULT_SYNC_WORD, DEFAULT_ENCRY_WORD, DEFAULT_FREC)) {
         ESP_LOGI(TAG_GSE, "LoRa listo para el Cohete!");
     } else {
         ESP_LOGE(TAG_GSE, "Falla crítica en hardware LoRa");
     }
-}
 
+}
+/*
 void GSE::actualizar(data_all_t *data) {
     const unsigned long currentMillis = millis();
-
+    // CONTIENE CÓDIGO VIEJO, BASURA, QUE SERVIA SI LOS MODULOS LORA PODIAN INTERCOMUNICARSE
     switch (_currentState) {
 
         case ROCKET_INIT:
@@ -128,7 +131,7 @@ void GSE::actualizar(data_all_t *data) {
             break;
     }
 }
-
+*/
 bool GSE::enviar_error(const char* error) {
     return _lora.send_error(error);
 }
@@ -139,6 +142,19 @@ bool GSE::enviar_mensaje(const char* mensaje) {
 
 bool GSE::actualizar_graficas(const data_all_t *data) {
     return _lora.send_data(*data);
+}
+
+bool GSE::enviar_ack(CmdAck_t acuse){
+    return _lora.c_send_ACK(acuse);
+}
+
+bool GSE::enviar_pong()
+{
+    return _lora.send_pong();
+}
+
+void GSE::set_estado_conexion(EstadoConexionGSE estado){
+    _currentState = estado;
 }
 
 bool GSE::leer_paquete(pkt_t* paquete){

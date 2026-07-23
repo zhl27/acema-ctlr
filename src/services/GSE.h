@@ -10,7 +10,7 @@
 #include "LoraConfig.h"
 #include "LoraWrapped.h"
 
-
+#include "EnlaceGSE/EnlaceGSE.h"
 
 enum EstadoConexionGSE : std::uint8_t {
     ROCKET_INIT,
@@ -39,13 +39,17 @@ public:
     static bool actualizar_graficas(const data_all_t *data);
     static bool enviar_mensaje(const char* mensaje);
     static bool enviar_error(const char* error);
+    static bool enviar_ack(CmdAck_t acuse);
+    static bool enviar_pong();
     static bool leer_paquete(pkt_t* paquete);
+    static void set_estado_conexion(EstadoConexionGSE estado);
 
-    static void actualizar(data_all_t *data);
+    //static void actualizar(data_all_t *data);
 
     static EstadoConexionGSE estado_conexion_gse() {
         return GSE::_currentState;
     }
+
 };
 
 

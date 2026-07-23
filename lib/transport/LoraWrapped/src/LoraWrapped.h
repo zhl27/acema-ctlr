@@ -109,6 +109,15 @@ public:
      */
     bool g_send_command(CommandPayload);
 
+    /**
+     * @brief Envia un ACK. Lo usa el CPU
+     */
+    bool c_send_ACK(CmdAck_t);
+
+    /**
+     * @brief Envia las únicamente las coordenas para buscar el cohete
+     */
+    //bool send_SOS(float lat, float, long);
     bool read_packet(pkt_t* pPkt);
 };
 

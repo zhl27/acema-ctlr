@@ -347,6 +347,19 @@ bool LoraWrapped::g_send_command(CommandPayload comando)
 
 }
 
+bool LoraWrapped::c_send_ACK(CmdAck_t ACK)
+{
+    static CmdAck_t ack = ACK;
+    pkt_t packet = {};
+    
+    // Prepara el paquete
+    packet.protocol = lora_protocol::C_ACK;
+    packet.payload = (void*)&ack;
+    packet.len = sizeof(ack); // envía solo los bytes necesarios
+
+    return _send_packet(&packet);
+}
+
 bool LoraWrapped::read_packet(pkt_t *pPkt)
 {
     if(pPkt == nullptr /*||_st != CONNECTION_STATUS::CONNECTED*/)

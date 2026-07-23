@@ -8,12 +8,7 @@
 #include "data.h"          
 #include "LoraProtocols.h"   
 
-// Estructura para el Acuse de Recibo (ACK)
-struct CmdAck_t {
-    uint32_t opCode;
-    int8_t status;
-    float datoOpcional;
-};
+
 
 // El "Sobre" genérico
 struct TxEnvelope_t {

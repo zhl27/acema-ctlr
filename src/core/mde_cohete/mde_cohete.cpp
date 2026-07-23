@@ -15,8 +15,6 @@ namespace Cohete {
         ._error = ERR_NINGUNO,
         ._entrando_estado = false,
         // .es_estado_salida = false,
-        .drogue_disparado = false,
-
         .procesos ={
             .xTaskReadSensorsHandle = NULL,
             .xTaskStateMachineHandle = NULL,
@@ -44,6 +42,19 @@ namespace Cohete {
             .masa_g_combustible = 0, // TODO: masa_combustible_kg debe ser configurable a traves de comando desde GSE: "set_masa_combustible_kg" o similar
             .altitud_m_pad = 0.0f, // TODO: altitud_m_pad toma el valor actual de la altitud_bmp --> cuando comando desde GSE: "tara_altitud" o similar
             .altitud_m_relativa_al_pad = 0.0f // se actualiza utilizando SYSTEM.ctx_fisico.altitud_m_cero_pad
+        },
+
+        .flags = {
+            .gse_conectado = false,
+            .flash_log_borrado = false, // Se debe borrar el log de datos basura
+            .gps_preciso = false,
+            .drogue_disparado = false,
+            .paracaidas_principal_disparado = false,
+            .emergencia_fatal = false,
+        },
+        .accion = {
+            .borrar_log = false,
+            .volcar_ram_a_flash = false,
         }
     };
 
@@ -57,8 +68,8 @@ namespace Cohete {
         f_st_fase_balistica,
         f_st_drogue_desplegado,
         f_st_pcaidas_ppal_desplegado,
-        f_st_caida_catastrofica,
-        f_st_aterrizaje
+        f_st_aterrizado,
+        f_st_caida_catastrofica
     };
 
     // correlativo a estado_vuelo_t --> el orden importa
@@ -77,21 +88,33 @@ namespace Cohete {
     };
 
 
+
     void mde_cohete_actualizar(data_all_t* datos_sensores) {
         if (SYSTEM._estado >= ST_NULL) {
-            // Nota: Si hubo un error, A qué estado vamos, idealmente al reset o entry point. 
-            // Pero como importa muchísimo conocer el estado actual, necesitamos una copia de respaldo
-            
-            //transicion_error(ERR_ESTADO_INVALIDO, datos_sensores);
             return;
         }
 
-        // actualizar datos de COHETE con datos nuevos de los sensores
-        SYSTEM.ctx_fisico.altitud_m_relativa_al_pad = datos_sensores->altitud_filtrada_m - SYSTEM.ctx_fisico.altitud_m_pad;
-        // TODO: chequear que altitud_filtrada_m sea altitud del bmp280 y que represente altitud al nivel del mar
-        // NOTE: Es una altura respecto de la base de despegue.
+        // Control de transición y tiempo en el estado
+        static estado_cohete_t estado_anterior = ST_NULL;
+        static uint32_t t_entrada_estado = 0;
 
-        MDE_COHETE[SYSTEM._estado](datos_sensores); // Ejecuta la función que corresponde al estado actual
+        uint32_t ahora = millis();
+
+        // Si hubo un cambio de estado, reiniciamos la referencia temporal
+        if (SYSTEM._estado != estado_anterior) {
+            t_entrada_estado = ahora;
+            estado_anterior = SYSTEM._estado;
+        }
+
+        // Calculamos cuánto tiempo lleva el cohete en el estado actual
+        uint32_t ms_en_estado = ahora - t_entrada_estado;
+
+        // Actualizar datos derivados de contexto físico
+        SYSTEM.ctx_fisico.altitud_m_relativa_al_pad = 
+            datos_sensores->altitud_filtrada_m - SYSTEM.ctx_fisico.altitud_m_pad;
+
+        // Ejecutar el estado pasando los datos y el tiempo transcurrido
+        MDE_COHETE[SYSTEM._estado](datos_sensores, ms_en_estado);
     }
 
     // void pausar_proceso(TaskHandle_t proceso) {

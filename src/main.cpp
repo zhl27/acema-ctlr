@@ -67,6 +67,7 @@ void setup() {
     xTaskCreatePinnedToCore(vTaskReadSensors, "ReadSensors", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskReadSensorsHandle), 1);
     xTaskCreatePinnedToCore(vTaskDataFilter, "DataFilter", 8192, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskDataFilterHandle), 1);
     xTaskCreatePinnedToCore(vTaskStateMachine, "StateMachine", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskStateMachineHandle), 1);
+    xTaskCreatePinnedToCore(vTaskFlash, "BlackBox", 8192, &cajaNegra, 4, &(Cohete::SYSTEM.procesos.xTaskFlashHandle), 1); 
 
     // Core 0: Operaciones de comunicación
     xTaskCreatePinnedToCore(vTaskLora, "Lora", 8192, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskLoraHandle), 0);

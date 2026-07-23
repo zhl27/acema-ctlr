@@ -51,6 +51,8 @@ int contadorLora = 0;
 
 
 static CmdDispatcher cmdDispatcher;
+mBuzzer buzzer (BUZZER_PIN);
+
 // int muestreo_datos_crudos_ms = 500; // cada 0,5 segundos
 
 //>! Orden
@@ -507,108 +509,183 @@ void vTaskStateMachine(void *pvParameters) {
 
 }
 
-// Mock implementation of the Flash task: consumes items from the Flash ringbuffer and "persists" them
 void vTaskFlash(void *pvParameters) {
-    (void)pvParameters;
+    mFlash* ptrCajaNegra = static_cast<mFlash*>(pvParameters);
+    
+    ESP_LOGI(TAG_TASK_FLASH, "vTaskFlash iniciada en Core %d", xPortGetCoreID());
+
     while (true) {
+        // -----------------------------------------------------------------
+        // 1. CHEQUEO DE NOTIFICACIONES ASÍNCRONAS (No bloqueante)
+        // -----------------------------------------------------------------
+        uint32_t notif_val = ulTaskNotifyTake(pdTRUE, 0);
 
-        ESP_LOGD(TAG_TASK_FLASH, "Core ID: %d", xPortGetCoreID());
+        // A) ACCIÓN CRÍTICA: VOLCADO DE EMERGENCIA DE LA RAM A FLASH
+        if (notif_val > 0 || Cohete::SYSTEM.accion.volcar_ram_a_flash) {
+            ESP_LOGW(TAG_TASK_FLASH, "Iniciando volcado de seguridad a Flash Externa (mFlash)...");
+            
+            size_t item_size = 0;
+            void *item = nullptr;
+            
+            // DRENADO TOTAL: Vaciamos todo el ring buffer iterativamente 
+            // con timeout 0 para rescatar cada byte disponible en RAM antes del choque.
+            while ((item = xRingbufferReceive(xFlashRingbuf, &item_size, 0)) != NULL) {
+                if (item_size == sizeof(data_all_t)) {
+                    ptrCajaNegra->guardarPuntoLog(item, sizeof(data_all_t));
+                }
+                vRingbufferReturnItem(xFlashRingbuf, item);
+            }
+            
+            Cohete::SYSTEM.accion.volcar_ram_a_flash = false;
+            ESP_LOGI(TAG_TASK_FLASH, "¡Volcado masivo de RAM completado antes del impacto!");
+        }
 
+        // B) ACCIÓN DE MANTENIMIENTO: BORRAR LOG (Independiente de la emergencia)
+        if (Cohete::SYSTEM.accion.borrar_log) {
+            ESP_LOGW(TAG_TASK_FLASH, "Ejecutando borrado de log en Flash (Caja Negra)...");
+            
+            if (ptrCajaNegra != nullptr) {
+                ptrCajaNegra->resetearLog(); 
+                Cohete::SYSTEM.accion.borrar_log = false;
+                Cohete::SYSTEM.flags.flash_log_borrado = true; 
+                ESP_LOGI(TAG_TASK_FLASH, "¡Log borrado con éxito!");
+            } else {
+                ESP_LOGE(TAG_TASK_FLASH, "No existe el objeto mFlash");
+            }
+        }
+
+        // -----------------------------------------------------------------
+        // 2. PERSISTENCIA NORMAL DE DATOS DE SENSORES
+        // -----------------------------------------------------------------
         size_t item_size = 0;
-        void *item = xRingbufferReceive(xFlashRingbuf, &item_size, pdMS_TO_TICKS(5000));
+        void *item = xRingbufferReceive(xFlashRingbuf, &item_size, pdMS_TO_TICKS(50));
 
         if (item != NULL) {
             if (item_size == sizeof(data_all_t)) {
-
-                data_all_t *datos_sensores = static_cast<data_all_t *>(item);
-
-                // Print a specific member of the struct (like elapsed_time) instead of %s
-                // Serial.printf("[Flash] Persisting (%d bytes). Time: %lu\n", static_cast<int>(item_size), micros());
-                // SerialPrint::plot("contadorFlash", contadorFlash);
-                // contadorFlash++;
-                // TODO: In a real implementation, write 'datos' to SD/flash.
+                ptrCajaNegra->guardarPuntoLog(item, sizeof(data_all_t));
             }
             vRingbufferReturnItem(xFlashRingbuf, item);
-        } else {
-            ESP_LOGI(TAG_TASK_FLASH, "No items to persist (timeout)");
         }
-
-        // vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 
 
 void vTaskLora(void *pvParameters) {
     (void)pvParameters;
-    pkt_t rxPacket; // Para almacenar paquetes entrantes
+    pkt_t rxPacket; 
+
+    static uint32_t ultimo_ping_millis = 0;
+    const uint32_t INTERVALO_PING_MS = 2000; // Intento de reconexión cada 2s si no hay enlace
+
+    ESP_LOGI(TAG_TASK_LORA, "vTaskLora iniciada correctamente.");
 
     while (true) {
+        
+        // ---------------------------------------------------------
+        // 0. MODO EMERGENCIA: CATASTROFE (Baliza SOS)
+        // ---------------------------------------------------------
+        if (Cohete::SYSTEM.flags.emergencia_fatal) {
+            // Empaquetamos la última coordenada GPS válida
+            char sos_msg[64];
+            snprintf(sos_msg, sizeof(sos_msg), "[SOS] LAT:%f LON:%f", 
+                     Cohete::SYSTEM.datos_actuales.gps_latitud, 
+                     Cohete::SYSTEM.datos_actuales.gps_longitud);
+                     
+            GSE::enviar_mensaje(sos_msg); // Reutilizamos tu función de C_MGS
+            ESP_LOGW(TAG_TASK_LORA, "[LoRa TX] ¡Transmitiendo Baliza SOS!");
+            
+            // Bombardear el espectro cada 250ms (Ignora todo lo demás)
+            vTaskDelay(pdMS_TO_TICKS(250));
+            continue; 
+        }
+
+        // ---------------------------------------------------------
+        // 1. FASE TX: Transmisión Continua (Independiente del estado)
+        // ---------------------------------------------------------
+        // NO condicionamos por ROCKET_CONNECTED. Si hay un sobre en la cola,
+        // lo transmitimos por aire. Si la GSE se desconecta y se vuelve a conectar,
+        // capturará la señal de inmediato sin requerir re-negociación.
         size_t item_size = 0;
-        void *item = xRingbufferReceive(xLoraRingbuf, &item_size, pdMS_TO_TICKS(10)); // Timeout bajo para no bloquear Rx
+        void *item = xRingbufferReceive(xLoraRingbuf, &item_size, pdMS_TO_TICKS(10));
 
         if (item != NULL) {
-            // Validamos que sea el tamaño de nuestro envoltorio
             if (item_size == sizeof(TxEnvelope_t)) {
-                Serial.println("--> div: 1");
                 TxEnvelope_t *sobre = static_cast<TxEnvelope_t *>(item);
 
-                // Solo pasamos a GSE::actualizar si el enlace está CONNECTED
-                if (GSE::estado_conexion_gse() == ROCKET_CONNECTED) {
-                Serial.println("--> div: 2");                    
-                    switch(sobre->tipo) {
-                        case lora_protocol::C_PLOT:
-                            GSE::actualizar_graficas(&(sobre->payload.telemetria));
-                            Serial.println("--> div: 3");
-                            break;
+                switch(sobre->tipo) {
+                    case lora_protocol::C_PLOT:
+                        GSE::actualizar_graficas(&(sobre->payload.telemetria));
+                        break;
+                    
+                    case lora_protocol::C_MGS:
+                        GSE::enviar_mensaje(sobre->payload.texto);
+                        break;
                         
-                        case lora_protocol::C_MGS:
-                            GSE::enviar_mensaje(sobre->payload.texto);
-                            Serial.println("--> div: 4");
-                            break;
-                            
-                        case lora_protocol::C_ERR:
-                            GSE::enviar_error(sobre->payload.texto);
-                            Serial.println("--> div: 5");
-                            break;
+                    case lora_protocol::C_ERR:
+                        GSE::enviar_error(sobre->payload.texto);
+                        break;
 
-                        // case Protocolo::C_ACK:
-                        //     GSE::enviar_ack(&(sobre->payload.ack));
-                        //     break;
-                    }
+                    case lora_protocol::C_ACK:
+                        GSE::enviar_ack(sobre->payload.ack);
+                        break;
                 }
             }
-            Serial.println("--> div: 6");
             vRingbufferReturnItem(xLoraRingbuf, item);
-            Serial.println("--> div: 7");
         }
 
-        // Aquí también iría la lógica (explicada en el mensaje anterior) 
-        // para lora.read_paquete() y recibir comandos (G_CMD) sin bloqueos.
         // ---------------------------------------------------------
-        // 1. FASE RX: Escuchar comandos desde la estación terrena
+        // 2. FASE RX: Procesar paquetes entrantes (Comandos / Handshake)
         // ---------------------------------------------------------
         if (GSE::leer_paquete(&rxPacket)) {
-                            Serial.println("--> div: 8");
-            if (rxPacket.protocol == lora_protocol::G_CMD) {
-                // Casteamos el payload a nuestra estructura de comando
-                // Asumiendo que el GSE envió un CommandPayload { uint32_t opCode; float value; }
-                CommandPayload* cmd = static_cast<CommandPayload*>(rxPacket.payload);
-                                Serial.println("--> div: 9");
-                ESP_LOGI(TAG_TASK_LORA, "[Lora] Comando Recibido: OP=%d, VAL=%f\n", cmd->opCode, cmd->value);
+            switch (rxPacket.protocol) {
                 
-                // Encolamos el comando en el CmdDispatcher
-                cmdDispatcher.enqueueCommand(cmd->opCode, cmd->value);
-                                Serial.println("--> div: 10");
+                // --- COMANDOS DESDE LA GSE ---
+                case lora_protocol::G_CMD: {
+                    CommandPayload* cmd = static_cast<CommandPayload*>(rxPacket.payload);
+                    ESP_LOGI(TAG_TASK_LORA, "[LoRa RX] Comando recibido -> OP: %d, VAL: %.2f", cmd->opCode, cmd->value);
+                    cmdDispatcher.enqueueCommand(cmd->opCode, cmd->value);
+                    break;
+                }
+
+                // --- PING / PONG DE LA ESTACIÓN TERRENA ---
+                case lora_protocol::PING:
+                case lora_protocol::PONG: {
+                    ESP_LOGI(TAG_TASK_LORA, "[LoRa RX] PING/PONG recibido de GSE. Enlace confirmado.");
+                    
+                    // Actualizamos el estado interno y le avisamos a la MdE
+                    GSE::set_estado_conexion(ROCKET_CONNECTED);
+                    Cohete::SYSTEM.flags.gse_conectado = true;
+
+                    // Si fue un PING explícito de la GSE, confirmamos recepción
+                    if (rxPacket.protocol == lora_protocol::PING) {
+                        GSE::enviar_pong();
+                    }
+                    break;
+                }
+
+                default:
+                    ESP_LOGD(TAG_TASK_LORA, "[LoRa RX] Protocolo no manejado: %d", rxPacket.protocol);
+                    break;
             }
         }
-                        Serial.println("--> div: 11");
-        // GSE::mantener_conexion() // Podrías extraer el switch(ROCKET_INIT...) a un método que se llame cíclicamente aquí.
-        // CRUCIAL: Libera el Core 0 y evita el colapso del stack y del Watchdog
+
+        // ---------------------------------------------------------
+        // 3. FASE HANDSHAKE: Emisión de PING si estamos buscando conexión
+        // ---------------------------------------------------------
+        if (GSE::estado_conexion_gse() != ROCKET_CONNECTED) {
+            if (millis() - ultimo_ping_millis >= INTERVALO_PING_MS) {
+                ultimo_ping_millis = millis();
+                ESP_LOGI(TAG_TASK_LORA, "[LoRa TX] Emitiendo PING de búsqueda de GSE...");
+                
+                // Emite el ping de reconexión por RF
+                GSE::enviar_mensaje("ROCKET_PING"); 
+            }
+        }
+
+        // Ceder control a FreeRTOS para no bloquear el CPU
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
-
-
 
 
 // ==========================================
@@ -637,6 +714,21 @@ CmdResult comando_disparar_piro(float value, void* context){
 
 CmdResult comandoDesplegarDrogue(float value, void* context){
     return {1, 0.0f}; // Status OK temporal
+}
+
+CmdResult cmd_borrar_log(float value, void* context) {
+    ESP_LOGI("CMD", "Solicitud de borrado de memoria recibida por LoRa.");
+
+    // Indica la acción
+    Cohete::SYSTEM.flags.flash_log_borrado = false;
+    Cohete::SYSTEM.accion.borrar_log = true;
+
+    // Despierta a vTaskFlash INMEDIATAMENTE
+    if (Cohete::SYSTEM.procesos.xTaskFlashHandle != NULL) {
+        xTaskNotifyGive(Cohete::SYSTEM.procesos.xTaskFlashHandle);
+    }
+
+    return CmdResult{.status = 1, .data= 0.0f}; // Respuesta rápida a la estación terrena
 }
 
 bool registrarComandos(){
