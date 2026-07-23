@@ -305,8 +305,8 @@ void vTaskDataFilter(void *pvParameters)
             data_all_t out = {};
             const int64_t t = raw.timestamp_us;
             
-            Serial.print(">heap_libre:"); 
-            Serial.println(ESP.getFreeHeap());
+            // Serial.print(">heap_libre:");
+            // Serial.println(ESP.getFreeHeap());
 
             // Velocidades angulares
             out.vel_angular_x_deg_s = gyroPitch_rad_s * RAD_TO_DEG;
@@ -393,7 +393,7 @@ void vTaskStateMachine(void *pvParameters) {
             vRingbufferReturnItem(xStateMachineRingbuf, item);
 
         } else {
-            ESP_LOGI(TAG_TASK_STATE_MACHINE, "No messages (timeout)");
+            ESP_LOGI(TAG_TASK_STATE_MACHINE, "No messages (timeout)"); // TODO: No sería más conveniente quitar el timeout ?
         }
 
         // Le permite al scheduler del RTOS resetear el WATCHDOG
@@ -467,9 +467,7 @@ void vTaskLora(void *pvParameters) {
                     }
                 }
             }
-            // Serial.println("--> div: 6");
             vRingbufferReturnItem(xLoraRingbuf, item);
-            // Serial.println("--> div: 7");
         }
 
         // Aquí también iría la lógica (explicada en el mensaje anterior) 

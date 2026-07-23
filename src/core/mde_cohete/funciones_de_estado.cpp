@@ -29,17 +29,30 @@ namespace Cohete {
     namespace Timers
     {
         static TimerHandle_t xTimerRecalibrarMPU;
-        static bool flag_recalibrarMPU_disparado = false;
+        static volatile bool flag_recalibrarMPU_disparado = false; // TODO: huelo una pequeña condicion de carrera, que en este caso zafa.
 
         // typedef void (* TimerCallbackFunction_t)( TimerHandle_t xTimer );
         void calibrar_mpu_callback(TimerHandle_t xTimer) {
-            ESP_LOGI(TAG_BASE, "Temporizador xTimerRecalibrarMPU disparado!");
-            mMPU6050::CalibrationStatus res;
-            res = Sensors::getMPU6050().calibrar();
-            if (res==  mMPU6050::CalibrationStatus::Ok ) {
-                flag_recalibrarMPU_disparado = true;
-                ESP_LOGI(TAG_BASE, "Calibración de MPU6050 exitosa.");
-            }
+            xTaskCreate(
+    [](void* pvParameters) {
+                    ESP_LOGI(TAG_BASE, "Temporizador xTimerRecalibrarMPU disparado!");
+                    ESP_LOGI(TAG_BASE, "Calibrando MPU6050.");
+
+                    const mMPU6050::CalibrationStatus res = Sensors::getMPU6050().calibrar();
+
+                    if (res == mMPU6050::CalibrationStatus::Ok) {
+                        flag_recalibrarMPU_disparado = true;
+                        ESP_LOGI(TAG_BASE, "Calibración de MPU6050 exitosa.");
+                    }
+
+                    vTaskDelete(NULL); // para auto-borrarse
+                },
+                "MPU_Calibrar_Task", // Name of the task for debugging
+                4096,                // Stack size in words (or bytes in ESP-IDF)
+                NULL,                // Parameter passed into the task (pvParameters)
+                5,                   // Task priority (adjust as needed)
+                NULL                 // Task handle (optional, pass &handle if needed)
+            );
         }
     }
 
