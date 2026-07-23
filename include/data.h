@@ -366,46 +366,60 @@ inline void plot_gps_raw(const data_raw_t *data) {
 // ============================================================================
 
 inline void plot_cinematica_filtrada(const data_all_t *data) {
+#ifdef DEBUG_ESP32
     if (data == nullptr) return;
     
     Serial.print(">alt_agl_m:");    Serial.println(data->altitud_filtrada_m, 2);
     Serial.print(">vel_z_m_s:");    Serial.println(data->vel_z_filtrada_m_s, 2);
     Serial.print(">accel_z_m_s2:"); Serial.println(data->aceleracion_z_m_s2, 2);
+#endif
 }
 
 
 
 inline void plot_actitud_filtrada(const data_all_t *data) {
+#ifdef DEBUG_ESP32
     if (data == nullptr) return;
     
     Serial.print(">pitch_deg:");  Serial.println(data->angulo_pitch_deg, 2);
     Serial.print(">yaw_deg:");    Serial.println(data->angulo_yaw_deg, 2);
     Serial.print(">incl_z_deg:"); Serial.println(data->angulo_respecto_z_deg, 2);
+#endif
+
 }
 
 inline void plot_gps_procesado(const data_all_t *data) {
+#ifdef DEBUG_ESP32
     if (data == nullptr) return;
     
     Serial.print(">lat:");  Serial.println(data->gps_latitud, 6);
     Serial.print(">lon:");  Serial.println(data->gps_longitud, 6);
     Serial.print(">hdop:"); Serial.println(data->gps_hdop, 2);
     Serial.print(">sats:"); Serial.println(data->gps_nro_satelites);
+#endif
+
 }
 
 
 inline void plot_giroscopio_filtrado(const data_all_t *data) {
+#ifdef DEBUG_ESP32
     if (data == nullptr) return;
     Serial.printf(">vel_ang_x_deg_s:%f\n>vel_ang_y_deg_s:%f\n>vel_ang_z_deg_s:%f\n",
                   data->vel_angular_x_deg_s,
                   data->vel_angular_y_deg_s,
                   data->vel_angular_z_deg_s);
+#endif
+
 }
 
 inline void plot_ambiental_procesado(const data_all_t *data) {
+#ifdef DEBUG_ESP32
     if (data == nullptr) return;
     Serial.printf(">temp_amb_c:%f\n>densidad_aire:%f\n",
                   data->temperatura_amb_c,
                   data->densidad_aire_kg_m3);
+#endif
+
 }
 
 
@@ -417,18 +431,21 @@ inline void plot_ambiental_procesado(const data_all_t *data) {
  * @brief Imprime en una sola línea del plotter todos los sensores en estado CRUDO
  */
 inline void plot_all_raw(const data_raw_t *data) {
+#ifdef DEBUG_ESP32
     if (data == nullptr) return;
     Serial.printf(">presion_hpa:%f\n>temp_c:%f\n>ax_m_s2:%f\n>ay_m_s2:%f\n>az_m_s2:%f\n>gx_rad_s:%f\n>gy_rad_s:%f\n>gz_rad_s:%f\n>lat:%ld\n>lon:%ld\n>sats:%d\n",
                   data->bmp.presion_hpa, data->bmp.temp_deg_c,
                   data->mpu.accel_x_m_s2, data->mpu.accel_y_m_s2, data->mpu.accel_z_m_s2,
                   data->mpu.gyro_x_rad_s, data->mpu.gyro_y_rad_s, data->mpu.gyro_z_rad_s,
                   (long)data->gps.latitude, (long)data->gps.longitude, (int)data->gps.satellites);
+#endif
 }
 
 /**
  * @brief Imprime en una sola línea del plotter todas las variables PROCESADAS / FILTRADAS
  */
 inline void plot_all_processed(const data_all_t *data) {
+#ifdef DEBUG_ESP32
     if (data == nullptr) return;
     Serial.printf(">alt_agl:%f\n>vel_z:%f\n>accel_z:%f\n>pitch:%f\n>yaw:%f\n>incl_z:%f\n>vel_ang_x:%f\n>vel_ang_y:%f\n>vel_ang_z:%f\n>temp_amb:%f\n>rho:%f\n>lat:%f\n>lon:%f\n>hdop:%f\n>sats:%d\n",
                   data->altitud_filtrada_m, data->vel_z_filtrada_m_s, data->aceleracion_z_m_s2,
@@ -436,6 +453,7 @@ inline void plot_all_processed(const data_all_t *data) {
                   data->vel_angular_x_deg_s, data->vel_angular_y_deg_s, data->vel_angular_z_deg_s,
                   data->temperatura_amb_c, data->densidad_aire_kg_m3,
                   data->gps_latitud, data->gps_longitud, data->gps_hdop, data->gps_nro_satelites);
+#endif
 }
 
 
@@ -479,9 +497,12 @@ inline void print_data_raw(const data_raw_t *data) {
 #endif
 }
 
-#if defined(PLOT_MPU_ONLY) || defined(PLOT_BMP_ONLY) || defined(PLOT_GPS_ONLY) || defined(PLOT_ALL)
-
+/*
+ * ESTO NOS PERMITE DEBUGGEAR LOS DATOS
+ * USANDO SERIAL PLOTTER DE LA IDE DE ARDUINO.
+ */
 inline void print_plotter_data_raw(const data_raw_t *data) {
+#if defined(PLOT_MPU_ONLY) || defined(PLOT_BMP_ONLY) || defined(PLOT_GPS_ONLY) || defined(PLOT_ALL)
     if (data == NULL) return;
 
 #if defined(PLOT_MPU_ONLY)
@@ -507,14 +528,14 @@ inline void print_plotter_data_raw(const data_raw_t *data) {
 #elif defined(PLOT_ALL)
     Serial.printf("Presion:%f,Temp:%f,AccX:%f,AccY:%f,AccZ:%f,GyroX:%f,GyroY:%f,GyroZ:%f,Lat:%ld,Lon:%ld,Sats:%d\r\n",
                   data->bmp.presion_hpa, data->bmp.temp_deg_c,
-                  data->mpu.accel_x_g, data->mpu.accel_y_g, data->mpu.accel_z_g,
+                  data->mpu.accel_x_m_s2, data->mpu.accel_y_m_s2, data->mpu.accel_z_m_s2,
                   data->mpu.gyro_x_rad_s, data->mpu.gyro_y_rad_s, data->mpu.gyro_z_rad_s,
-                  (long)data->gps.lat, (long)data->gps.lon, (int)data->gps.numSV);
+                  (long)data->gps.latitude, (long)data->gps.longitude, (int)data->gps.satellites);
+#endif
+    return;
 #endif
     return;
 }
-
-#endif
 
 
 // TODO: poner "printear_data" en un lugar mejor

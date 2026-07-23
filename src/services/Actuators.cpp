@@ -57,3 +57,7 @@ bool Actuators::init() {
 
     return true;
 }
+
+void Actuators::update() {
+    
+}

@@ -19,11 +19,15 @@ mMPU6050 Sensors::_mpu6050;
 using namespace ConfigInit; 
 
 bool Sensors::init() {
+#ifdef  SENSORES_MOCK
+    ESP_LOGI(TAG_TASK_SENSORS, "Inicializando Mock de Sensores.");
+#else
     if(!Wire.begin(WIRE_SDA_0, WIRE_SCL_0)){
         ESP_LOGE(TAG_TASK_SENSORS, "Falló la inicialización del I2C.");
         return false;
     }
     // Wire.setClock(400000); // Set I2C clock to 400kHz Fast Mode
+#endif
 
     if (!_mpu6050.init(MPU_ADDR)) {
         ESP_LOGE(TAG_TASK_SENSORS, "Falló la inicialización de mMPU6050.");

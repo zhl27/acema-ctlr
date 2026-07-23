@@ -4,7 +4,7 @@
 #include "mGPS.h"
 
 // Instantiate mGPS: UART2, RX = GPIO 16, TX = GPIO 17, 9600 baud (NEO-7M default)
-mGPS gps(2, GPS_RX_PIN, GPS_TX_PIN, 9600);
+mGPS gps(2, ConfigInit::GPS_RX_PIN, ConfigInit::GPS_TX_PIN, 9600);
 
 void setup() {
   Serial.begin(115200);

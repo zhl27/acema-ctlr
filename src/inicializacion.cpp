@@ -72,7 +72,7 @@ void initSerialLog(){
 bool initBlackBox()
 {
     if(!cajaNegra.begin(sizeof(data_all_t))){
-        if(EnlaceGSE::enviarError("Not load blackBox")) 
+        if(EnlaceGSE::enviarError("Not load blackBox"))
         {
             ESP_LOGI("INIT BLACK BOX","Not load blackBox");
         }
@@ -83,7 +83,7 @@ bool initBlackBox()
     }
 
     if(!cajaNegra.cargarConfig(&g_configActual, sizeof(g_configActual))){
-        if(EnlaceGSE::enviarError("Not load config")) 
+        if(EnlaceGSE::enviarError("Not load config"))
         {
             ESP_LOGI("INIT BLACK BOX","Not load config");
         }
@@ -97,8 +97,8 @@ bool initBlackBox()
 
 bool initHardware() {
     bool inicializacion = false;
-    
-    // NOTA: Sensors::init() AHORA SOLO DEBE INICIALIZAR LOS BUSES Y OBJETOS (begin). 
+
+    // NOTA: Sensors::init() AHORA SOLO DEBE INICIALIZAR LOS BUSES Y OBJETOS (begin).
     // LA CALIBRACIÓN DEBE HABER SIDO EXTRAÍDA DE ESTE MÉTODO.
     inicializacion = Sensors::init();
     if(inicializacion) {
@@ -115,7 +115,7 @@ bool initHardware() {
         ESP_LOGE("INIT_HARD", "ERROR en la inicializacion de Actuators");
         return false;
     }
-    
+
     cmdDispatcher.init();
     return true;
 }
@@ -132,28 +132,28 @@ void puntoDeInicio(bool sensoresInit) {
     ESP_LOGI("BOOT_LOGIC", "Evaluando estado de vuelo post-reinicio...");
 
     // Todo, cambiar segun prubea
-    mMPU6050::GravityAxis ejeZ = mMPU6050::GravityAxis::PLUS_Y;
-    
+    const mMPU6050::GravityAxis ejeZ = mMPU6050::GravityAxis::PLUS_Y;
+
     // INTERLOCK 1: ¿La misión había sido armada/iniciada antes del reinicio?
     if (g_configActual.mision_activa == true) {
-        
+
         // INTERLOCK 2: Validación por sensores (se asume que Sensors::get_raw_data obtiene una lectura válida)
         data_raw_t raw_data = {};
         float altitud_actual = {};
-        // Descarta ruido inicial 
+        // Descarta ruido inicial
         for (size_t i = 0; i < 50; i++)
         {
             raw_data = Sensors::get_raw_data();
-            altitud_actual = raw_data.bmp.altitud_snm_m; 
+            altitud_actual = raw_data.bmp.altitud_snm_m;
         }
-        
+
         // Comparamos la altitud actual con la altitud base guardada en flash
         if ((altitud_actual - g_configActual.altitud_base_agl) > 20.0f) {
             // ¡ESTAMOS EN EL AIRE REALMENTE! Recuperando vuelo.
             ESP_LOGW("BOOT_LOGIC", "¡Reinicio en vuelo detectado! Saltando calibración IMU.");
-            g_configActual.estado_cohete_actual = Cohete::ST_BOOST; 
-            
-            // Aquí NO se llama a Sensors::calibrar(). El filtro dependerá de los offsets guardados 
+            g_configActual.estado_cohete_actual = Cohete::ST_BOOST;
+
+            // Aquí NO se llama a Sensors::calibrar(). El filtro dependerá de los offsets guardados
             // previamente en la flash, o usará valores por defecto seguros.
             math::Vector3f biasAccel = g_configActual.bias.accel;
             math::Vector3f biasGyro = g_configActual.bias.gyro;
@@ -168,7 +168,7 @@ void puntoDeInicio(bool sensoresInit) {
             g_configActual.bias.accel = Sensors::getMPU6050().get_calibration_result().accel_bias;
             g_configActual.bias.gyro = Sensors::getMPU6050().get_calibration_result().gyro_bias;
         }
-        
+
     } else {
         // No hay misión activa. Arranque normal.
         ESP_LOGI("BOOT_LOGIC", "Arranque normal de prevuelo. Calibrando sensores...");
@@ -190,7 +190,7 @@ void initLora(){
 
     // 5Inicializar la capa de enlace GSE
     ESP_LOGI(TAG_MAIN, "Enlace LoRa/GSE configurado.");
-    
+
     GSE::init();
     EnlaceGSE::inicializar(xLoraRingbuf);
 }
@@ -232,15 +232,17 @@ void vTaskReadSensors(void *pvParameters) {
 
         ESP_LOGD(TAG_TASK_SENSORS, "Core ID: %d", xPortGetCoreID());
 
-        data_raw_t raw={1.0f };
-        if(!DEBUG_SERIAL){
-                // POR SERIAL
-        }
-        else{
-            raw= Sensors::get_raw_data();
-
-        }
+        // TODO: IMPLEMENTAR ESTA IDEA PARA LOS mockBMP280 y mockMPU6050
+        // data_raw_t raw;
+        // if(DEBUG_SERIAL){
+        //     // PARA SIMULAR DATOS POR SERIAL
+        // }
+        // else{
+        //     raw = Sensors::get_raw_data(); // si no simulamos, usamos datos reales.
+        // }
         // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
+        data_raw_t raw = Sensors::get_raw_data();
+        // print_plotter_data_raw(&raw);
         //print_data_raw(&raw);
 
         // TODO: Curiosidad: Por qué se utiliza una Queue en lugar de un Ringbuffer ?
@@ -332,15 +334,11 @@ void vTaskDataFilter(void *pvParameters)
             // MAPEO DE EJES (Sensor MPU -> Cohete Físico)
             // Todo permanece en las unidades nativas
             //----------------------------------------------------------------------
-            #ifdef DEBUG_DATOS_CRUDOS
-            const float accelX_m_s2 = raw.mpu.accel_x_m_s2;
-            const float accelY_m_s2 = raw.mpu.accel_y_m_s2;
-            const float accelZ_m_s2 = raw.mpu.accel_z_m_s2;
-            #else 
+
             const float accelX_m_s2 = raw.mpu.accel_x_m_s2;
             const float accelY_m_s2 = raw.mpu.accel_z_m_s2;
             const float accelZ_m_s2 = raw.mpu.accel_y_m_s2;
-            #endif
+
             const float gyroRoll_rad_s  = raw.mpu.gyro_z_rad_s;     // Alabeo
             const float gyroPitch_rad_s = raw.mpu.gyro_y_rad_s;     // Cabeceo
             const float gyroYaw_rad_s   = raw.mpu.gyro_x_rad_s;     // Rotación sobre el eje vertical
@@ -422,10 +420,10 @@ void vTaskDataFilter(void *pvParameters)
             // Recién acá convertimos a las unidades públicas de data_all_t.
             //----------------------------------------------------------------------
             data_all_t out = {};
-            int64_t t = raw.timestamp_us;
+            const int64_t t = raw.timestamp_us;
             
-            Serial.print(">heap_libre:"); 
-            Serial.println(ESP.getFreeHeap());
+            // Serial.print(">heap_libre:");
+            // Serial.println(ESP.getFreeHeap());
 
             // Velocidades angulares
             out.vel_angular_x_deg_s = gyroPitch_rad_s * RAD_TO_DEG;
@@ -457,8 +455,8 @@ void vTaskDataFilter(void *pvParameters)
             plot_cinematica_filtrada(&out);
             
             // Timestamp corregido para evitar fugas de memoria o punteros fantasma
-            Serial.print(">timestamp_ms:");
-            Serial.println((uint32_t)(t / 1000));
+            // Serial.print(">timestamp_ms:");
+            // Serial.println((uint32_t)(t / 1000));
 
             //----------------------------------------------------------------------
             // Distribución (MdE, Lora)
@@ -495,11 +493,11 @@ void vTaskStateMachine(void *pvParameters) {
     (void)pvParameters;
     while (true) {
 
-        ESP_LOGI(TAG_TASK_STATE_MACHINE, "Core ID: %d", xPortGetCoreID());
+        ESP_LOGD(TAG_TASK_STATE_MACHINE, "Core ID: %d", xPortGetCoreID());
 
         size_t item_size = 0;
         // 1. Receive as a generic void pointer
-        void *item = xRingbufferReceive(xStateMachineRingbuf, &item_size, pdMS_TO_TICKS(5000));
+        void *item = xRingbufferReceive(xStateMachineRingbuf, &item_size, pdMS_TO_TICKS(5000)); // TODO: podemos implementar un patrón Mailbox.
 
         if (item != nullptr) {
             if (item_size == sizeof(data_all_t)) {
@@ -520,7 +518,7 @@ void vTaskStateMachine(void *pvParameters) {
             vRingbufferReturnItem(xStateMachineRingbuf, item);
 
         } else {
-            ESP_LOGI(TAG_TASK_STATE_MACHINE, "No messages (timeout)");
+            ESP_LOGI(TAG_TASK_STATE_MACHINE, "No messages (timeout)"); // TODO: No sería más conveniente quitar el timeout ?
         }
 
         // Le permite al scheduler del RTOS resetear el WATCHDOG
@@ -531,7 +529,7 @@ void vTaskStateMachine(void *pvParameters) {
 
 void vTaskFlash(void *pvParameters) {
     mFlash* ptrCajaNegra = static_cast<mFlash*>(pvParameters);
-    
+
     ESP_LOGI(TAG_TASK_FLASH, "vTaskFlash iniciada en Core %d", xPortGetCoreID());
 
     while (true) {
@@ -543,11 +541,11 @@ void vTaskFlash(void *pvParameters) {
         // A) ACCIÓN CRÍTICA: VOLCADO DE EMERGENCIA DE LA RAM A FLASH
         if (notif_val > 0 || Cohete::SYSTEM.accion.volcar_ram_a_flash) {
             ESP_LOGW(TAG_TASK_FLASH, "Iniciando volcado de seguridad a Flash Externa (mFlash)...");
-            
+
             size_t item_size = 0;
             void *item = nullptr;
-            
-            // DRENADO TOTAL: Vaciamos todo el ring buffer iterativamente 
+
+            // DRENADO TOTAL: Vaciamos todo el ring buffer iterativamente
             // con timeout 0 para rescatar cada byte disponible en RAM antes del choque.
             while ((item = xRingbufferReceive(xFlashRingbuf, &item_size, 0)) != NULL) {
                 if (item_size == sizeof(data_all_t)) {
@@ -555,7 +553,7 @@ void vTaskFlash(void *pvParameters) {
                 }
                 vRingbufferReturnItem(xFlashRingbuf, item);
             }
-            
+
             Cohete::SYSTEM.accion.volcar_ram_a_flash = false;
             ESP_LOGI(TAG_TASK_FLASH, "¡Volcado masivo de RAM completado antes del impacto!");
         }
@@ -563,11 +561,11 @@ void vTaskFlash(void *pvParameters) {
         // B) ACCIÓN DE MANTENIMIENTO: BORRAR LOG (Independiente de la emergencia)
         if (Cohete::SYSTEM.accion.borrar_log) {
             ESP_LOGW(TAG_TASK_FLASH, "Ejecutando borrado de log en Flash (Caja Negra)...");
-            
+
             if (ptrCajaNegra != nullptr) {
-                ptrCajaNegra->resetearLog(); 
+                ptrCajaNegra->resetearLog();
                 Cohete::SYSTEM.accion.borrar_log = false;
-                Cohete::SYSTEM.flags.flash_log_borrado = true; 
+                Cohete::SYSTEM.flags.flash_log_borrado = true;
                 ESP_LOGI(TAG_TASK_FLASH, "¡Log borrado con éxito!");
             } else {
                 ESP_LOGE(TAG_TASK_FLASH, "No existe el objeto mFlash");
@@ -592,7 +590,7 @@ void vTaskFlash(void *pvParameters) {
 
 void vTaskLora(void *pvParameters) {
     (void)pvParameters;
-    pkt_t rxPacket; 
+    pkt_t rxPacket;
 
     static uint32_t ultimo_ping_millis = 0;
     const uint32_t INTERVALO_PING_MS = 2000; // Intento de reconexión cada 2s si no hay enlace
@@ -600,23 +598,23 @@ void vTaskLora(void *pvParameters) {
     ESP_LOGI(TAG_TASK_LORA, "vTaskLora iniciada correctamente.");
 
     while (true) {
-        
+
         // ---------------------------------------------------------
         // 0. MODO EMERGENCIA: CATASTROFE (Baliza SOS)
         // ---------------------------------------------------------
         if (Cohete::SYSTEM.flags.emergencia_fatal) {
             // Empaquetamos la última coordenada GPS válida
             char sos_msg[64];
-            snprintf(sos_msg, sizeof(sos_msg), "[SOS] LAT:%f LON:%f", 
-                     Cohete::SYSTEM.datos_actuales.gps_latitud, 
+            snprintf(sos_msg, sizeof(sos_msg), "[SOS] LAT:%f LON:%f",
+                     Cohete::SYSTEM.datos_actuales.gps_latitud,
                      Cohete::SYSTEM.datos_actuales.gps_longitud);
-                     
+
             GSE::enviar_mensaje(sos_msg); // Reutilizamos tu función de C_MGS
             ESP_LOGW(TAG_TASK_LORA, "[LoRa TX] ¡Transmitiendo Baliza SOS!");
-            
+
             // Bombardear el espectro cada 250ms (Ignora todo lo demás)
             vTaskDelay(pdMS_TO_TICKS(250));
-            continue; 
+            continue;
         }
 
         // ---------------------------------------------------------
@@ -626,7 +624,7 @@ void vTaskLora(void *pvParameters) {
         // lo transmitimos por aire. Si la GSE se desconecta y se vuelve a conectar,
         // capturará la señal de inmediato sin requerir re-negociación.
         size_t item_size = 0;
-        void *item = xRingbufferReceive(xLoraRingbuf, &item_size, pdMS_TO_TICKS(10));
+        void *item = xRingbufferReceive(xLoraRingbuf, &item_size, pdMS_TO_TICKS(10)); // Timeout bajo para no bloquear Rx
 
         if (item != NULL) {
             if (item_size == sizeof(TxEnvelope_t)) {
@@ -636,11 +634,11 @@ void vTaskLora(void *pvParameters) {
                     case lora_protocol::C_PLOT:
                         GSE::actualizar_graficas(&(sobre->payload.telemetria));
                         break;
-                    
+
                     case lora_protocol::C_MGS:
                         GSE::enviar_mensaje(sobre->payload.texto);
                         break;
-                        
+
                     case lora_protocol::C_ERR:
                         GSE::enviar_error(sobre->payload.texto);
                         break;
@@ -658,7 +656,7 @@ void vTaskLora(void *pvParameters) {
         // ---------------------------------------------------------
         if (GSE::leer_paquete(&rxPacket)) {
             switch (rxPacket.protocol) {
-                
+
                 // --- COMANDOS DESDE LA GSE ---
                 case lora_protocol::G_CMD: {
                     CommandPayload* cmd = static_cast<CommandPayload*>(rxPacket.payload);
@@ -671,7 +669,7 @@ void vTaskLora(void *pvParameters) {
                 case lora_protocol::PING:
                 case lora_protocol::PONG: {
                     ESP_LOGI(TAG_TASK_LORA, "[LoRa RX] PING/PONG recibido de GSE. Enlace confirmado.");
-                    
+
                     // Actualizamos el estado interno y le avisamos a la MdE
                     GSE::set_estado_conexion(ROCKET_CONNECTED);
                     Cohete::SYSTEM.flags.gse_conectado = true;
@@ -696,9 +694,9 @@ void vTaskLora(void *pvParameters) {
             if (millis() - ultimo_ping_millis >= INTERVALO_PING_MS) {
                 ultimo_ping_millis = millis();
                 ESP_LOGI(TAG_TASK_LORA, "[LoRa TX] Emitiendo PING de búsqueda de GSE...");
-                
+
                 // Emite el ping de reconexión por RF
-                GSE::enviar_mensaje("ROCKET_PING"); 
+                GSE::enviar_mensaje("ROCKET_PING");
             }
         }
 
@@ -708,9 +706,6 @@ void vTaskLora(void *pvParameters) {
 }
 
 
-// ==========================================
-// LÓGICA DE COMANDOS
-// ==========================================
 
 // ==========================================
 // LÓGICA DE COMANDOS
@@ -719,19 +714,19 @@ void vTaskLora(void *pvParameters) {
 // Callback unificado para apertura de paracaídas (Drogue o Principal)
 CmdResult cmd_apertura_paracaidas(float value, void* context) {
     mPyro* piro = static_cast<mPyro*>(context);
-    
+
     // 1. Evaluar estado de salud (continuidad) sin que sea condición bloqueante
     bool tiene_continuidad = piro->tieneContinuidad();
-    
+
     // 2. Enviar reporte (ACK) explícito del estado de salud
     // Si la continuidad es OK devuelve 1, si falla devuelve 0.
     // (Ajusta el método según tu clase, ej: EnlaceGSE::enviar_ack() o EnlaceGSE::enviarACK())
     // EnlaceGSE::enviar_ack(tiene_continuidad ? 1 : 0);
-    
+
     // 3. Ejecutar la mini rutina de despliegue incondicionalmente
     piro->armar();
     piro->disparar((uint32_t)value); // Usamos el value recibido como tiempo de ignición (ms)
-    
+
     // 4. Retornar el resultado para que el dispatcher cierre la transacción
     int8_t stat =( tiene_continuidad ? (int8_t)1 : (int8_t)0);
     return CmdResult{.status = stat, .data = value};
@@ -741,10 +736,10 @@ CmdResult cmd_apertura_paracaidas(float value, void* context) {
 CmdResult cmd_set_angulo_servo(float value, void* context) {
     // Limitamos el rango para proteger la estructura mecánicamente
     float angulo_seguro = mi_clamp(value, 0.0f, 30.0f);
-    
+
     // Actuamos directamente sobre el actuador
     Actuators::getServo().sendAngulo(angulo_seguro);
-    
+
     // Devolvemos status 1 (Éxito) y el ángulo final aplicado
     return CmdResult{.status = 1, .data = angulo_seguro};
 }
@@ -797,7 +792,7 @@ bool registrarComandos(){
     // Pasamos las instancias correctas a través del puntero de contexto (void* context)
     state &= cmdDispatcher.registerCommand(CMD_DESPLEGAR_DROGUE, cmd_apertura_paracaidas, &Actuators::getPyroDrogue());
     state &= cmdDispatcher.registerCommand(CMD_DESPLEGAR_MAIN, cmd_apertura_paracaidas, &Actuators::getPyroPpal());
-    
+
     // El servo no necesita pasar por contexto si se accede vía singleton o getter estático
     state &= cmdDispatcher.registerCommand(CMD_SET_SERVO, cmd_set_angulo_servo, nullptr);
 

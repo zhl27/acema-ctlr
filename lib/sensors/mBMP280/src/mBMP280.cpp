@@ -14,12 +14,22 @@ bool mBMP280::init(uint8_t addr, uint8_t chipid) {
         return false;
     }
 
+#ifdef SENSORES_MOCK
+    // Configuración para telemetría de alta velocidad (Cohete)
+    _bmp.setSampling(MODE_NORMAL,     // Modo Normal (medición continua)
+                     SAMPLING_X2,     // Sobremuestreo de Temp (Bajo, prioridad a la velocidad)
+                     SAMPLING_X8,     // Sobremuestreo de Presión (Moderado, reduce ruido aerodinámico)
+                     FILTER_OFF,      // Filtro IIR desactivado para evitar retrasos de fase en el vuelo
+                     STANDBY_MS_1);   // Tiempo de espera entre lecturas al mínimo (0.5 ms)
+#else
     // Configuración para telemetría de alta velocidad (Cohete)
     _bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     // Modo Normal (medición continua)
-                Adafruit_BMP280::SAMPLING_X2,     // Sobremuestreo de Temp (Bajo, prioridad a la velocidad)
-                Adafruit_BMP280::SAMPLING_X8,     // Sobremuestreo de Presión (Moderado, reduce ruido aerodinámico)
-                Adafruit_BMP280::FILTER_OFF,      // Filtro IIR desactivado para evitar retrasos de fase en el vuelo
-                Adafruit_BMP280::STANDBY_MS_1);   // Tiempo de espera entre lecturas al mínimo (0.5 ms)
+                     Adafruit_BMP280::SAMPLING_X2,     // Sobremuestreo de Temp (Bajo, prioridad a la velocidad)
+                     Adafruit_BMP280::SAMPLING_X8,     // Sobremuestreo de Presión (Moderado, reduce ruido aerodinámico)
+                     Adafruit_BMP280::FILTER_OFF,      // Filtro IIR desactivado para evitar retrasos de fase en el vuelo
+                     Adafruit_BMP280::STANDBY_MS_1);   // Tiempo de espera entre lecturas al mínimo (0.5 ms)
+#endif
+
 
     // Calibración de la altitud en la rampa (Offset de la media)
     float suma_altitud = 0.0f;

@@ -5,9 +5,6 @@
 #ifndef ACEMA_CTLR_CONFIG_H
 #define ACEMA_CTLR_CONFIG_H
 
-
-
-#pragma once
 #include <cstddef> // Para size_t
 #include <cstdint>
 
@@ -139,6 +136,7 @@ enum comandosGlobale {
     CMD_DESPLEGAR_MAIN,
     CMD_SET_SERVO
 };
+
 
 #endif //ACEMA_CTLR_CONFIG_H
 /**

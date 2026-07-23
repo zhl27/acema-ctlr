@@ -31,7 +31,7 @@ LoraWrapped lora(LORA_CS, LORA_RST, LORA_DIO0, LORA_DIO1, SPI);
 LoraWrapped lora(LORA_CS, LORA_RST, LORA_DIO1, LORA_BUSY, SPI);
 #endif
 
-mBuzzer buzzer(BUZZER_PIN);
+mBuzzer buzzer(ConfigInit::BUZZER_PIN);
 
 // Estados de la MDE del Cohete
 enum RocketState : uint8_t {
@@ -58,7 +58,7 @@ void setup() {
     delay(1000);
     Serial.println(F("[COHETE] Sistema inicializado de telemetría."));
 
-    buzzer.init();
+    // buzzer.init();
     //buzzer.beep(500);
 
 // Inicialización del bus SPI condicional
@@ -93,7 +93,7 @@ void setup() {
         Serial.println("Falla crítica en hardware LoRa");
     }
 
-    buzzer.playSuccess();
+    //buzzer.playSuccess();
 }
 
 // ============================================================================
