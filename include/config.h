@@ -5,9 +5,6 @@
 #ifndef ACEMA_CTLR_CONFIG_H
 #define ACEMA_CTLR_CONFIG_H
 
-
-
-#pragma once
 #include <cstddef> // Para size_t
 #include <cstdint>
 
@@ -137,6 +134,7 @@ enum comandosGlobale {
     CMD_DISPARAR_PIRO,
     CMD_DEPLEGAR_DROGE
 };
+
 
 #endif //ACEMA_CTLR_CONFIG_H
 /**

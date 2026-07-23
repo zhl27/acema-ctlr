@@ -28,6 +28,7 @@ class Actuators {
          * @return true if all initialized successfully, false otherwise.
          */
         static bool init();
+        static void update();
 
         // Getters
         static mBuzzer& getBuzzer() { return _buzzer; }

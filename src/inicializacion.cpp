@@ -1,6 +1,7 @@
 #include "main.h"
 #include "config.h"
 #include <freertos/projdefs.h>
+#include "data.h"
 
 
 using namespace ConfigInit;
@@ -120,6 +121,7 @@ void vTaskReadSensors(void *pvParameters) {
 
         // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
         data_raw_t raw = Sensors::get_raw_data();
+        print_plotter_data_raw(&raw);
         //print_data_raw(&raw);
 
         // TODO: Curiosidad: Por qué se utiliza una Queue en lugar de un Ringbuffer ?
@@ -301,7 +303,7 @@ void vTaskDataFilter(void *pvParameters)
             // Recién acá convertimos a las unidades públicas de data_all_t.
             //----------------------------------------------------------------------
             data_all_t out = {};
-            int64_t t = raw.timestamp_us;
+            const int64_t t = raw.timestamp_us;
             
             Serial.print(">heap_libre:"); 
             Serial.println(ESP.getFreeHeap());
@@ -336,8 +338,8 @@ void vTaskDataFilter(void *pvParameters)
             plot_cinematica_filtrada(&out);
             
             // Timestamp corregido para evitar fugas de memoria o punteros fantasma
-            Serial.print(">timestamp_ms:");
-            Serial.println((uint32_t)(t / 1000));
+            // Serial.print(">timestamp_ms:");
+            // Serial.println((uint32_t)(t / 1000));
 
             //----------------------------------------------------------------------
             // Distribución (MdE, Lora)
@@ -442,26 +444,21 @@ void vTaskLora(void *pvParameters) {
         if (item != NULL) {
             // Validamos que sea el tamaño de nuestro envoltorio
             if (item_size == sizeof(TxEnvelope_t)) {
-                Serial.println("--> div: 1");
                 TxEnvelope_t *sobre = static_cast<TxEnvelope_t *>(item);
 
                 // Solo pasamos a GSE::actualizar si el enlace está CONNECTED
                 if (GSE::estado_conexion_gse() == ROCKET_CONNECTED) {
-                Serial.println("--> div: 2");                    
                     switch(sobre->tipo) {
                         case lora_protocol::C_PLOT:
                             GSE::actualizar_graficas(&(sobre->payload.telemetria));
-                            Serial.println("--> div: 3");
                             break;
                         
                         case lora_protocol::C_MGS:
                             GSE::enviar_mensaje(sobre->payload.texto);
-                            Serial.println("--> div: 4");
                             break;
                             
                         case lora_protocol::C_ERR:
                             GSE::enviar_error(sobre->payload.texto);
-                            Serial.println("--> div: 5");
                             break;
 
                         // case Protocolo::C_ACK:
@@ -470,9 +467,9 @@ void vTaskLora(void *pvParameters) {
                     }
                 }
             }
-            Serial.println("--> div: 6");
+            // Serial.println("--> div: 6");
             vRingbufferReturnItem(xLoraRingbuf, item);
-            Serial.println("--> div: 7");
+            // Serial.println("--> div: 7");
         }
 
         // Aquí también iría la lógica (explicada en el mensaje anterior) 
@@ -481,20 +478,20 @@ void vTaskLora(void *pvParameters) {
         // 1. FASE RX: Escuchar comandos desde la estación terrena
         // ---------------------------------------------------------
         if (GSE::leer_paquete(&rxPacket)) {
-                            Serial.println("--> div: 8");
+            // Serial.println("--> div: 8");
             if (rxPacket.protocol == lora_protocol::G_CMD) {
                 // Casteamos el payload a nuestra estructura de comando
                 // Asumiendo que el GSE envió un CommandPayload { uint32_t opCode; float value; }
                 CommandPayload* cmd = static_cast<CommandPayload*>(rxPacket.payload);
-                                Serial.println("--> div: 9");
+                // Serial.println("--> div: 9");
                 ESP_LOGI(TAG_TASK_LORA, "[Lora] Comando Recibido: OP=%d, VAL=%f\n", cmd->opCode, cmd->value);
                 
                 // Encolamos el comando en el CmdDispatcher
                 cmdDispatcher.enqueueCommand(cmd->opCode, cmd->value);
-                                Serial.println("--> div: 10");
+                // Serial.println("--> div: 10");
             }
         }
-                        Serial.println("--> div: 11");
+        // Serial.println("--> div: 11");
         // GSE::mantener_conexion() // Podrías extraer el switch(ROCKET_INIT...) a un método que se llame cíclicamente aquí.
         // CRUCIAL: Libera el Core 0 y evita el colapso del stack y del Watchdog
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -533,12 +530,10 @@ CmdResult comandoDesplegarDrogue(float value, void* context){
 }
 
 bool registrarComandos(){
-
-    bool state;
-    state = cmdDispatcher.registerCommand(
-        CMD_DISPARAR_PIRO, 
-        comando_disparar_piro, 
-        &Actuators::getPyroDrogue() 
+    const bool state = cmdDispatcher.registerCommand(
+        CMD_DISPARAR_PIRO,
+        comando_disparar_piro,
+        &Actuators::getPyroDrogue()
     );
     return state;
 }

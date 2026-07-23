@@ -141,7 +141,7 @@ void mBuzzer::beep(const uint32_t durationMs) {
 // Podria haber un bool para verificar si se realizó la carga de la secuencia
 void mBuzzer::playSuccess() {
     // N = 2 | ON = 100ms | OFF = 50ms
-    startSequence(2, 100, 50);
+    startSequence(2, 100, 50); // tampoco funciona en N=4
 }
 
 void mBuzzer::playError() {
