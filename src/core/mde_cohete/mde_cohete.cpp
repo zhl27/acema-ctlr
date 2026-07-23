@@ -94,6 +94,11 @@ namespace Cohete {
             return;
         }
 
+#ifdef DEBUG_ESP32
+        Serial.print(">estado_mde:");
+        Serial.println(SYSTEM._estado);
+#endif
+
         // Control de transición y tiempo en el estado
         static estado_cohete_t estado_anterior = ST_NULL;
         static uint32_t t_entrada_estado = 0;

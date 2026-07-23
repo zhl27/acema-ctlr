@@ -199,11 +199,6 @@ struct __attribute__((__packed__)) ConfigDatos {
 
 
 
-
-
-
-
-
 namespace Cohete {
 
     static const char *TAG_BASE = "STATE MACHINE";
