@@ -176,7 +176,7 @@ struct __attribute__((__packed__)) ConfigDatos {
 
     // Estructuras para los bias de calibración
 // Estructuras para los bias de calibración (POD puro)
-    struct {
+    struct bias_t{
         math::Vector3f gyro; 
         math::Vector3f accel;
     } bias;

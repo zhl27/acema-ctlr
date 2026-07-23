@@ -148,7 +148,9 @@ void puntoDeInicio() {
             
             // Aquí NO se llama a Sensors::calibrar(). El filtro dependerá de los offsets guardados 
             // previamente en la flash, o usará valores por defecto seguros.
-            Sensors::getMPU6050().setBias(g_configActual.bias.accel, g_configActual.bias.gyro);
+            math::Vector3f biasAccel = g_configActual.bias.accel;
+            math::Vector3f biasGyro = g_configActual.bias.gyro;
+            Sensors::getMPU6050().setBias(biasAccel,biasGyro);
             // NOTE: no importa setear el eje de gravedad pues eso se quedó guardado en la bias
 
         } else {
