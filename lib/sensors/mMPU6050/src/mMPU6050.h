@@ -4,10 +4,18 @@
 #ifndef ACEMA_CTLR_MMPU6050_H
 #define ACEMA_CTLR_MMPU6050_H
 
-#include "Adafruit_MPU6050.h"
 #include "data.h"
 #include "../../../../src/core/math/Vector3f.h"             // API Matemática
 #include "../../../../src/core/math/RunningStatistics3D.h"  // API Estadística
+
+
+#if defined(SENSORES_MOCK)
+    #include "mockMPU6050.h"
+    using SensorMPU6050 = mockMPU6050;
+#elif
+    #include "Adafruit_MPU6050.h"
+    using SensorMPU6050 = Adafruit_MPU6050;
+#endif
 
 class mMPU6050 {
 public:
@@ -48,7 +56,7 @@ public:
     CalibrationResult get_calibration_result() const;
 
 private:
-    Adafruit_MPU6050 _mpu;
+    SensorMPU6050 _mpu;
 
     math::Vector3f m_accel_bias;
     math::Vector3f m_gyro_bias;

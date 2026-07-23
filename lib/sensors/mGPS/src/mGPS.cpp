@@ -44,7 +44,7 @@ bool mGPS::init() {
         }
     }
 
-    const BaseType_t res = xTaskCreate(mGPS::_gpsTask, "mGPS_Task", 3072, this, 1, &_taskHandle);
+    const BaseType_t res = xTaskCreate(_gpsTask, "mGPS_Task", 3072, this, 1, &_taskHandle);
 
     _timestamp_init = millis();
 

@@ -5,8 +5,17 @@
 #ifndef ACEMA_CTLR_MBMP280_H
 #define ACEMA_CTLR_MBMP280_H
 
-#include "Adafruit_BMP280.h"
 #include "data.h"
+
+
+#if defined(SENSORES_MOCK)
+    #include "mockBMP280.h"
+    using SensorBMP280 = mockBMP280;
+#elif
+    #include "Adafruit_BMP280.h"
+    using SensorBMP280 = Adafruit_BMP280;
+#endif
+
 
 /**
  * @class mBMP280
@@ -17,7 +26,7 @@
  */
 class mBMP280 {
 private:
-    Adafruit_BMP280 _bmp;
+    SensorBMP280 _bmp;
     float _altitud_base_m; // Variable para almacenar el Offset de la rampa de lanzamiento
 
 public:
