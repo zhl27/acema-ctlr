@@ -478,20 +478,16 @@ void vTaskLora(void *pvParameters) {
         // 1. FASE RX: Escuchar comandos desde la estación terrena
         // ---------------------------------------------------------
         if (GSE::leer_paquete(&rxPacket)) {
-            // Serial.println("--> div: 8");
             if (rxPacket.protocol == lora_protocol::G_CMD) {
                 // Casteamos el payload a nuestra estructura de comando
                 // Asumiendo que el GSE envió un CommandPayload { uint32_t opCode; float value; }
                 CommandPayload* cmd = static_cast<CommandPayload*>(rxPacket.payload);
-                // Serial.println("--> div: 9");
                 ESP_LOGI(TAG_TASK_LORA, "[Lora] Comando Recibido: OP=%d, VAL=%f\n", cmd->opCode, cmd->value);
                 
                 // Encolamos el comando en el CmdDispatcher
                 cmdDispatcher.enqueueCommand(cmd->opCode, cmd->value);
-                // Serial.println("--> div: 10");
             }
         }
-        // Serial.println("--> div: 11");
         // GSE::mantener_conexion() // Podrías extraer el switch(ROCKET_INIT...) a un método que se llame cíclicamente aquí.
         // CRUCIAL: Libera el Core 0 y evita el colapso del stack y del Watchdog
         vTaskDelay(pdMS_TO_TICKS(10));
