@@ -97,17 +97,17 @@ data_all_t DataFilter::process(const data_raw_t& raw) {
 
     // 2. Velocidad Vertical Z (m/s) y Aceleración Z (m/s2)
     if (_es_primer_ciclo || dt <= 0.0f) {
-        out.vel_z_filtrada_m_s = 0.0f;
-        out.aceleracion_z_m_s2 = 0.0f;
+        out.velocidad_vertical_filtrada_m_s = 0.0f;
+        out.aceleracion_vertical_m_s2 = 0.0f;
         _es_primer_ciclo = false;
     } else {
         // Velocidad vertical estimada por la derivada de la altura barométrica
-        out.vel_z_filtrada_m_s = (out.altitud_filtrada_m - _ultima_altura_m) / dt;
+        out.velocidad_vertical_filtrada_m_s = (out.altitud_filtrada_m - _ultima_altura_m) / dt;
 
         // Aceleración lineal filtrada
         // NOTA: Para tener la aceleración absoluta sin gravedad, se debe restar g (~9.81)
         // multiplicada por el coseno del ángulo respecto a Z.
-        out.aceleracion_z_m_s2 = raw_accel_z_f;
+        out.aceleracion_vertical_m_s2 = raw_accel_z_f;
     }
 
     // Guardar estados para el próximo ciclo
@@ -115,7 +115,7 @@ data_all_t DataFilter::process(const data_raw_t& raw) {
     _ultimo_tiempo_us = raw.timestamp_us;
 
     // 3. Momentum (P = m * v)
-    out.momentum_kg_m_s = Cohete::SYSTEM.ctx_fisico.masa_g_cohete * out.vel_z_filtrada_m_s;
+    out.momentum_kg_m_s = Cohete::SYSTEM.ctx_fisico.masa_g_cohete * out.velocidad_vertical_filtrada_m_s;
 
 
     // ==========================================

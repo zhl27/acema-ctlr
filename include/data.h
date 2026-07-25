@@ -6,8 +6,6 @@
 #ifndef ACEMA_CTLR_DATA_H
 #define ACEMA_CTLR_DATA_H
 
-#pragma once
-
 #include <Arduino.h>
 
 #include <cstdint>
@@ -87,24 +85,27 @@ typedef struct {
  *
  */
 typedef struct {
+    uint64_t timestamp_micros; // queremos saber a qué tiempo exacto se tomaron estos datos.
+
     // --- CINEMÁTICA ANGULAR (Velocidades) ---
-    float vel_angular_z_deg_s;              // Yaw rate (°/s)
-    float vel_angular_y_deg_s;              // Roll rate (°/s)
-    float vel_angular_x_deg_s;              // Pitch rate (°/s)
+    float vel_angular_z_deg_s;              // Yaw rate (°/s) --> Exclusivo MPU6050
+    float vel_angular_y_deg_s;              // Roll rate (°/s) --> Exclusivo MPU6050
+    float vel_angular_x_deg_s;              // Pitch rate (°/s) --> Exclusivo MPU6050
 
     // --- CINEMÁTICA ANGULAR (Ángulos Absolutos) ---
-    float angulo_pitch_deg;               // Ángulo Pitch filtrado por Kalman (°)
-    float angulo_yaw_deg;                 // Ángulo Yaw filtrado por Kalman (°)
-    float angulo_respecto_z_deg;          // Inclinación total del cohete
+    float angulo_pitch_deg;                 // Ángulo Pitch filtrado por Kalman (°) --> Exclusivo MPU6050
+    float angulo_yaw_deg;                   // Ángulo Yaw filtrado por Kalman (°) --> Exclusivo MPU6050
+    float angulo_respecto_z_deg;            // Inclinación total del cohete --> Exclusivo MPU6050
 
-    // --- CINEMÁTICA LINEAL (Eje Y absoluto calibrado al cielo) ---
-    float altitud_filtrada_m;         // Altura filtrada sobre el suelo --> obtenida del bmp280
-    float vel_z_filtrada_m_s;         // Velocidad vertical real
-    float aceleracion_z_m_s2;         // Aceleración lineal absoluta (sin gravedad)
+    // --- CINEMÁTICA LINEAL (Eje Y es nuestro eje vertical) ---
+    float altitud_filtrada_m_bmp;           // Altura filtrada sobre el nivel del mar --> Exclusivo BMP280 // TODO: Necesitamos tener valor de altitud que salga solamente del bmp280.
+    float aceleracion_vertical_m_s2;        // Aceleración lineal absoluta (sin gravedad) --> Exclusivo MPU6050
+    float altitud_filtrada_m;               // Altura filtrada sobre el nivel del mar --> BMP280 + MPU6050
+    float velocidad_vertical_filtrada_m_s;  // Velocidad vertical real --> BMP280 + MPU6050
 
-    float momentum_kg_m_s;            // Cantidad de movimiento (P = m * v)
-    float temperatura_amb_c;          // Tomada estrictamente del BMP280
-    float densidad_aire_kg_m3;        // Calculada por ley de gases ideales
+    float momentum_kg_m_s;                  // Cantidad de movimiento (P = m * v)
+    float temperatura_amb_c;                // Tomada estrictamente del BMP280
+    float densidad_aire_kg_m3;              // Calculada por ley de gases ideales --> Exclusivo BMP280
 
     // --- GPS ---
     bool gps_is_valid;
@@ -172,7 +173,7 @@ typedef struct {
 /**
  * @brief Datos primordiales para cargar en caso de reinicio
  */
-struct __attribute__((__packed__)) ConfigDatos {
+struct __attribute__((__packed__)) ConfigDatos { // TODO: Esto me inspira la idea de un Process Control Block.
 
     // Estructuras para los bias de calibración
 // Estructuras para los bias de calibración (POD puro)
@@ -242,7 +243,8 @@ namespace Cohete {
 
 
     typedef struct {
-        estado_cohete_t _estado;
+        estado_cohete_t estado;
+        estado_cohete_t estado_anterior;
         error_cohete_t _error; // contiene el último error que se dio
         bool _entrando_estado;
         // bool es_estado_salida;
@@ -266,8 +268,8 @@ namespace Cohete {
         } gse_configs;
 
         // Tracking de integradores temporales
-        uint64_t timestamp_micros_entrada_estado; // se actualiza cada vez que entramos a un nuevo estado de la mde
-        uint64_t timestamp_millis_inicio_pico_g;  ///< Mide los 150ms continuos de >= 2G
+        uint32_t timestamp_millis_entrada_estado; // se actualiza cada vez que entramos a un nuevo estado de la mde
+        uint64_t _timestamp_millis_inicio_pico_g;  ///< Mide los 150ms continuos de >= 2G
         uint64_t timestamp_micros_apertura_drogue;
 
         struct {
@@ -281,19 +283,15 @@ namespace Cohete {
         // PEGAMENTO FEO, NECESITO ACCESO A LA FLASH
         // void* blackBox; 
         struct{
-            bool gse_conectado;
+            // bool gse_conectado;
             bool flash_log_borrado;
             bool gps_preciso;
             bool drogue_disparado;
             bool paracaidas_principal_disparado;
             bool emergencia_fatal;
-        } flags;
-        
-        // Permite interconexión entre comandos y tareas
-        struct{
-            bool borrar_log;
+            // bool borrar_log;
             bool volcar_ram_a_flash;
-        } accion;
+        } flags;
 
         struct{
             float gps_latitud;
@@ -365,8 +363,8 @@ inline void plot_cinematica_filtrada(const data_all_t *data) {
     if (data == nullptr) return;
     
     Serial.print(">alt_agl_m:");    Serial.println(data->altitud_filtrada_m, 2);
-    Serial.print(">vel_z_m_s:");    Serial.println(data->vel_z_filtrada_m_s, 2);
-    Serial.print(">accel_z_m_s2:"); Serial.println(data->aceleracion_z_m_s2, 2);
+    Serial.print(">vel_z_m_s:");    Serial.println(data->velocidad_vertical_filtrada_m_s, 2);
+    Serial.print(">accel_z_m_s2:"); Serial.println(data->aceleracion_vertical_m_s2, 2);
 #endif
 }
 
@@ -443,7 +441,7 @@ inline void plot_all_processed(const data_all_t *data) {
 #ifdef DEBUG_ESP32
     if (data == nullptr) return;
     Serial.printf(">alt_agl:%f\n>vel_z:%f\n>accel_z:%f\n>pitch:%f\n>yaw:%f\n>incl_z:%f\n>vel_ang_x:%f\n>vel_ang_y:%f\n>vel_ang_z:%f\n>temp_amb:%f\n>rho:%f\n>lat:%f\n>lon:%f\n>hdop:%f\n>sats:%d\n",
-                  data->altitud_filtrada_m, data->vel_z_filtrada_m_s, data->aceleracion_z_m_s2,
+                  data->altitud_filtrada_m, data->velocidad_vertical_filtrada_m_s, data->aceleracion_vertical_m_s2,
                   data->angulo_pitch_deg, data->angulo_yaw_deg, data->angulo_respecto_z_deg,
                   data->vel_angular_x_deg_s, data->vel_angular_y_deg_s, data->vel_angular_z_deg_s,
                   data->temperatura_amb_c, data->densidad_aire_kg_m3,
@@ -497,39 +495,49 @@ inline void print_data_raw(const data_raw_t *data) {
  * USANDO SERIAL PLOTTER DE LA IDE DE ARDUINO.
  */
 inline void print_plotter_data_raw(const data_raw_t *data) {
-#if defined(PLOT_MPU_ONLY) || defined(PLOT_BMP_ONLY) || defined(PLOT_GPS_ONLY) || defined(PLOT_ALL)
+#if defined(PLOT_MPU_RAW) || defined(PLOT_BMP_RAW) || defined(PLOT_GPS_RAW)
     if (data == NULL) return;
 
-#if defined(PLOT_MPU_ONLY)
+#if defined(PLOT_MPU_RAW)
     // Ideal para calibrar offsets, ver ruido y probar el filtro complementario
-    Serial.printf("AccX_g:%f,AccY_g:%f,AccZ_g:%f,"
-                  "GyroX_rads:%f,GyroY_rads:%f,GyroZ_rads:%f\r\n",
-                  data->mpu.accel_x_m_s2, data->mpu.accel_y_m_s2, data->mpu.accel_z_m_s2,
-                  data->mpu.gyro_x_rad_s, data->mpu.gyro_y_rad_s, data->mpu.gyro_z_rad_s);
+    Serial.printf(
+        // "AccX_raw_m_s2:%f,"
+        "AccY_raw_m_s2:%f,"
+        // "AccZ_raw_m_s2:%f,"
+        // "GyroX_raw_rads:%f,"
+        // "GyroY_raw_rads:%f,"
+        // "GyroZ_raw_rads:%f"
+        "\r\n",
+                  // data->mpu.accel_x_m_s2,
+                  data->mpu.accel_y_m_s2
+                  // data->mpu.accel_z_m_s2
+                  // data->mpu.gyro_x_rad_s,
+                  // data->mpu.gyro_y_rad_s,
+                  // data->mpu.gyro_z_rad_s
+    );
+#endif
 
-#elif defined(PLOT_BMP_ONLY)
+#if defined(PLOT_BMP_RAW)
     // Restamos un offset aproximado (ej. 1000 hPa) a la presión si quieres ver variaciones
     // pequeñas de altura junto con la temperatura sin que se aplasten mutuamente:
-    Serial.printf("Presion_hPa:%f,Temp_C:%f\r\n",
-                  data->bmp.presion_hpa,
-                  data->bmp.temp_deg_c);
+    Serial.printf(
+        // "Presion_raw_hPa:%f,"
+        "Altura_raw_bmp:%f"
+        // ",Temp_raw_C:%f"
+        "\r\n",
+                  // data->bmp.presion_hpa,
+                  data->bmp.altitud_snm_m
+                  // data->bmp.temp_deg_c
+    );
+#endif
 
-#elif defined(PLOT_GPS_ONLY)
+#if defined(PLOT_GPS_RAW)
     Serial.printf("Lat:%ld,Lon:%ld,Sats:%d\r\n",
                   (long)data->gps.latitude,
                   (long)data->gps.longitude,
                   (int)data->gps.satellites);
-
-#elif defined(PLOT_ALL)
-    Serial.printf("Presion:%f,Temp:%f,AccX:%f,AccY:%f,AccZ:%f,GyroX:%f,GyroY:%f,GyroZ:%f,Lat:%ld,Lon:%ld,Sats:%d\r\n",
-                  data->bmp.presion_hpa, data->bmp.temp_deg_c,
-                  data->mpu.accel_x_m_s2, data->mpu.accel_y_m_s2, data->mpu.accel_z_m_s2,
-                  data->mpu.gyro_x_rad_s, data->mpu.gyro_y_rad_s, data->mpu.gyro_z_rad_s,
-                  (long)data->gps.latitude, (long)data->gps.longitude, (int)data->gps.satellites);
 #endif
-    return;
 #endif
-    return;
 }
 
 
@@ -546,8 +554,8 @@ inline void print_data(const data_all_t *data) {
 
     Serial.printf("--- CINEMÁTICA LINEAL ---\n");
     Serial.printf("Altura AGL:         %.2f m\n", data->altitud_filtrada_m);
-    Serial.printf("Velocidad Z:        %.2f m/s\n", data->vel_z_filtrada_m_s);
-    Serial.printf("Aceleración Z:      %.2f m/s^2\n", data->aceleracion_z_m_s2);
+    Serial.printf("Velocidad Z:        %.2f m/s\n", data->velocidad_vertical_filtrada_m_s);
+    Serial.printf("Aceleración Z:      %.2f m/s^2\n", data->aceleracion_vertical_m_s2);
     // Serial.printf("Altitud Rampa ASL:  %.2f m\n", data->altitud_rampa_asl_m);
 
     Serial.printf("--- CINEMÁTICA ANGULAR ---\n");
@@ -577,9 +585,69 @@ inline void print_data(const data_all_t *data) {
 
     Serial.printf("======================================================\n\n");
 #endif
-    return;
 }
 
+inline void print_plotter_data_processed(const data_all_t *data) {
+#if defined(PLOT_MPU_PROCESSED) || defined(PLOT_BMP_PROCESSED) || defined(PLOT_GPS_PROCESSED)
+    if (data == NULL) return;
+
+#if defined(PLOT_MPU_PROCESSED)
+    // Ideal para evaluar el filtro de Kalman/complementario, orientación espacial y cinemática lineal
+    Serial.printf(
+                // "Pitch_deg:%f,"
+                // "Yaw_deg:%f,"
+                // "InclZ_deg:%f,"
+                // "PitchRate_deg_s:%f,"
+                // "RollRate_deg_s:%f,"
+                // "YawRate_deg_s:%f,"
+                "AccVert_m_s2:%f"
+                "\r\n",
+        // data->angulo_pitch_deg,
+        // data->angulo_yaw_deg,
+        // data->angulo_respecto_z_deg,
+        // data->vel_angular_x_deg_s,
+        // data->vel_angular_y_deg_s,
+        // data->vel_angular_z_deg_s,
+        data->aceleracion_vertical_m_s2
+    );
+#endif
+
+#if defined(PLOT_BMP_PROCESSED) && defined(PLOT_MPU_PROCESSED)
+    Serial.printf(
+        "VelVert_m_s:%f,"
+               "AltFusion_m:%f"
+               "\r\n",
+        data->velocidad_vertical_filtrada_m_s,
+        data->altitud_filtrada_m);
+#endif
+
+#if defined(PLOT_BMP_PROCESSED)
+    // Ideal para comparar la altitud pura del BMP280 vs. la altitud fusionada (BMP + MPU),
+    // ver la velocidad vertical, temperatura ambiental y la densidad del aire calculada
+    Serial.printf(
+        "AltBMP_m:%f,"
+                // "Temp_C:%f,"
+                // "Densidad_kg_m3:%f,"
+                // "Momentum_kg_m_s:%f"
+                "\r\n",
+        data->altitud_filtrada_m_bmp
+          // data->temperatura_amb_c
+          // data->densidad_aire_kg_m3
+          // ,data->momentum_kg_m_s
+          );
+#endif
+
+#if defined(PLOT_GPS_PROCESSED)
+    // Para visualización de la posición georreferenciada procesada y métricas de calidad de señal
+    Serial.printf("Valid:%d,Lat:%f,Lon:%f,Sats:%u,HDOP:%f\r\n",
+                  data->gps_is_valid ? 1 : 0,
+                  data->gps_latitud,
+                  data->gps_longitud,
+                  data->gps_nro_satelites,
+                  data->gps_hdop);
+#endif
+#endif
+}
 
 
 // Estructura del payload que viajará por la cola RTOS

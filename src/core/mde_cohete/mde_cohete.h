@@ -43,15 +43,15 @@
 
 namespace Cohete {
 
-    bool entrando_a_estado();
-    void transicionar_hacia(estado_cohete_t nuevo_estado);
+    // bool entrando_a_estado();
+    // void transicionar_hacia(estado_cohete_t nuevo_estado);
 
     /** @brief Tabla de punteros a función estrictamente mapeada a estado_vuelo_t */
     extern const f_st_t MDE_COHETE[];
     extern const char* estado_cohete_string[];
 
     void mde_cohete_actualizar(data_all_t* datos_sensores);
-    void transicion_error(error_cohete_t error, data_all_t* datos_sensores);
+    // void transicion_error(error_cohete_t error, data_all_t* datos_sensores);
 
 
 }

@@ -2,6 +2,7 @@
 #include "config.h"
 #include <freertos/projdefs.h>
 
+
 static const char *TAG_MAIN = "MAIN_SETUP";
 bool DEBUG_SERIAL = true;
 using namespace ConfigInit;
@@ -132,7 +133,7 @@ void puntoDeInicio(bool sensoresInit) {
     ESP_LOGI("BOOT_LOGIC", "Evaluando estado de vuelo post-reinicio...");
 
     // Todo, cambiar segun prubea
-    const mMPU6050::GravityAxis ejeZ = mMPU6050::GravityAxis::PLUS_Y;
+    constexpr mMPU6050::GravityAxis nuestro_eje_vertical = mMPU6050::GravityAxis::PLUS_Y;
 
     // INTERLOCK 1: ¿La misión había sido armada/iniciada antes del reinicio?
     if (g_configActual.mision_activa == true) {
@@ -164,7 +165,7 @@ void puntoDeInicio(bool sensoresInit) {
             // Falsa alarma. Se armó, pero nunca despegó (o ya aterrizó).
             ESP_LOGI("BOOT_LOGIC", "Misión activa pero en tierra. Calibrando sensores...");
             g_configActual.estado_cohete_actual = Cohete::ST_INIT;
-            mMPU6050::CalibrationStatus result = Sensors::getMPU6050().calibrar(ejeZ); // <-- Calibración segura en tierra
+            mMPU6050::CalibrationStatus result = Sensors::getMPU6050().calibrar(nuestro_eje_vertical); // <-- Calibración segura en tierra
             g_configActual.bias.accel = Sensors::getMPU6050().get_calibration_result().accel_bias;
             g_configActual.bias.gyro = Sensors::getMPU6050().get_calibration_result().gyro_bias;
         }
@@ -173,7 +174,7 @@ void puntoDeInicio(bool sensoresInit) {
         // No hay misión activa. Arranque normal.
         ESP_LOGI("BOOT_LOGIC", "Arranque normal de prevuelo. Calibrando sensores...");
         g_configActual.estado_cohete_actual = Cohete::ST_INIT;
-        mMPU6050::CalibrationStatus result =  Sensors::getMPU6050().calibrar(ejeZ); // <-- Calibración segura en tierra
+        mMPU6050::CalibrationStatus result =  Sensors::getMPU6050().calibrar(nuestro_eje_vertical); // <-- Calibración segura en tierra
         g_configActual.bias.accel = Sensors::getMPU6050().get_calibration_result().accel_bias;
         g_configActual.bias.gyro = Sensors::getMPU6050().get_calibration_result().gyro_bias;
     }
@@ -242,7 +243,6 @@ void vTaskReadSensors(void *pvParameters) {
         // }
         // TODO: Para los tasks que consumen más lento, deberíamos poner buffers más grandes. RBUF_SIZE quizás haya que borrarlo.
         data_raw_t raw = Sensors::get_raw_data();
-        // print_plotter_data_raw(&raw);
         //print_data_raw(&raw);
 
         // TODO: Curiosidad: Por qué se utiliza una Queue en lugar de un Ringbuffer ?
@@ -311,7 +311,7 @@ void vTaskDataFilter(void *pvParameters)
     {
         if (xQueueReceive(xColaSensores, &raw, portMAX_DELAY) == pdTRUE){
 
-            //print_data_raw(&raw);
+            print_plotter_data_raw(&raw);
 
             //----------------------------------------------------------------------
             // Primera muestra: solamente inicializa el tiempo
@@ -420,7 +420,7 @@ void vTaskDataFilter(void *pvParameters)
             // Recién acá convertimos a las unidades públicas de data_all_t.
             //----------------------------------------------------------------------
             data_all_t out = {};
-            const int64_t t = raw.timestamp_us;
+            out.timestamp_micros = raw.timestamp_us;
             
             // Serial.print(">heap_libre:");
             // Serial.println(ESP.getFreeHeap());
@@ -437,8 +437,8 @@ void vTaskDataFilter(void *pvParameters)
 
             // Cinemática vertical
             out.altitud_filtrada_m  = kalmanAlt.getAltitude();
-            out.vel_z_filtrada_m_s  = kalmanAlt.getVelocity(); 
-            out.aceleracion_z_m_s2  = accelVertical_m_s2;
+            out.velocidad_vertical_filtrada_m_s  = kalmanAlt.getVelocity();
+            out.aceleracion_vertical_m_s2  = accelVertical_m_s2;
 
             // Ambientales
             out.temperatura_amb_c   = raw.bmp.temp_deg_c;
@@ -479,6 +479,8 @@ void vTaskDataFilter(void *pvParameters)
                     0);
             }
             EnlaceGSE::enviarTelemetria(out);
+
+            print_plotter_data_processed(&out);
         }
         else {
             ESP_LOGI(TAG_TASK_DATA_FILTER, "No messages (timeout)");
@@ -539,7 +541,7 @@ void vTaskFlash(void *pvParameters) {
         uint32_t notif_val = ulTaskNotifyTake(pdTRUE, 0);
 
         // A) ACCIÓN CRÍTICA: VOLCADO DE EMERGENCIA DE LA RAM A FLASH
-        if (notif_val > 0 || Cohete::SYSTEM.accion.volcar_ram_a_flash) {
+        if (notif_val > 0 || Cohete::SYSTEM.flags.volcar_ram_a_flash) {
             ESP_LOGW(TAG_TASK_FLASH, "Iniciando volcado de seguridad a Flash Externa (mFlash)...");
 
             size_t item_size = 0;
@@ -554,17 +556,16 @@ void vTaskFlash(void *pvParameters) {
                 vRingbufferReturnItem(xFlashRingbuf, item);
             }
 
-            Cohete::SYSTEM.accion.volcar_ram_a_flash = false;
-            ESP_LOGI(TAG_TASK_FLASH, "¡Volcado masivo de RAM completado antes del impacto!");
+            Cohete::SYSTEM.flags.volcar_ram_a_flash = false;
+            ESP_LOGI(TAG_TASK_FLASH, "¡Volcado masivo de RAM a Flash completado!");
         }
 
         // B) ACCIÓN DE MANTENIMIENTO: BORRAR LOG (Independiente de la emergencia)
-        if (Cohete::SYSTEM.accion.borrar_log) {
+        if (false) { //TODO: Tirar otra notificacion desde la MdE
             ESP_LOGW(TAG_TASK_FLASH, "Ejecutando borrado de log en Flash (Caja Negra)...");
 
             if (ptrCajaNegra != nullptr) {
                 ptrCajaNegra->resetearLog();
-                Cohete::SYSTEM.accion.borrar_log = false;
                 Cohete::SYSTEM.flags.flash_log_borrado = true;
                 ESP_LOGI(TAG_TASK_FLASH, "¡Log borrado con éxito!");
             } else {
@@ -606,7 +607,7 @@ void vTaskLora(void *pvParameters) {
             // Empaquetamos la última coordenada GPS válida
             char sos_msg[64];
             snprintf(sos_msg, sizeof(sos_msg), "[SOS] LAT:%f LON:%f",
-                     Cohete::SYSTEM.datos_actuales.gps_latitud,
+                     Cohete::SYSTEM.datos_actuales.gps_latitud, //TODO: se podría eliminar "datos_actuales.gps_latitud" y usar los datos que recibe de prepo el vTaskLora
                      Cohete::SYSTEM.datos_actuales.gps_longitud);
 
             GSE::enviar_mensaje(sos_msg); // Reutilizamos tu función de C_MGS
@@ -672,7 +673,7 @@ void vTaskLora(void *pvParameters) {
 
                     // Actualizamos el estado interno y le avisamos a la MdE
                     GSE::set_estado_conexion(ROCKET_CONNECTED);
-                    Cohete::SYSTEM.flags.gse_conectado = true;
+                    // Cohete::SYSTEM.flags.gse_conectado = true; // La MdE es la UNICA que puede modificar los datos SYSTEM. Todos los DEMÁS solo tienen permitida LECTURA
 
                     // Si fue un PING explícito de la GSE, confirmamos recepción
                     if (rxPacket.protocol == lora_protocol::PING) {
@@ -690,7 +691,7 @@ void vTaskLora(void *pvParameters) {
         // ---------------------------------------------------------
         // 3. FASE HANDSHAKE: Emisión de PING si estamos buscando conexión
         // ---------------------------------------------------------
-        if (GSE::estado_conexion_gse() != ROCKET_CONNECTED) {
+        if (GSE::get_estado_conexion() != ROCKET_CONNECTED) {
             if (millis() - ultimo_ping_millis >= INTERVALO_PING_MS) {
                 ultimo_ping_millis = millis();
                 ESP_LOGI(TAG_TASK_LORA, "[LoRa TX] Emitiendo PING de búsqueda de GSE...");
@@ -773,7 +774,7 @@ CmdResult cmd_borrar_log(float value, void* context) {
 
     // Indica la acción
     Cohete::SYSTEM.flags.flash_log_borrado = false;
-    Cohete::SYSTEM.accion.borrar_log = true;
+    // Cohete::SYSTEM.accion.borrar_log = true;
 
     // Despierta a vTaskFlash INMEDIATAMENTE
     if (Cohete::SYSTEM.procesos.xTaskFlashHandle != NULL) {

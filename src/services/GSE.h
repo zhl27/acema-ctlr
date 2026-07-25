@@ -46,8 +46,8 @@ public:
 
     //static void actualizar(data_all_t *data);
 
-    static EstadoConexionGSE estado_conexion_gse() {
-        return GSE::_currentState;
+    static EstadoConexionGSE get_estado_conexion() {
+        return GSE::_currentState; // TODO: AGREGAR UN MUTEX!
     }
 
 };

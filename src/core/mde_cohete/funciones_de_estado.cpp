@@ -15,20 +15,19 @@
 // TODO: Integrar con la variable global COHETE para transiciones de estado
 
 constexpr float     A_GRAV                                  = 9.81;
-constexpr float     UMBRAL_ACEL_BOOST                       = 2 * A_GRAV;   // 2G (acorde a requerimientos)
+constexpr float     ACEL_M_S2_UMBRAL_BOOST                  = 2 * A_GRAV;   // 2G (acorde a requerimientos)
 constexpr int       TIEMPO_MS_MIN_BOOST                     = 200;          // 0.2 segundos en milisegundos (acorde a requerimientos)
 constexpr uint32_t  CONEXION_GSE_TIMEOUT_MILLIS             = 1000;         // Solo debemos esperar un minuto
 constexpr uint8_t   CANT_REINTENTOS_TMOUT                   = 2;            // Cantidad de reintentos que hacemos para conectarnos a la gse
 constexpr float     ALTURA_M_MAX                            = 1000;         // TODO: chequear ALTURA_M_MAX. Igual nos importa realmente este dato?
+constexpr float     ALTURA_M_MIN                            = 500;
 constexpr uint32_t  GPS_TIMEOUT_MILLIS                      = 1000*5;
-constexpr uint32_t  TIEMPO_MILLIS_ESPERA_WARMUP_MPU         = 1000*60*5;
+constexpr uint32_t  TIEMPO_MILLIS_ESPERA_WARMUP_MPU         = 1000*20;
 constexpr int       DIFF_ALTURA_M_APOGEO_CAIDA              = 10;
 constexpr int       ALTITUD_DESPLIEGUE_PCAIDAS_PPAL         = 250;
 
 
-
 namespace Cohete {
-
     namespace Timers
     {
         static TimerHandle_t xTimerRecalibrarMPU;
@@ -59,25 +58,14 @@ namespace Cohete {
         }
     }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     namespace Eventos {
-        // val0 --> valor de estudio
-        // val1 --> valor objetivo
-        // delta --> margen
-        /*inline bool aproxima(const float val0, const float val1, const float delta) {
-            return fabsf(val0 - val1) <= delta; // implementación que aprovecha la FPU de la ESP32
-            // return (val0 <= val1 + delta && val0 >= val1 - delta);
-        }
-        */
         // lo mismo que decir: es val0 menor por 5 unidades a val1?
         // inline bool menor_delta_que(const int val0, const int val1, const float delta) {
         //     return (val0 <= val1 + delta);
         // }
 
-        inline bool entorno (float X, float centro, float radio){
-            return fabsf(X - centro) <= radio;
-        }
         // TODO: SUPONGO QUE VAMOS A QUERER OVERRIDEAR ESTA CONDICION, EN CASO DE QUE LAS CONDICIONES NO CUMPLAN, LANZAR IGUAL EL COHETE.
         bool gps_es_preciso(const data_all_t* datos_sensores) {
             static uint8_t ticks_cumple_condiciones = 0;
@@ -102,82 +90,90 @@ namespace Cohete {
             return false;
         }
 
-        bool en_codiciones_para_volar(data_all_t* dat_ssr) {
+        bool en_codiciones_para_volar(const data_all_t* datos_sensores) {
             // Verificación geométrica de inclinación en rampa
-            bool estaListo = entorno(dat_ssr->angulo_respecto_z_deg, 0.0f, 5.0f);
-            if (!estaListo) return false;
+            bool estaListo = entorno(datos_sensores->angulo_respecto_z_deg, 0.0f, 5.0f);
 
-            // Verificación de borrado de memoria Flash
-            if (Cohete::SYSTEM.flags.gse_conectado) {
-                // Si hay enlace GSE, dependemos de la bandera de confirmación
-                estaListo = Cohete::SYSTEM.flags.flash_log_borrado;
-            } 
-            else {
-                // Si no hay GSE pero la memoria no está borrada aún:
-                if (!Cohete::SYSTEM.flags.flash_log_borrado) {
-                    
-                    // Dispara la orden SOLO SI no fue disparada previamente
-                    if (!Cohete::SYSTEM.accion.borrar_log) {
-                        ESP_LOGW(TAG_BASE, "Autoborrado de Flash solicitado por MdE en rampa...");
-                        Cohete::SYSTEM.accion.borrar_log = true;
-                        
-                        // Notifica a la tarea de Flash para que despierte ya mismo
-                        if (Cohete::SYSTEM.procesos.xTaskFlashHandle != NULL) {
-                            xTaskNotifyGive(SYSTEM.procesos.xTaskFlashHandle);
-                        }
+            if (GSE::get_estado_conexion() == ROCKET_CONNECTED) {
+                estaListo &= SYSTEM.flags.flash_log_borrado; // Si hay enlace GSE, dependemos de comandos de GSE del usuario
+            }
+            else { // Si no hay GSE
+                // Dispara la orden SOLO SI los logs del flash no fueron borrados previamente
+                if (!SYSTEM.flags.flash_log_borrado) { // TODO: MOVER RESPONSABILIDAD DE FLASH_BORRADO_O_NO A LA FLASH.
+                    ESP_LOGW(TAG_BASE, "Autoborrado de Flash solicitado por MdE en rampa...");
+
+                    // Notifica a la tarea de Flash para que despierte ya mismo
+                    if (SYSTEM.procesos.xTaskFlashHandle != NULL) {
+                        xTaskNotifyGive(SYSTEM.procesos.xTaskFlashHandle);
                     }
-                    return false; // Aún no esta lista, espera que vTaskFlash termine
+                    return false; // Aún no está lista, espera que vTaskFlash termine
                 }
                 estaListo = true;
             }
 
             // Sí se calibró, estamos listos
-            estaListo = Timers::flag_recalibrarMPU_disparado;
+            estaListo &= Timers::flag_recalibrarMPU_disparado;
             if (!estaListo) return false;
 
             // Si no se saltea el GPS y tampoco es preciso, entonces no estamos listos
-            if (!Cohete::SYSTEM.gse_configs.gps_override_skip && !Cohete::SYSTEM.flags.gps_preciso) {
-                return false;
-            }
-
-            estaListo = true;
-
+            // estaListo &= SYSTEM.gse_configs.gps_override_skip;
 
             return estaListo;
         }
 
-        bool hay_boost(data_all_t *datos_sensores) { 
-            // Memoria para recordar que la condición de empuje inicial se cumplió
-            static bool empuje_sostenido_confirmado = false;
-
-            // Evaluar aceleración de ignición
-            if (datos_sensores->aceleracion_z_m_s2 >= UMBRAL_ACEL_BOOST) { 
-                if (SYSTEM.timestamp_millis_inicio_pico_g == 0) { 
-                    SYSTEM.timestamp_millis_inicio_pico_g = millis(); 
-                } 
-                else if ((millis() - SYSTEM.timestamp_millis_inicio_pico_g) >= TIEMPO_MS_MIN_BOOST) {
-                    // Ya tuvimos 200ms sostenidos. El motor encendió. Guardamos el estado.
-                    empuje_sostenido_confirmado = true;
+#define TOLERANCIA_RUIDO_MS            50     // Permite caídas de hasta 50ms por vibración antes de resetear
+#define ALTITUD_MIN_SALIDA_RAMPA_M     4.0f   // Altura para confirmar salida de rampa
+#define ALTITUD_FALLBACK_M             12.0f  // Altura de redundancia
+#define VELOCIDAD_VERT_MIN_FALLBACK    5.0f   // ~5 m/s para validar que realmente subimos (evita viento en rampa)
+        bool hay_boost(const data_all_t *datos_sensores) {
+            // 1. Regla NASA: Validación defensiva de punteros
+            if (datos_sensores == NULL) {
+                return false;
+            }
+            if (!isfinite(datos_sensores->aceleracion_vertical_m_s2) ||
+                !isfinite(datos_sensores->altitud_filtrada_m) ||
+                !isfinite(datos_sensores->velocidad_vertical_filtrada_m_s)) {
+                // Datos corruptos por ruido I2C, NaN o infinito. Abortar evaluación este ciclo.
+                return false;
                 }
-            } else {
-                // CRÍTICO: Solo reiniciamos el cronómetro si el empuje NO había sido confirmado
-                // Esto evita abortar el despegue si la IMU lee < 2g por ruido o fin de combustión
-                if (!empuje_sostenido_confirmado) {
-                    SYSTEM.timestamp_millis_inicio_pico_g = 0;
+
+            const uint32_t ahora_ms = millis();
+            static uint32_t timestamp_ultima_acel_valida = 0;
+            static uint32_t timestamp_millis_inicio_pico_g = 0;
+
+            // 1. Evaluación de Aceleración con Ventana de Tolerancia (Debounce)
+            if (datos_sensores->aceleracion_vertical_m_s2 >= ACEL_M_S2_UMBRAL_BOOST) {
+                if (timestamp_millis_inicio_pico_g == 0) {
+                    timestamp_millis_inicio_pico_g = ahora_ms;
+                }
+                timestamp_ultima_acel_valida = ahora_ms;
+            }
+            // Si dejamos de tener pico de Gs, pero ya habiamos registrado un inicio de pico de Gs anteriormente...
+            else if (timestamp_millis_inicio_pico_g != 0) {
+                // Caída de aceleración durante el empuje: ¿Es vibración (<50ms) o apagado de motor (>50ms)?
+                if ((ahora_ms - timestamp_ultima_acel_valida) > TOLERANCIA_RUIDO_MS) {
+                    // Se limpian AMBOS temporizadores para no arruinar la tolerancia de futuros ciclos
+                    timestamp_millis_inicio_pico_g = 0;
+                    timestamp_ultima_acel_valida = 0;
                 }
             }
 
-            // Condición principal: Motor encendido Y superamos los 4 metros (salida de rampa)
-            if (empuje_sostenido_confirmado && datos_sensores->altitud_filtrada_m > (SYSTEM.ctx_fisico.altitud_m_pad + 4.0f)) {
-                empuje_sostenido_confirmado = false; // Limpiamos la bandera para un futuro
-                return true; 
+            // 2. Condición Principal: Empuje sostenido en tiempo + Salida física de rampa
+            if (timestamp_millis_inicio_pico_g != 0) {
+                const uint32_t duracion_pico_ms = ahora_ms - timestamp_millis_inicio_pico_g;
+
+                if ((duracion_pico_ms >= TIEMPO_MS_MIN_BOOST) && (SYSTEM.ctx_fisico.altitud_m_relativa_al_pad > ALTITUD_MIN_SALIDA_RAMPA_M)) {
+                    timestamp_millis_inicio_pico_g = 0;
+                    timestamp_ultima_acel_valida = 0;
+                    return true; // Despegue nominal confirmado (IMU + Barómetro)
+                }
             }
 
-            // Condición de seguridad (Fallback / Redundancia)
-            // Si por ruido extremo o falla de la IMU jamás leímos 2G constantes, pero
-            // de repente estamos 10 metros por encima de la rampa, estamos volando sí o sí.
-            if (datos_sensores->altitud_filtrada_m > (SYSTEM.ctx_fisico.altitud_m_pad + 10.0f)) {
-                return true;
+            // 3. Condición de Redundancia / Fallback Robusta (Fallo de acelerómetro)
+            if (SYSTEM.ctx_fisico.altitud_m_relativa_al_pad > ALTITUD_FALLBACK_M) {
+                timestamp_millis_inicio_pico_g = 0;
+                timestamp_ultima_acel_valida = 0;
+                return true; // Despegue confirmado por cinemática pura
             }
 
             return false;
@@ -185,7 +181,7 @@ namespace Cohete {
 
     }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     /**
      * @brief Dispara un timer de 5 min para calentar la IMU
@@ -194,18 +190,19 @@ namespace Cohete {
         ESP_LOGI(TAG_BASE, "\nINIT\n");
 
         //TODO: LÓGICA DE LECTURA DE FLASH = X
-        // Note: Delegado en main, máxima prioridad 
-
+        // Note: Delegado en main, máxima prioridad
 
         // Esperar 5 minutos para que la mpu entre en calor, luego calibrarla.
-        Timers::xTimerRecalibrarMPU =
-            xTimerCreate(
-                "Recalibrar",
-                pdMS_TO_TICKS(TIEMPO_MILLIS_ESPERA_WARMUP_MPU),
-                pdFALSE, // one shot timer
-                nullptr,
-                Timers::calibrar_mpu_callback
-            );
+        if (Timers::xTimerRecalibrarMPU == NULL) {
+            Timers::xTimerRecalibrarMPU =
+                xTimerCreate(
+                    "Recalibrar",
+                    pdMS_TO_TICKS(TIEMPO_MILLIS_ESPERA_WARMUP_MPU),
+                    pdFALSE, // one shot timer
+                    nullptr,
+                    Timers::calibrar_mpu_callback
+                );
+        }
 
         if(Timers::xTimerRecalibrarMPU != NULL ) {
             /* Iniciamos el temporizador con un tiempo de bloqueo (block time) de 0 */
@@ -219,31 +216,29 @@ namespace Cohete {
             }
         }
 
-        // Se debería llamar a la función _lora.c_connect_to_GSE() por medio de GSE o EnlaceGSE, 
+        // Se debería llamar a la función _lora.c_connect_to_GSE() por medio de GSE o EnlaceGSE,
         //_lora.c_connect_to_GSE(); EMITE UN PING
-        
+
         ESP_LOGI(TAG_BASE, " -> [CONEXIÓN GSE] Entrando a: Espera conexión con GSE...");
-        SYSTEM.flags.gse_conectado = false; 
-        SYSTEM._estado = ST_ESPERA_CONEXION_GSE;
+        SYSTEM.estado = ST_ESPERA_CONEXION_GSE;
         // transicionar_hacia(ST_ESPERA_CONEXION_GSE);
     }
 
     void f_st_espera_conexion_gse(data_all_t* datos_sensores, uint32_t ms_en_estado) {
-        ESP_LOGI(TAG_BASE, "\n ESPERA CONEXION \n");
+        ESP_LOGI(TAG_BASE, "Esperando conexión con la GSE...");
 
-       
         //  Condición de éxito: ¿Se conectó por LoRa?
-        if (SYSTEM.flags.gse_conectado) {
-            ESP_LOGI(TAG_BASE, " -> [CONEXIÓN GSE] Nos conectamos exitosamente.");
-            EnlaceGSE::enviarMensaje("Conexion establecida. Buscando GPS.");
-            SYSTEM._estado = ST_ESPERA_GPS_PRECISO;
+        if (GSE::get_estado_conexion() == ROCKET_CONNECTED) {
+            ESP_LOGI(TAG_BASE, " -> [CONEXIÓN GSE] Nos conectamos exitósamente.");
+            EnlaceGSE::enviarMensaje("Conexion establecida.");
+            SYSTEM.estado = ST_ESPERA_GPS_PRECISO;
             return;
         }
 
-        // Condición de Timeout: Evaluado directamente contra el argumento
+        // Condición de Timeout: Evaluado directamente contra   el argumento
         if (ms_en_estado >= CONEXION_GSE_TIMEOUT_MILLIS) {
             ESP_LOGE(TAG_BASE, "Timeout de conexión con GSE. Continuando vuelo...");
-            SYSTEM._estado = ST_ESPERA_GPS_PRECISO;
+            SYSTEM.estado = ST_ESPERA_GPS_PRECISO;
         }
     }
     /*
@@ -260,7 +255,7 @@ namespace Cohete {
         //     timestamp_millis_inicio_timeout = millis();
         //     ESP_LOGI(TAG_BASE, " -> [CONEXIÓN GSE] Esperando conexión con GSE...");
         // }
-        
+
         if (GSE::estado_conexion_gse() == ROCKET_CONNECTED) {
             ESP_LOGI(TAG_BASE, " -> [CONEXIÓN GSE] Nos conectamos a la GSE.");
             //transicionar_hacia(ST_ESPERA_GPS_PRECISO);
@@ -275,7 +270,7 @@ namespace Cohete {
             ESP_LOGE(TAG_BASE, "Timeout de conexión con GSE.");
             // matamos el proceso GSE asi no nos gasta recursos del cohete, o bajamos su frecuencia.
             // vTaskSuspend(SYSTEM.procesos.xTaskLoraHandle);
-            // NUNCA MATAR, ENVIAR CONTINUAMENTE. 
+            // NUNCA MATAR, ENVIAR CONTINUAMENTE.
             // TODO: SÓLO SI EL HARDWARE NO SE PUDO INICIALIZAR EL MÓDULO, NO DEBERIA HABERSE CREADO LA TAREA (no implementado)
 
             SYSTEM.procesos.flujos.Sensors_a_Lora_enabled = false;
@@ -287,39 +282,39 @@ namespace Cohete {
     }
     */
 
-void f_st_espera_gps_preciso(data_all_t* datos_sensores, uint32_t ms_en_estado) {
-            ESP_LOGI(TAG_BASE, "\n ESPERA CONEXION \n");
+    void f_st_espera_gps_preciso(data_all_t* datos_sensores, uint32_t ms_en_estado) {
+        ESP_LOGI(TAG_BASE, "Esperando condiciones estables para el módulo GPS...");
 
-    
-    // Timeout
-    if (ms_en_estado >= GPS_TIMEOUT_MILLIS) {
-        ESP_LOGE(TAG_BASE, "Timeout de GPS. Avanzando a espera de ignición.");
-        EnlaceGSE::enviarError("[GPS] Timeout ");
-        Cohete::SYSTEM.flags.gps_preciso = false;
-        SYSTEM._estado = ST_ESPERA_IGNICION;
-        return;
-    }
-    Cohete::SYSTEM.flags.gps_preciso = Eventos::gps_es_preciso(datos_sensores);
-    // Condición de éxito o bypass de GSE
-    if ( Cohete::SYSTEM.flags.gps_preciso || SYSTEM.gse_configs.gps_override_skip) {
-        ESP_LOGI(TAG_BASE, " -> [GPS] Precisión asegurada.");
-        EnlaceGSE::enviarMensaje(
-            (Cohete::SYSTEM.gse_configs.gps_override_skip)?
-                "[GPS] SKIP busqueda":
-                "[GPS] Precisión asegurada."
-            );
-        Cohete::SYSTEM._estado = ST_ESPERA_IGNICION;
-        return;
-    }
+        // Timeout
+        if (ms_en_estado >= GPS_TIMEOUT_MILLIS) {  // TODO: Deberiamos poner Timeout largo teniendo en cuenta que ya se puede overridear desde GSE
+            ESP_LOGE(TAG_BASE, "Timeout de GPS. Avanzando a espera de ignición.");
+            EnlaceGSE::enviarError("[GPS] Timeout");
+            // SYSTEM.flags.gps_preciso = false;
+            SYSTEM.estado = ST_ESPERA_IGNICION;
+            return;
+        }
 
-    // LOG
-    if (ms_en_estado% 200 == 0){
-        ESP_LOGI(TAG_BASE, " -> [GPS] Esperando satélites. Visibles: %d", datos_sensores->gps_nro_satelites);
-    }
+        SYSTEM.flags.gps_preciso = Eventos::gps_es_preciso(datos_sensores);
 
-}
+        // Condición de éxito o bypass de GSE
+        if (SYSTEM.gse_configs.gps_override_skip || SYSTEM.flags.gps_preciso) {
+            const auto msg = SYSTEM.gse_configs.gps_override_skip?
+                    "[GPS] SKIP busqueda":
+                    "[GPS] Precisión asegurada.";
+            ESP_LOGI(TAG_BASE, " -> %s", msg);
+            EnlaceGSE::enviarMensaje(msg);
+            SYSTEM.estado = ST_ESPERA_IGNICION;
+            return;
+        }
+
+        // LOG
+        if (ms_en_estado % 1000 <= 100){
+            ESP_LOGI(TAG_BASE, " -> [GPS] Esperando satélites. Visibles: %d", datos_sensores->gps_nro_satelites);
+        }
+    }
 
     void f_st_espera_ignicion(data_all_t* datos_sensores, uint32_t ms_en_estado) {
+        static uint32_t timer_millis = 0;
         // Aquí el cohete está pasivo en la rampa. Ignición es externa.
         // Lógica del filtro anti-zarandeo:
         // 1. Transformar aceleración a vector inercial.
@@ -332,14 +327,16 @@ void f_st_espera_gps_preciso(data_all_t* datos_sensores, uint32_t ms_en_estado) 
 
         if(Eventos::en_codiciones_para_volar(datos_sensores)) {
             // if led no encendido: encenderlo para señalizar que ya podemos volar.
-            if (ms_en_estado >= 3000) { // hacemos un beep cada 3 segundos
+            if (millis() - timer_millis >= 3000) { // cada 3 segundos hacer un beep
+                timer_millis = millis();
+                // buzzer.beep(100);
                 ESP_LOGI(TAG_BASE, " -> [ESPERA IGNICION] Cohete en condiciones para volar!");
             }
 
             if (Eventos::hay_boost(datos_sensores)) {
                 // SYSTEM.timestamp_millis_inicio_pico_g = micros();
-                EnlaceGSE::enviarMensaje("Depegue Autorizado");
-                Cohete::SYSTEM._estado = ST_BOOST;
+                EnlaceGSE::enviarMensaje("Despegue Autorizado");
+                SYSTEM.estado = ST_BOOST;
             }
         }
         else if (Eventos::hay_boost(datos_sensores)) { // detectamos boost a pesar de no estar en condiciones para volar, KEEEEE!!!!!!
@@ -349,7 +346,7 @@ void f_st_espera_gps_preciso(data_all_t* datos_sensores, uint32_t ms_en_estado) 
             // J: TOTALMENTE. Que sea lo que Dios quiera
             
             EnlaceGSE::enviarError("Despegue no autorizado");
-            Cohete::SYSTEM._estado = ST_BOOST;
+            Cohete::SYSTEM.estado = ST_BOOST;
         }
     }
 
@@ -363,7 +360,7 @@ void f_st_espera_gps_preciso(data_all_t* datos_sensores, uint32_t ms_en_estado) 
         // Hay un tick cada 5ms -> 15 ms de debouce
         static uint8_t ticks_inclinacion_peligrosa = 0;
         
-        if (datos_sensores->angulo_respecto_z_deg > 30.0f ) { 
+        if (datos_sensores->angulo_respecto_z_deg > 30.0f ) { // TODO: Podríamos usar 50 grados, para tener en cuenta el posible error del valor en +-10
             if (ticks_inclinacion_peligrosa < 255) ticks_inclinacion_peligrosa++;
         } else {
             ticks_inclinacion_peligrosa = 0;
@@ -376,7 +373,7 @@ void f_st_espera_gps_preciso(data_all_t* datos_sensores, uint32_t ms_en_estado) 
             Actuators::getPyroDrogue().armar();
             Actuators::getPyroDrogue().disparar();
             
-            SYSTEM._estado = ST_CAIDA_CATASTROFICA; // O un estado específico de ABORTO
+            SYSTEM.estado = ST_CAIDA_CATASTROFICA; // O un estado específico de ABORTO
             return; 
         }
 
@@ -389,16 +386,16 @@ void f_st_espera_gps_preciso(data_all_t* datos_sensores, uint32_t ms_en_estado) 
             
             // Si la aceleración Z (sin gravedad) cae por debajo de 0, 
             // significa que el empuje es menor que el Drag. El motor se apagó.
-            if (datos_sensores->aceleracion_z_m_s2 <= 0.0f) {
+            if (datos_sensores->aceleracion_vertical_m_s2 <= 0.0f) {
                 
                 // Verificamos que sigamos subiendo a buena velocidad como doble chequeo
-                if (datos_sensores->vel_z_filtrada_m_s > 5.0f) {
+                if (datos_sensores->velocidad_vertical_filtrada_m_s > 5.0f) {
                     EnlaceGSE::enviarMensaje("[BOOST] MOTOR APAGADO. MODO BALISTICO.");
                     
                     // Actualizamos la masa antes de entrar a balística
-                    SYSTEM.ctx_fisico.masa_g_cohete -= SYSTEM.ctx_fisico.masa_g_combustible;
+                    SYSTEM.ctx_fisico.masa_g_cohete -= SYSTEM.ctx_fisico.masa_g_combustible; // TODO: PREGUNTAR VALORES REALES.
                     
-                    SYSTEM._estado = ST_FASE_BALISTICA;
+                    SYSTEM.estado = ST_FASE_BALISTICA;
                     return;
                 }
             }
@@ -417,7 +414,7 @@ void f_st_fase_balistica(data_all_t* datos_sensores, uint32_t ms_en_estado) {
     // ---------------------------------------------------------
     // 1. ACTUALIZACIÓN DE ALTURA MÁXIMA
 	// ---------------------------------------------------------
-    if ((datos_sensores->vel_z_filtrada_m_s > -0.2f) &&
+    if ((datos_sensores->velocidad_vertical_filtrada_m_s > -0.2f) &&
         (datos_sensores->altitud_filtrada_m > SYSTEM.ctx_fisico.altura_m_max_historica)) 
     {
         SYSTEM.ctx_fisico.altura_m_max_historica = datos_sensores->altitud_filtrada_m;
@@ -426,9 +423,9 @@ void f_st_fase_balistica(data_all_t* datos_sensores, uint32_t ms_en_estado) {
     // ---------------------------------------------------------
     // 2. GATES DE DETECCIÓN DE APOGEO
     // ---------------------------------------------------------  
-  	const bool vel_apogeo = (datos_sensores->vel_z_filtrada_m_s <= -0.3f);
+  	const bool vel_apogeo = (datos_sensores->velocidad_vertical_filtrada_m_s <= -0.3f);
     const bool caida_confirmada = (SYSTEM.ctx_fisico.altura_m_max_historica - datos_sensores->altitud_filtrada_m) >= DIFF_ALTURA_M_APOGEO_CAIDA; 
-    const bool g_gate_valido = (datos_sensores->aceleracion_z_m_s2 > -5.0f && datos_sensores->aceleracion_z_m_s2 < 2.0f);
+    const bool g_gate_valido = (datos_sensores->aceleracion_vertical_m_s2 > -5.0f && datos_sensores->aceleracion_vertical_m_s2 < 2.0f);
 
     if ((vel_apogeo && g_gate_valido) || caida_confirmada) {
         if (ticks_apogeo_confirmado < 255) ticks_apogeo_confirmado++;
@@ -468,7 +465,7 @@ void f_st_fase_balistica(data_all_t* datos_sensores, uint32_t ms_en_estado) {
             // FAIL CRÍTICO: Ningún ignitor funciona
             else {
                 ESP_LOGE(TAG_BASE, "[CRÍTICO] ¡Sin continuidad en NINGÚN pirotécnico!");
-                SYSTEM._estado = ST_CAIDA_CATASTROFICA;
+                SYSTEM.estado = ST_CAIDA_CATASTROFICA;
                 return;
             }
         } 
@@ -479,20 +476,20 @@ void f_st_fase_balistica(data_all_t* datos_sensores, uint32_t ms_en_estado) {
                 if (SYSTEM.flags.drogue_disparado) {
                     Actuators::getPyroDrogue().desarmar();
                     ESP_LOGI(TAG_BASE, "[APOGEO] Drogue ignisecus OK. Transición a ST_DROGUE_DESPLEGADO");
-                    SYSTEM._estado = ST_DROGUE_DESPLEGADO;
+                    SYSTEM.estado = ST_DROGUE_DESPLEGADO;
                 } else {
                     Actuators::getPyroPpal().desarmar();
                     ESP_LOGI(TAG_BASE, "[APOGEO] Principal ignisecus OK. Transición a ST_PCAIDAS_PPAL_DESPLEGADO");
-                    SYSTEM._estado = ST_PCAIDAS_PPAL_DESPLEGADO;
+                    SYSTEM.estado = ST_PCAIDAS_PPAL_DESPLEGADO;
                 }
                 return;
             }
         }
     } 
-    // 4. CONTROL DE AIRBRAKES EN ASCENSO
+    // 4. CONTROL DE AIRBRAKES DURANTE ASCENSO SIN BOOST
     else {
         float angulo_airbrake = 0.0f;
-        if (datos_sensores->vel_z_filtrada_m_s >= 15.0f) {
+        if (datos_sensores->velocidad_vertical_filtrada_m_s >= 15.0f) {
             // angulo_airbrake = MPC_Controller::calcular_accion(...);
         }
         Actuators::getServo().sendAngulo(angulo_airbrake);
@@ -503,7 +500,7 @@ void f_st_fase_balistica(data_all_t* datos_sensores, uint32_t ms_en_estado) {
 void f_st_drogue_desplegado(data_all_t* datos_sensores, uint32_t ms_en_estado) {
     static uint8_t ticks_despliegue_ppal = 0;
     static bool disparo_ppal_iniciado = false;
-    static uint32_t t_inicio_pulso_ppal = 0;
+    static uint32_t timestamp_inicio_pulso_ppal = 0;
 
     if (ms_en_estado == 0) {
         ticks_despliegue_ppal = 0;
@@ -515,8 +512,8 @@ void f_st_drogue_desplegado(data_all_t* datos_sensores, uint32_t ms_en_estado) {
     // ---------------------------------------------------------
     // Si caemos demasiado rápido (ej. vel < -35 m/s), el drogue falló o se desprendió.
     if (ms_en_estado >= 3000 && !disparo_ppal_iniciado) {
-        if (datos_sensores->vel_z_filtrada_m_s < -35.0f) {
-            ESP_LOGE(TAG_BASE, "[ALERTA] Caída excesivamente rápida (%.1f m/s). ¡Drogue falló!", datos_sensores->vel_z_filtrada_m_s);
+        if (datos_sensores->velocidad_vertical_filtrada_m_s < -35.0f) {
+            ESP_LOGE(TAG_BASE, "[ALERTA] Caída excesivamente rápida (%.1f m/s). ¡Drogue falló!", datos_sensores->velocidad_vertical_filtrada_m_s);
             // Adelantamos la apertura del principal por emergencia
             ticks_despliegue_ppal = 10; 
         }
@@ -525,7 +522,7 @@ void f_st_drogue_desplegado(data_all_t* datos_sensores, uint32_t ms_en_estado) {
     // ---------------------------------------------------------
     // 2. CONDICIÓN NOMINAL: ALTITUD DE DESPLIEGUE DEL PRINCIPAL
     // ---------------------------------------------------------
-    if (SYSTEM.ctx_fisico.altitud_m_relativa_al_pad <= ALTITUD_DESPLIEGUE_PCAIDAS_PPAL && datos_sensores->vel_z_filtrada_m_s < 0.0f) {
+    if (SYSTEM.ctx_fisico.altitud_m_relativa_al_pad <= ALTITUD_DESPLIEGUE_PCAIDAS_PPAL && datos_sensores->velocidad_vertical_filtrada_m_s < 0.0f) {
         if (ticks_despliegue_ppal < 255) ticks_despliegue_ppal++;
     } else if (ticks_despliegue_ppal < 10) {
         ticks_despliegue_ppal = 0;
@@ -544,19 +541,19 @@ void f_st_drogue_desplegado(data_all_t* datos_sensores, uint32_t ms_en_estado) {
                 
                 SYSTEM.flags.paracaidas_principal_disparado = true;
                 disparo_ppal_iniciado = true;
-                t_inicio_pulso_ppal = micros();
+                timestamp_inicio_pulso_ppal = micros();
             } else {
                 ESP_LOGE(TAG_BASE, "[CRÍTICO] Sin continuidad en Pyro Principal. Transición a Caída Catastrófica.");
-                SYSTEM._estado = ST_CAIDA_CATASTROFICA;
+                SYSTEM.estado = ST_CAIDA_CATASTROFICA;
                 return;
             }
         } 
         else {
             // Mantenemos el pulso de 100 ms antes de cortar corriente y transicionar
-            if ((micros() - t_inicio_pulso_ppal) >= 100000UL) {
+            if ((micros() - timestamp_inicio_pulso_ppal) >= 100000UL) {
                 Actuators::getPyroPpal().desarmar();
                 ESP_LOGI(TAG_BASE, "[DESCENSO] Principal desplegado con éxito.");
-                SYSTEM._estado = ST_PCAIDAS_PPAL_DESPLEGADO;
+                SYSTEM.estado = ST_PCAIDAS_PPAL_DESPLEGADO;
                 return;
             }
         }
@@ -576,10 +573,10 @@ void f_st_pcaidas_ppal_desplegado(data_all_t* datos_sensores, uint32_t ms_en_est
     // 1. CRITERIO DE ATERRIZAJE (TOUCHDOWN)
     // ---------------------------------------------------------
     // Condición A: Velocidad vertical prácticamente nula (-0.4 m/s < vel < 0.4 m/s)
-    const bool velocidad_nula = (datos_sensores->vel_z_filtrada_m_s > -0.4f && datos_sensores->vel_z_filtrada_m_s < 0.4f);
+    const bool velocidad_nula = (datos_sensores->velocidad_vertical_filtrada_m_s > -0.4f && datos_sensores->velocidad_vertical_filtrada_m_s < 0.4f);
     
     // Condición B: Aceleración estática (sin sacudidas del paracaídas ni viento fuerte)
-    const bool aceleracion_estatica = (datos_sensores->aceleracion_z_m_s2 > -1.5f && datos_sensores->aceleracion_z_m_s2 < 1.5f);
+    const bool aceleracion_estatica = (datos_sensores->aceleracion_vertical_m_s2 > -1.5f && datos_sensores->aceleracion_vertical_m_s2 < 1.5f);
 
     if (velocidad_nula && aceleracion_estatica) {
         if (ticks_aterrizado < 65535) ticks_aterrizado++;
@@ -606,7 +603,7 @@ void f_st_pcaidas_ppal_desplegado(data_all_t* datos_sensores, uint32_t ms_en_est
         }
 
         // Transicionar al estado final de reposo/recuperación
-        SYSTEM._estado = ST_ATERRIZADO;
+        SYSTEM.estado = ST_ATERRIZADO;
     }
 }
 
@@ -627,88 +624,87 @@ void f_st_pcaidas_ppal_desplegado(data_all_t* datos_sensores, uint32_t ms_en_est
     //     // 2. Transición a ST_ATERRIZAJE (esperando el suelo).
     // }
 
-void f_st_caida_catastrofica(data_all_t* datos_sensores, uint32_t ms_en_estado) {
-    
-    // Solo ejecutamos las acciones críticas al entrar al estado
-    if (ms_en_estado == 0) {
-        ESP_LOGE(TAG_BASE, "==================================================");
-        ESP_LOGE(TAG_BASE, " -> [FATAL] CAÍDA CATASTRÓFICA DETECTADA.");
-        ESP_LOGE(TAG_BASE, " -> INICIANDO PROTOCOLO DE EMERGENCIA POST-MORTEM.");
-        ESP_LOGE(TAG_BASE, "==================================================");
+    void f_st_caida_catastrofica(data_all_t* datos_sensores, uint32_t ms_en_estado) {
 
-        // 1. Activar bandera global de pánico  cargar datos
-        SYSTEM.flags.emergencia_fatal = true;
-        SYSTEM.datos_actuales.gps_latitud   = datos_sensores->gps_latitud;
-        SYSTEM.datos_actuales.gps_longitud  = datos_sensores->gps_longitud;
+        // Solo ejecutamos las acciones críticas al entrar al estado
+        if (ms_en_estado == 0) {
+            ESP_LOGE(TAG_BASE, "==================================================");
+            ESP_LOGE(TAG_BASE, " -> [FATAL] CAÍDA CATASTRÓFICA DETECTADA.");
+            ESP_LOGE(TAG_BASE, " -> INICIANDO PROTOCOLO DE EMERGENCIA POST-MORTEM.");
+            ESP_LOGE(TAG_BASE, "==================================================");
 
-        // 2. Medida desesperada: Forzar disparo del principal si tiene continuidad
-        // Si ya se disparó antes o está roto, esto fallará de forma segura.
-        // Si por algún bug de software no se había abierto, esto podría salvar el fuselaje.
-        if (Actuators::getPyroPpal().tieneContinuidad()) {
-            Actuators::getPyroPpal().armar();
-            Actuators::getPyroPpal().disparar();
+            // 1. Activar bandera global de pánico cargar datos
+            SYSTEM.flags.emergencia_fatal = true;
+            SYSTEM.datos_actuales.gps_latitud   = datos_sensores->gps_latitud;
+            SYSTEM.datos_actuales.gps_longitud  = datos_sensores->gps_longitud;
+
+            // 2. Medida desesperada: Forzar disparo del principal si tiene continuidad
+            // Si ya se disparó antes o está roto, esto fallará de forma segura.
+            // Si por algún bug de software no se había abierto, esto podría salvar el fuselaje.
+            if (Actuators::getPyroPpal().tieneContinuidad()) {
+                Actuators::getPyroPpal().armar();
+                Actuators::getPyroPpal().disparar();
+            }
+
+            // 3. Ordenar el volcado de RAM a Flash Interna (LittleFS/SPIFFS)
+            // SYSTEM.accion.volcar_ram_a_flash = true;
+            if (SYSTEM.procesos.xTaskFlashHandle != NULL) {
+                xTaskNotifyGive(SYSTEM.procesos.xTaskFlashHandle);
+            }
+
+            // 4. Despertar a la tarea LoRa INMEDIATAMENTE para iniciar el SOS
+            if (SYSTEM.procesos.xTaskLoraHandle != NULL) {
+                xTaskNotifyGive(Cohete::SYSTEM.procesos.xTaskLoraHandle);
+            }
         }
 
-        // 3. Ordenar el volcado de RAM a Flash Interna (LittleFS/SPIFFS)
-        SYSTEM.accion.volcar_ram_a_flash = true;
-        if (SYSTEM.procesos.xTaskFlashHandle != NULL) {
-            xTaskNotifyGive(SYSTEM.procesos.xTaskFlashHandle);
-        }
-
-        // 4. Despertar a la tarea LoRa INMEDIATAMENTE para iniciar el SOS
-        if (SYSTEM.procesos.xTaskLoraHandle != NULL) {
-            xTaskNotifyGive(Cohete::SYSTEM.procesos.xTaskLoraHandle);
-        }
+        // Lógica continua (opcional):
+        // Como es terminal, la MdE puede dejar de procesar matemática pesada (como el MPC)
+        // para cederle todo el tiempo de CPU y energía a las tareas de LoRa y Flash.
+        // Retraemos el servo para evitar que se rompa en el impacto.
+        Actuators::getServo().sendAngulo(0.0f);
     }
 
-    // Lógica continua (opcional):
-    // Como es terminal, la MdE puede dejar de procesar matemática pesada (como el MPC)
-    // para cederle todo el tiempo de CPU y energía a las tareas de LoRa y Flash.
-    // Retraemos el servo para evitar que se rompa en el impacto.
-    Actuators::getServo().sendAngulo(0.0f);
-}
-
-void f_st_aterrizado(data_all_t* datos_sensores, uint32_t ms_en_estado) {
-    // Lógica:
-    
-
-     // Solo ejecutamos las acciones críticas al entrar al estado
-    if (ms_en_estado == 0) {
-        ESP_LOGE(TAG_BASE, "==================================================");
-        ESP_LOGE(TAG_BASE, " -> [EXITO] ATERRIZAJE CORRECTO.");
-        ESP_LOGE(TAG_BASE, "==================================================");
-
-        // 1. Activar bandera global de pánico  cargar datos
-        SYSTEM.flags.emergencia_fatal = true;
-        SYSTEM.datos_actuales.gps_latitud   = datos_sensores->gps_latitud;
-        SYSTEM.datos_actuales.gps_longitud  = datos_sensores->gps_longitud;
+    void f_st_aterrizado(data_all_t* datos_sensores, uint32_t ms_en_estado) {
+        // Lógica:
 
 
-        // 2. Ordenar el volcado de RAM a Flash Interna (LittleFS/SPIFFS)
-        SYSTEM.accion.volcar_ram_a_flash = true;
-        if (SYSTEM.procesos.xTaskFlashHandle != NULL) {
-            xTaskNotifyGive(SYSTEM.procesos.xTaskFlashHandle);
+         // Solo ejecutamos las acciones críticas al entrar al estado
+        if (ms_en_estado == 0) {
+            ESP_LOGE(TAG_BASE, "==================================================");
+            ESP_LOGE(TAG_BASE, " -> [EXITO] ATERRIZAJE CORRECTO.");
+            ESP_LOGE(TAG_BASE, "==================================================");
+
+            // 1. Activar bandera global de pánico  cargar datos
+            SYSTEM.flags.emergencia_fatal = true;
+            SYSTEM.datos_actuales.gps_latitud   = datos_sensores->gps_latitud;
+            SYSTEM.datos_actuales.gps_longitud  = datos_sensores->gps_longitud;
+
+
+            // 2. Ordenar el volcado de RAM a Flash Interna (LittleFS/SPIFFS)
+            // SYSTEM.accion.volcar_ram_a_flash = true;
+            if (SYSTEM.procesos.xTaskFlashHandle != NULL) {
+                xTaskNotifyGive(SYSTEM.procesos.xTaskFlashHandle);
+            }
+
+            // 3. Despertar a la tarea LoRa INMEDIATAMENTE para iniciar el SOS
+            if (SYSTEM.procesos.xTaskLoraHandle != NULL) {
+                xTaskNotifyGive(Cohete::SYSTEM.procesos.xTaskLoraHandle);
+            }
         }
 
-        // 3. Despertar a la tarea LoRa INMEDIATAMENTE para iniciar el SOS
-        if (SYSTEM.procesos.xTaskLoraHandle != NULL) {
-            xTaskNotifyGive(Cohete::SYSTEM.procesos.xTaskLoraHandle);
+        // 2. Detener logs de alta frecuencia para salvar batería.
+
+
+        if(ms_en_estado % 500 <= 5){
+            // Suponiendo que los sensores funcionan... MEJOR NO xd
+            SYSTEM.datos_actuales.gps_longitud  = datos_sensores->gps_longitud;
+            SYSTEM.datos_actuales.gps_latitud   = datos_sensores->gps_latitud;
+            buzzer.playSuccess();
         }
+        // 3. Cerrar archivos en la SD (flush y close).
+        // 4. Emitir un "beeeeep beeeeep" continuo y transmitir coordenadas Lat/Lon por LoRa cada X segundos.
     }
-    
-    // 2. Detener logs de alta frecuencia para salvar batería.
-
-
-    if(ms_en_estado % 500 ==0){
-        // Suponiendo que los sensores funcionan... MEJOR NO xd
-        SYSTEM.datos_actuales.gps_longitud  = datos_sensores->gps_longitud;
-        SYSTEM.datos_actuales.gps_latitud   = datos_sensores->gps_latitud;
-        buzzer.playSuccess();
-    }
-    // 3. Cerrar archivos en la SD (flush y close).
-    // 4. Emitir un "beeeeep beeeeep" continuo y transmitir coordenadas Lat/Lon por LoRa cada X segundos.
-}
-
 }
 /**
  * Si el drogue no tiene continuidad, abrir el paracaidas

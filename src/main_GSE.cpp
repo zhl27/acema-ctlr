@@ -230,6 +230,7 @@ void loop() {
             if (lora.begin(DEFAULT_SYNC_WORD, DEFAULT_ENCRY_WORD, DEFAULT_FREC)) {
                 #ifdef DEBUG
                 Serial.println(F("[GSE] Modulo LoRa inicializado con éxito."));
+                Serial.println(F("[GSE] Esperando datos..."));
                 #endif
                 currentState = GSE_RECEIVING_DATA;
             } else {

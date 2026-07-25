@@ -11,6 +11,15 @@
 
 namespace Cohete {
 
+    namespace Eventos {
+        inline bool entorno(const float X, const float centro, const float radio){
+            return fabsf(X - centro) <= radio; // implementación que aprovecha la FPU de la ESP32
+        }
+        bool gps_es_preciso(const data_all_t* datos_sensores);
+        bool en_codiciones_para_volar(const data_all_t* datos_sensores);
+        bool hay_boost(const data_all_t *datos_sensores);
+
+    }
     // Punteros a funciones de estado. Reciben el array de datos de los sensores y un clock.
     typedef void (*f_st_t)(data_all_t* datos_sensores, uint32_t ms_en_estado);
     // Firma actualizada de las funciones de estado
