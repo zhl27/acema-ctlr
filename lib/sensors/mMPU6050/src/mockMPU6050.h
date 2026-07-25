@@ -89,8 +89,8 @@ public:
     mockMPU6050() {
         // Inicializar datos falsos por defecto (ej. vector gravedad en Z)
         mock_accel_x = 0.0f;
-        mock_accel_y = 0.0f;
-        mock_accel_z = 9.81f; // Gravedad terrestre en m/s^2
+        mock_accel_y = 9.81f; // Gravedad terrestre en m/s^2
+        mock_accel_z = 0.0f;
 
         mock_gyro_x = 0.0f;
         mock_gyro_y = 0.0f;

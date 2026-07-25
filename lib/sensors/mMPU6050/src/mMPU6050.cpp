@@ -27,6 +27,10 @@ bool mMPU6050::init(const uint8_t addr) {
     _mpu.setInterruptPinLatch(false);             
     _mpu.setMotionInterrupt(false);               
 
+#ifdef SENSORES_MOCK
+    _mpu.setMockSensorData(0, 9.81, 0, 0,0, 0); // en la rampa estamos quietos
+#endif
+
     return true; 
 }
 
@@ -95,6 +99,39 @@ mMPU6050::CalibrationResult mMPU6050::get_calibration_result() const {
 }
 
 data_raw_mpu_t mMPU6050::get_mpu_raw_data() {
+
+#ifdef SENSORES_MOCK
+    constexpr float g_val = 9.80665f;
+    constexpr float a_boost = 2.0f * g_val;         // Empuje neto del motor (2G)
+    constexpr unsigned long t_lanzamiento = 50000;  // Despegue en t = 50s
+    constexpr unsigned long duracion_boost = 5000;  // Duración del quemado
+
+    unsigned long t_actual = millis();
+
+    // 1. Fase de Reposo en Rampa (0s a 50s): 1G vertical (fuerza normal del suelo hacia el cielo)
+    float acc_y = g_val;
+
+    if (t_actual > t_lanzamiento && t_actual <= (t_lanzamiento + duracion_boost)) {
+        // 2. Fase Boost (50s a 53s): 1G de normal + 2G netos de motor = 3G (+29.42 m/s²)
+        // Supera el umbral de aceleración >= 2G por 0.15s para activar la MdE
+        acc_y = g_val + a_boost;
+
+    } else if (t_actual > (t_lanzamiento + duracion_boost)) {
+        // 3. Fase Coast y Caída Libre (t > 53s): Motor apagado.
+        // FÍSICA REAL: Un sensor MEMS en caída libre/vuelo balístico experimenta ingravidez (0G).
+        acc_y = 0.0f;
+
+        // NOTA DE DEPURACIÓN: Si tu Máquina de Estados NO usa un filtro que reste la gravedad
+        // y está programada "hardcodeada" esperando leer el número crudo -9.81 para abrir paracaídas,
+        // comenta la línea anterior y usa la siguiente:
+        // acc_z = -g_val;
+    }
+
+    // Según tus requerimientos, el eje vertical hacia el cielo es el Z.
+    // Pasamos el valor al 3er parámetro: setMockSensorData(ax, ay, az, gx, gy, gz)
+    _mpu.setMockSensorData(0.0f, acc_y, 0.0f, 0.0f, 0.0f, 0.0f);
+#endif
+
     data_raw_mpu_t raw_mpu = {};
     sensors_event_t a, g, t;
     

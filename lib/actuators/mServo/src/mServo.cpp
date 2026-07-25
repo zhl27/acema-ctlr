@@ -16,9 +16,8 @@ bool mServo::init() {
   // Asignamos el pin al periférico PWM del ESP32 especificando los anchos de pulso
   _servo.attach(_cfg->pinServo, _cfg->minPulse, _cfg->maxPulse);
 
-  // Inicializamos la posición en 0 grados
-  angActual = 0.0f;
-  sendAngulo(angActual);
+  // Inicializamos la posición en 5 grados
+  sendAngulo(5.0f);
 
   return true;
 }
@@ -26,12 +25,12 @@ bool mServo::init() {
 void mServo::sendAngulo(const float ang) {
   if (_cfg == nullptr) return;
 
-  // Restringimos el valor entre los límites de operación del servo (0° a 180°)
-  angActual = constrain(ang, 0.0f, 180.0f);
+  // Restringimos el valor entre los límites de operación del servo (5° a 180°)
+  angActual = constrain(ang, 5.0f, 180.0f);
 
   // Mapeo directo del ángulo al ancho de pulso en microsegundos
-  const uint16_t pulse = static_cast<uint16_t>(round(_cfg->minPulse + 
-                         (_cfg->maxPulse - _cfg->minPulse) * (angActual / 180.0f)));
+  const uint16_t pulse = static_cast<uint16_t>(round((float)(_cfg->minPulse) +
+                         (float)(_cfg->maxPulse - _cfg->minPulse) * (angActual / 180.0f)));
   
   // Enviamos la orden inmediatamente al hardware para movimiento a máxima velocidad
   _servo.writeMicroseconds(pulse);
