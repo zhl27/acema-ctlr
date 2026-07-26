@@ -47,7 +47,7 @@ bool Actuators::init() {
 
     // 1. Inicializar el Buzzer
     _buzzer.init();
-
+    
     // 2. Inicializar los Pirotécnicos
     _pyro_pcaidas_drogue.init();
     _pyro_pcaidas_ppal.init();

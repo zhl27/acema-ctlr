@@ -105,16 +105,18 @@ bool initHardware() {
         ESP_LOGI("INIT_HARD", "Inicialización de Sensors exitosa (Sin calibrar)");
     } else {
         ESP_LOGE("INIT_HARD", "ERROR en la inicializacion de sensors");
-        return false;
+        //return false;
     }
 
     inicializacion = Actuators::init();
+
     if(inicializacion) {
         ESP_LOGI("INIT_HARD", "Inicialización de Actuators exitosa");
     } else {
         ESP_LOGE("INIT_HARD", "ERROR en la inicializacion de Actuators");
-        return false;
+        //return false;
     }
+
 
     cmdDispatcher.init();
     return true;

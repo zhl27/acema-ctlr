@@ -19,6 +19,7 @@ static const char *TAG_MAIN = "MAIN_SETUP";
 using namespace ConfigInit;
 
 void setup() {
+
     // 1. Inicialización de la consola y logs
     initSerialLog(); // Utiliza tu función de inicializacion.cpp en lugar de duplicar código
     
@@ -27,11 +28,11 @@ void setup() {
     ESP_LOGI(TAG_MAIN, "===========================================");
 
     // 2. Recuperación de memoria y configuración (Caja Negra)
-    if (initBlackBox()) {
+   /* if (initBlackBox()) {
         ESP_LOGI(TAG_MAIN, "Configuración previa recuperada de la Flash.");
     } else {
         ESP_LOGW(TAG_MAIN, "No se pudo recuperar la configuración. Cargando defaults.");
-    }
+    }*/
 
     // 3. Inicialización de Hardware Base (I2C, SPI, Sensores sin calibrar)
     bool hardIniciado = initHardware();
@@ -41,9 +42,10 @@ void setup() {
         ESP_LOGE(TAG_MAIN, "CRITICAL ERROR: Fallo en initHardware(). Posible fallo en I2C.");
         //while(true) { vTaskDelay(100); } // Bucle infinito de seguridad
     }
+    Actuators::getBuzzer().playError();
 
     // 4. Lógica de Boot y Diagnóstico de Vuelo (Decide estado y si calibra o no)
-    puntoDeInicio(hardIniciado); 
+    //cpuntoDeInicio(hardIniciado); 
 
     // 5. Inicialización de Comunicaciones RF y Comandos
     initLora();
@@ -67,25 +69,28 @@ void setup() {
     // 7. Lanzamiento de las Tareas (Threads)
     ESP_LOGI(TAG_MAIN, "Desplegando Tareas de FreeRTOS en Cores...");
     
-    // Core 1: Operaciones críticas
-        xTaskCreatePinnedToCore(vTaskStateMachine, "StateMachine", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskStateMachineHandle), 1);
+    // // Core 1: Operaciones críticas
+    xTaskCreatePinnedToCore(vTaskStateMachine, "StateMachine", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskStateMachineHandle), 1);
     xTaskCreatePinnedToCore(vTaskFlash, "BlackBox", 8192, &cajaNegra, 4, &(Cohete::SYSTEM.procesos.xTaskFlashHandle), 1); 
     xTaskCreatePinnedToCore(vTaskReadSensors, "ReadSensors", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskReadSensorsHandle), 1);
     xTaskCreatePinnedToCore(vTaskDataFilter, "DataFilter", 8192, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskDataFilterHandle), 1);
 
 
     // Core 0: Operaciones de comunicación
-    xTaskCreatePinnedToCore(vTaskLora, "Lora", 8192, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskLoraHandle), 0);
+    //xTaskCreatePinnedToCore(vTaskLora, "Lora", 8192, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskLoraHandle), 0);
     // xTaskCreatePinnedToCore(vTaskFlash, "Flash", 4096, NULL, 4, &(SYSTEM.procesos.xTaskFlashHandle), 0);
 
     ESP_LOGI(TAG_MAIN, "===========================================");
     ESP_LOGI(TAG_MAIN, "🚀 BOOT SEQUENCE COMPLETADA. Entregando control a FreeRTOS.");
     ESP_LOGI(TAG_MAIN, "===========================================");
 
+    Serial.println("off sensor");
+    //Actuators::getBuzzer().off();
+
     // 8. Borrar la tarea "setup/loop" predeterminada
     vTaskDelete(NULL); 
 }
 
 void loop() {
-    // Vacío
+    //Actuators::getBuzzer().runBuzzer();
 }

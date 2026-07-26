@@ -35,7 +35,12 @@ private:
     uint32_t _onTime_ms;        //  Duracion del pulso ON
     uint8_t  _beepsRemaining;   //  Repeticiones (N)
     bool _reloadedSequence;     //  Flag de secuencia
+   
     
+    TaskHandle_t _taskHandle;
+    // Tarea RTOS estática y método run interno
+    static void _taskWrapper(void* pvParameters);
+
     /* estados */
     void stIdle(void);
     void stOn(void);

@@ -28,8 +28,30 @@ void mBuzzer::init() {
     state = BUZZER_ST_IDLE;
     _actualState = &mBuzzer::stIdle;
     _beepsRemaining = 0;
+
+    xTaskCreate(
+        _taskWrapper, 
+        "buzzer", 
+        4096,        // Stack size 
+        this,        // Pasamos la instancia como parámetro
+        2,           // Prioridad
+        &_taskHandle
+    );
 }
 
+void mBuzzer::_taskWrapper(void* pvParameters) {
+    mBuzzer* buzz = static_cast<mBuzzer*>(pvParameters);
+    TickType_t xLastWakeTime;
+    const TickType_t xPeriodo = pdMS_TO_TICKS(10); // Muestreo cada 10 ms (100 Hz)
+
+    // Inicializar el tiempo de referencia para vTaskDelayUntil
+    xLastWakeTime = xTaskGetTickCount();
+    while(true){
+               // Espera estricta y precisa hasta el próximo ciclo de 10ms --> ademas nos permite procesar a las otras Tasks
+        vTaskDelayUntil(&xLastWakeTime, xPeriodo);
+        buzz->runBuzzer();
+    }
+}
 
 
 // ------------------------------------------
@@ -46,6 +68,7 @@ void mBuzzer::stOn (void){
 
     // Timer soft de ON. Vencido el timer, apaga el buzzer. 
     // Sólo activa la lógica si entró al estado por secuencia y no forzado 
+    ESP_LOGI("BUZZER", "millis() - _last_ms: %i", millis() - _last_ms);
     if(_reloadedSequence && (millis() - _last_ms > _onTime_ms)){
         OFF_BUZZER(buzzerPin);
 
@@ -54,6 +77,7 @@ void mBuzzer::stOn (void){
 
         // Aún quedan repeticiones, pasa al estado de pausa WAIT
         if (_beepsRemaining > 0) {
+
             state = BUZZER_ST_WAIT;
             _actualState = &mBuzzer::stWait;
         } 
@@ -114,6 +138,8 @@ void mBuzzer::on() {
     _reloadedSequence = false; // Fuerza la anulación de cualquier secuencia
 
     state = BUZZER_ST_ON; 
+        Serial.println("de ON() yendo a STIDLE");
+
     _actualState = &mBuzzer::stOn; 
 }
 
@@ -122,6 +148,7 @@ void mBuzzer::off() {
     OFF_BUZZER(buzzerPin);
 
     state = BUZZER_ST_IDLE;
+    Serial.println("de off() yendo a STIDLE");
     _actualState = &mBuzzer::stIdle;
 }
 
@@ -141,10 +168,10 @@ void mBuzzer::beep(const uint32_t durationMs) {
 // Podria haber un bool para verificar si se realizó la carga de la secuencia
 void mBuzzer::playSuccess() {
     // N = 2 | ON = 100ms | OFF = 50ms
-    startSequence(2, 100, 50); // tampoco funciona en N=4
+    startSequence(4, 1000, 500); // tampoco funciona en N=4
 }
 
 void mBuzzer::playError() {
     // N = 2 | ON = 500ms | OFF = 100ms
-    startSequence(2, 500, 100);
+    startSequence(8, 500, 500);
 }
