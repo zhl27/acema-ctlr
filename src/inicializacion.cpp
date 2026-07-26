@@ -17,6 +17,12 @@ static EmaFilter emaTemperatura(FREC_SAMPLING_SENSORS_HZ, EMA_FREC_CORTE_TEMPERA
 static EmaFilter emaPresion(FREC_SAMPLING_SENSORS_HZ, EMA_FREC_CORTE_PRESION_ATM);
 static EmaFilter emaDensidad(FREC_SAMPLING_SENSORS_HZ, EMA_FREC_CORTE_DENSIDAD_AIRE);
 static EmaFilter emaAccelVertical(FREC_SAMPLING_SENSORS_HZ, EMA_FREC_CORTE_ACCEL_VERTICAL);
+static EmaFilter emaAltitudBMP(FREC_SAMPLING_SENSORS_HZ, EMA_FREC_CORTE_ALTITUD_BMP);
+//<<! EXPERIMENTAL
+static EmaFilter emaAccelMPU_X(FREC_SAMPLING_SENSORS_HZ, EMA_FREC_CORTE_ACCEL_MPU);
+static EmaFilter emaAccelMPU_Y(FREC_SAMPLING_SENSORS_HZ, EMA_FREC_CORTE_ACCEL_MPU);
+static EmaFilter emaAccelMPU_Z(FREC_SAMPLING_SENSORS_HZ, EMA_FREC_CORTE_ACCEL_MPU);
+
 
 // Ring buffer handles
 RingbufHandle_t xStateMachineRingbuf;
@@ -410,6 +416,8 @@ void vTaskDataFilter(void *pvParameters)
             out.angulo_yaw_deg        = yaw_rad * RAD_TO_DEG;
             out.angulo_respecto_z_deg = inclinacion_rad * RAD_TO_DEG;
 
+            // Altitud
+            out.altitud_filtrada_m_bmp = emaAltitudBMP.actualizar(raw.bmp.altitud_snm_m);
             // Cinemática vertical
             out.altitud_asl_filtrada_m  = kalmanAlt.getAltitude();
             out.velocidad_vertical_filtrada_m_s  = kalmanAlt.getVelocity();
@@ -418,6 +426,13 @@ void vTaskDataFilter(void *pvParameters)
             // Ambientales
             out.temperatura_amb_c   = raw.bmp.temp_deg_c;
             out.densidad_aire_kg_m3 = emaDensidad.actualizar(calcularDensidadAire(raw.bmp.presion_hpa, raw.bmp.temp_deg_c));
+            
+            //EXPERIMENTAL
+            out.mpu.accel_filtrada.x = emaAccelMPU_X.actualizar(raw.mpu.accel_x_m_s2);
+            out.mpu.accel_filtrada.y = emaAccelMPU_Y.actualizar(raw.mpu.accel_y_m_s2);
+            out.mpu.accel_filtrada.z = emaAccelMPU_Z.actualizar(raw.mpu.accel_z_m_s2);
+
+
 
             // GPS
             out.gps_is_valid = raw.gps.is_valid;
