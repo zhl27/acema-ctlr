@@ -19,39 +19,40 @@ static const char *TAG_MAIN = "MAIN_SETUP";
 using namespace ConfigInit;
 
 void setup() {
-    // 1. Inicialización de la consola y logs
-    initSerialLog(); // Utiliza tu función de inicializacion.cpp en lugar de duplicar código
+
+    Serial.begin(115200); // TODO: Para la Compu de vuelo no se usa Serial
+    while (!Serial)
+        delay(10);
     
-    ESP_LOGI(TAG_MAIN, "===========================================");
     ESP_LOGI(TAG_MAIN, "🚀 BOOT SEQUENCE INICIADA");
-    ESP_LOGI(TAG_MAIN, "===========================================");
 
-    // 2. Recuperación de memoria y configuración (Caja Negra)
-    if (initBlackBox()) {
-        ESP_LOGI(TAG_MAIN, "Configuración previa recuperada de la Flash.");
+    // Inicialización de Hardware Base (I2C, SPI, Sensores sin calibrar)
+    const bool hw_iniciado_con_exito = init_hardware();
+    if (hw_iniciado_con_exito) {
+        ESP_LOGI(TAG_MAIN, "[init_hardware]: Hardware inicializado exitósamente.");
     } else {
-        ESP_LOGW(TAG_MAIN, "No se pudo recuperar la configuración. Cargando defaults.");
-    }
-
-    // 3. Inicialización de Hardware Base (I2C, SPI, Sensores sin calibrar)
-    const bool hardIniciado = initHardware();
-    if (hardIniciado) {
-        ESP_LOGI(TAG_MAIN, "Hardware base inicializado.");
-    } else {
-        ESP_LOGE(TAG_MAIN, "CRITICAL ERROR: Fallo en initHardware(). Posible fallo en I2C.");
+        ESP_LOGE(TAG_MAIN, "[init_hardware]: Fallo en init_hardware(). Posible fallo en I2C.");
         //while(true) { vTaskDelay(100); } // Bucle infinito de seguridad
     }
 
-    // 4. Lógica de Boot y Diagnóstico de Vuelo (Decide estado y si calibra o no)
-    puntoDeInicio(hardIniciado); 
+    // Lógica de Boot y Diagnóstico de Vuelo (Decide estado y si calibra o no)
+    run_boot_logic(hw_iniciado_con_exito);
 
-    // 5. Inicialización de Comunicaciones RF y Comandos
-    initLora();
-    if (registrarComandos()) {
-        ESP_LOGI(TAG_MAIN, "Comandos de GSE registrados exitosamente.");
+    // Inicialización de Comunicaciones RF y Comandos
+    init_lora();
+    if (registrar_comandos_gse()) {
+        ESP_LOGI(TAG_MAIN, "[registrar_comandos_gse]: Comandos de GSE registrados exitosamente.");
     } else {
-        ESP_LOGW(TAG_MAIN, "Atención: Fallo al registrar algunos comandos.");
+        ESP_LOGW(TAG_MAIN, "[registrar_comandos_gse]: Fallo al registrar algunos comandos.");
     }
+
+    // Recuperación de memoria y configuración (Caja Negra)
+    if (init_black_box()) {
+        ESP_LOGI(TAG_MAIN, "[init_black_box]: Configuración previa recuperada de la Flash.");
+    } else {
+        ESP_LOGW(TAG_MAIN, "[init_black_box]: No se pudo recuperar la configuración. Cargando defaults.");
+    }
+
 
     // 6. Creación de Colas y RingBuffers de FreeRTOS
     ESP_LOGI(TAG_MAIN, "Asignando memoria para Buffers de FreeRTOS...");
@@ -78,9 +79,7 @@ void setup() {
     xTaskCreatePinnedToCore(vTaskLora, "Lora", 8192, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskLoraHandle), 0);
     // xTaskCreatePinnedToCore(vTaskFlash, "Flash", 4096, NULL, 4, &(SYSTEM.procesos.xTaskFlashHandle), 0);
 
-    ESP_LOGI(TAG_MAIN, "===========================================");
     ESP_LOGI(TAG_MAIN, "🚀 BOOT SEQUENCE COMPLETADA. Entregando control a FreeRTOS.");
-    ESP_LOGI(TAG_MAIN, "===========================================");
 
     // 8. Borrar la tarea "setup/loop" predeterminada
     vTaskDelete(NULL); 

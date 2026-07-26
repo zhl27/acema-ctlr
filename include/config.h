@@ -78,8 +78,8 @@ namespace ConfigInit {
     /***********************/
     /*         MdE         */
     /***********************/
-    constexpr int   UMBRAL_LANZAMIENTO      = 100; // TODO: falta implementar valor real
-    constexpr float AREA_REFERENCIA_COHETE  = 0.01; // m^2, TODO: falta implementar valor real
+    // constexpr int   UMBRAL_LANZAMIENTO      = 100; // TODO: falta implementar valor real
+    // constexpr float AREA_REFERENCIA_COHETE  = 0.01; // m^2, TODO: falta implementar valor real
 
     /***********************/
     /*         UART        */

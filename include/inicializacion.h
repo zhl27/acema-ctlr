@@ -36,29 +36,29 @@ void initSerialLog();
 /**
  * @brief Inicializa la memria flash y carga la configuración
  */
-bool initBlackBox();
+bool init_black_box();
 
 /**
  * @brief Inicializa el hardware (sensores, actuadores, bus I2C) 
  * @return true si todo inició correctamente, false en caso de error.
  */
-bool initHardware(); // Corregí el typo de "initHarware" a "initHardware"
+bool init_hardware(); // Corregí el typo de "initHarware" a "initHardware"
 
  /**
  * @brief Aplica la lógica de boot y decide el estado de inicio
  */
-void puntoDeInicio(bool);
+void run_boot_logic(bool);
 
  /**
  * @brief Inicializa el lora y canal de comunicaciones 
  */
-void initLora();
+void init_lora();
 
 /**
  * @brief Registra los callbacks en el CmdDispatcher
  * @return true si se registraron correctamente
  */
-bool registrarComandos();
+bool registrar_comandos_gse();
 
 // ---------------------------------------------------------
 // Prototipos de Tareas de FreeRTOS

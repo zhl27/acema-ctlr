@@ -59,44 +59,34 @@ mBuzzer buzzer (BUZZER_PIN);
 
 //>! Orden
 
-// 1. Para comunicación serial
-void initSerialLog(){
-    Serial.begin(115200); // TODO: Para la Compu de vuelo no se usa Serial
-
-    while (!Serial)
-        delay(10);
-
-    ESP_LOGI("SETUP", "Comenzando SETUP.");
-}
-
 // 2. Para cargar datos de configuración
-bool initBlackBox()
+bool init_black_box()
 {
     if(!cajaNegra.begin(sizeof(data_all_t))){
-        if(EnlaceGSE::enviarError("Not load blackBox"))
+        if(EnlaceGSE::enviarError("El Flash no se ha inicializado correctamente"))
         {
-            ESP_LOGI("INIT BLACK BOX","Not load blackBox");
+            ESP_LOGI("INIT_BLACK_BOX", "El Flash no se ha inicializado correctamente");
         }
         else {
-            ESP_LOGE("INIT BLACK BOX", "EnlaceGSE roto");
+            ESP_LOGE("INIT_BLACK_BOX", "EnlaceGSE roto");
         }
-        return false; // false?
+        return false; // false? sep, porque malió sal
     }
 
     if(!cajaNegra.cargarConfig(&g_configActual, sizeof(g_configActual))){
-        if(EnlaceGSE::enviarError("Not load config"))
+        if(EnlaceGSE::enviarError("No se pudo cargar la configuracion guardada en Flash"))
         {
-            ESP_LOGI("INIT BLACK BOX","Not load config");
+            ESP_LOGI("INIT_BLACK_BOX","No se pudo cargar la configuracion guardada en Flash");
         }
         else {
-            ESP_LOGE("INIT BLACK BOX", "EnlaceGSE roto");
+            ESP_LOGE("INIT_BLACK_BOX", "EnlaceGSE roto");
         }
-        return false; // false?
+        return false; // false? sep, porque malió sal
     }
     return true;
 }
 
-bool initHardware() {
+bool init_hardware() {
     bool inicializacion = false;
 
     // NOTA: Sensors::init() AHORA SOLO DEBE INICIALIZAR LOS BUSES Y OBJETOS (begin).
@@ -125,14 +115,15 @@ bool initHardware() {
 // Se esperaría en algun momento, limpiar el logger antes de despegar,
 // mas no, que sea condición para el depegue
 // LOGICA DE MAQUINA DE ESTADOS: Esto puede ir en la FSM para prevenir los reinicios
-void puntoDeInicio(bool sensoresInit) {
-    if(!sensoresInit){
-        g_configActual.estado_cohete_actual = Cohete::ST_INIT;
+void run_boot_logic(const bool sensores_inicializaron_bien) {
+    ESP_LOGI("BOOT_LOGIC", "sensores_inicializaron_bien=%d", sensores_inicializaron_bien);
+
+    if(!sensores_inicializaron_bien){
+        g_configActual.estado_cohete_actual = Cohete::ST_INIT; // comenzamos MdE desde cero.
         return;
     }
     ESP_LOGI("BOOT_LOGIC", "Evaluando estado de vuelo post-reinicio...");
 
-    // Todo, cambiar segun prubea
     constexpr mMPU6050::GravityAxis nuestro_eje_vertical = mMPU6050::GravityAxis::PLUS_Y;
 
     // INTERLOCK 1: ¿La misión había sido armada/iniciada antes del reinicio?
@@ -155,7 +146,7 @@ void puntoDeInicio(bool sensoresInit) {
             g_configActual.estado_cohete_actual = Cohete::ST_BOOST;
 
             // Aquí NO se llama a Sensors::calibrar(). El filtro dependerá de los offsets guardados
-            // previamente en la flash, o usará valores por defecto seguros.
+            // previamente en el flash, o usará valores por defecto seguros.
             math::Vector3f biasAccel = g_configActual.bias.accel;
             math::Vector3f biasGyro = g_configActual.bias.gyro;
             Sensors::getMPU6050().setBias(biasAccel,biasGyro);
@@ -181,7 +172,7 @@ void puntoDeInicio(bool sensoresInit) {
 }
 
 
-void initLora(){
+void init_lora(){
     // Crea el buffer de telemetria
     xLoraRingbuf = xRingbufferCreate(RBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
     if (xLoraRingbuf == NULL) ESP_LOGE(TAG_MAIN, "Error crítico: No se pudo crear xLoraRingbuf");
@@ -538,7 +529,7 @@ void vTaskFlash(void *pvParameters) {
         // -----------------------------------------------------------------
         // 1. CHEQUEO DE NOTIFICACIONES ASÍNCRONAS (No bloqueante)
         // -----------------------------------------------------------------
-        uint32_t notif_val = ulTaskNotifyTake(pdTRUE, 0);
+        const uint32_t notif_val = ulTaskNotifyTake(pdTRUE, 0);
 
         // A) ACCIÓN CRÍTICA: VOLCADO DE EMERGENCIA DE LA RAM A FLASH
         if (notif_val > 0 || Cohete::SYSTEM.flags.volcar_ram_a_flash) {
@@ -551,7 +542,13 @@ void vTaskFlash(void *pvParameters) {
             // con timeout 0 para rescatar cada byte disponible en RAM antes del choque.
             while ((item = xRingbufferReceive(xFlashRingbuf, &item_size, 0)) != NULL) {
                 if (item_size == sizeof(data_all_t)) {
-                    ptrCajaNegra->guardarPuntoLog(item, sizeof(data_all_t));
+                    if (ptrCajaNegra != nullptr) {
+                        ptrCajaNegra->guardarPuntoLog(item, sizeof(data_all_t));
+                    }
+                    else {
+                        ESP_LOGE(TAG_TASK_FLASH, "No existe el objeto mFlash");
+                        // EnlaceGSE::enviar_error("No existe el objeto mFlash");
+                    }
                 }
                 vRingbufferReturnItem(xFlashRingbuf, item);
             }
@@ -561,11 +558,12 @@ void vTaskFlash(void *pvParameters) {
         }
 
         // B) ACCIÓN DE MANTENIMIENTO: BORRAR LOG (Independiente de la emergencia)
-        if (false) { //TODO: Tirar otra notificacion desde la MdE
+        if (Cohete::SYSTEM.flags.borrar_log) { //TODO: Tirar otra notificacion desde la MdE
             ESP_LOGW(TAG_TASK_FLASH, "Ejecutando borrado de log en Flash (Caja Negra)...");
 
             if (ptrCajaNegra != nullptr) {
                 ptrCajaNegra->resetearLog();
+                Cohete::SYSTEM.flags.borrar_log = false;
                 Cohete::SYSTEM.flags.flash_log_borrado = true;
                 ESP_LOGI(TAG_TASK_FLASH, "¡Log borrado con éxito!");
             } else {
@@ -607,8 +605,8 @@ void vTaskLora(void *pvParameters) {
             // Empaquetamos la última coordenada GPS válida
             char sos_msg[64];
             snprintf(sos_msg, sizeof(sos_msg), "[SOS] LAT:%f LON:%f",
-                     Cohete::SYSTEM.datos_actuales.gps_latitud, //TODO: se podría eliminar "datos_actuales.gps_latitud" y usar los datos que recibe de prepo el vTaskLora
-                     Cohete::SYSTEM.datos_actuales.gps_longitud);
+                     Cohete::SYSTEM.ctx_fisico.gps_ultima_latitud_valida,  //TODO: se podría eliminar "datos_actuales.gps_latitud" y usar los datos que recibe de prepo el vTaskLora
+                     Cohete::SYSTEM.ctx_fisico.gps_ultima_longitud_valida);
 
             GSE::enviar_mensaje(sos_msg); // Reutilizamos tu función de C_MGS
             ESP_LOGW(TAG_TASK_LORA, "[LoRa TX] ¡Transmitiendo Baliza SOS!");
@@ -673,7 +671,7 @@ void vTaskLora(void *pvParameters) {
 
                     // Actualizamos el estado interno y le avisamos a la MdE
                     GSE::set_estado_conexion(ROCKET_CONNECTED);
-                    // Cohete::SYSTEM.flags.gse_conectado = true; // La MdE es la UNICA que puede modificar los datos SYSTEM. Todos los DEMÁS solo tienen permitida LECTURA
+                    // Cohete::SYSTEM.flags.gse_conectado = true; // La MdE es la UNICA que puede modificar los datos SYSTEM. Todos los DEMÁS solo tienen permitida LECTURA. En este caso, podemos utilizar en su lugar: get_estado_conexion()
 
                     // Si fue un PING explícito de la GSE, confirmamos recepción
                     if (rxPacket.protocol == lora_protocol::PING) {
@@ -774,7 +772,7 @@ CmdResult cmd_borrar_log(float value, void* context) {
 
     // Indica la acción
     Cohete::SYSTEM.flags.flash_log_borrado = false;
-    // Cohete::SYSTEM.accion.borrar_log = true;
+    Cohete::SYSTEM.flags.borrar_log = true; // manda accion para borrar log
 
     // Despierta a vTaskFlash INMEDIATAMENTE
     if (Cohete::SYSTEM.procesos.xTaskFlashHandle != NULL) {
@@ -784,7 +782,7 @@ CmdResult cmd_borrar_log(float value, void* context) {
     return CmdResult{.status = 1, .data= 0.0f}; // Respuesta rápida a la estación terrena
 }
 
-bool registrarComandos(){
+bool registrar_comandos_gse(){
 
     bool state = true;
     state &= cmdDispatcher.registerCommand(CMD_CLEAR_LOG, cmd_borrar_log, nullptr);

@@ -14,7 +14,7 @@ namespace Cohete {
         .estado = ST_INIT,
         .estado_anterior = ST_NULL,
         ._error = ERR_NINGUNO,
-        ._entrando_estado = false,
+        // .entrando_estado = false,
         // .es_estado_salida = false,
         .procesos ={
             .xTaskReadSensorsHandle = NULL,
@@ -29,8 +29,9 @@ namespace Cohete {
             }
         },
 
-        .gse_configs = {
+        .gse = {
             .gps_override_skip = false,
+            // .en_condiciones_para_vuelo_override_true = false,
         },
 
         .timestamp_millis_entrada_estado = 0,
@@ -42,7 +43,9 @@ namespace Cohete {
             .masa_g_cohete = 0, // TODO: masa_cohete_kg debe ser configurable a traves de comando desde GSE: "set_masa_cohete_kg" o similar
             .masa_g_combustible = 0, // TODO: masa_combustible_kg debe ser configurable a traves de comando desde GSE: "set_masa_combustible_kg" o similar
             .altitud_m_pad = 0.0f, // TODO: altitud_m_pad toma el valor actual de la altitud_bmp --> cuando comando desde GSE: "tara_altitud" o similar
-            .altitud_m_relativa_al_pad = 0.0f // se actualiza utilizando SYSTEM.ctx_fisico.altitud_m_cero_pad
+            .altitud_m_relativa_al_pad = 0.0f, // se actualiza utilizando SYSTEM.ctx_fisico.altitud_m_cero_pad
+            .gps_ultima_latitud_valida = 0.0f,
+            .gps_ultima_longitud_valida = 0.0f,
         },
 
         .flags = {
@@ -52,7 +55,7 @@ namespace Cohete {
             .drogue_disparado = false,
             .paracaidas_principal_disparado = false,
             .emergencia_fatal = false,
-            // .borrar_log = false,
+            .borrar_log = false,
             .volcar_ram_a_flash = false,
         },
     };
@@ -103,6 +106,11 @@ namespace Cohete {
         if (SYSTEM.estado != SYSTEM.estado_anterior) {
             SYSTEM.timestamp_millis_entrada_estado = ahora_ms;
             SYSTEM.estado_anterior = SYSTEM.estado;
+        }
+
+        if (datos_sensores->gps_is_valid) {
+            SYSTEM.ctx_fisico.gps_ultima_latitud_valida  = datos_sensores->gps_latitud;
+            SYSTEM.ctx_fisico.gps_ultima_longitud_valida = datos_sensores->gps_longitud;
         }
 
         // Calculamos cuánto tiempo lleva el cohete en el estado actual
