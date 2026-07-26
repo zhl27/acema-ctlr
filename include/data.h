@@ -114,6 +114,18 @@ typedef struct {
     float gps_latitud;
     float gps_longitud;
 
+    
+    // TODO: MOVER LOS SIGUIENTES CAMPOS HACIA data_gse_t
+    ///> DATOS EXTRAS PARA ENVIAR POR GSE
+
+    float angulo_airbrake;
+
+    bool hay_continuidad_pyro_pcaidas_ppal;
+    bool hay_continuidad_pyro_pcaidas_drogue;
+
+    uint32_t estado_vuelo;
+    uint32_t error_vuelo;
+
 } data_all_t; ///< Información de utilidad obtenida del ambiente a través de los sensores que YA ESTÁN SANITIZADOS Y FILTRADOS!
 
 
@@ -134,28 +146,7 @@ typedef struct {
 // - Código de error
 typedef struct {
 
-    float altura_m_snm; // obtenida del bmp280
-    float altura_relativa_a_pad;
-
-    float vel_z_bmp;
-    float vel_y_bmp;
-    float vel_x_bmp;
-
-    float vel_z_mpu;
-    float vel_y_mpu;
-    float vel_x_mpu;
-
-    float acel_z_mpu;
-
-    float angulo_respecto_z;
-
-    bool gps_is_valid;
-    uint32_t gps_nro_satelites;
-    float gps_hdop; // Esto muestra la precision de latitud y longitud. Menor o igual a 2 es un buen valor.
-    float gps_latitud;
-    float gps_longitud;
-
-    uint32_t masa_cohete_g; // ponemos en gramos para evitar floats --> en GSE se convierte a Kg
+    data_all_t datos_filtrados;
 
     float angulo_airbrake;
 
@@ -246,7 +237,7 @@ namespace Cohete {
         estado_cohete_t estado;
         estado_cohete_t estado_anterior;
         error_cohete_t _error; // contiene el último error que se dio
-        bool _entrando_estado;
+        // bool entrando_estado;
         // bool es_estado_salida;
 
 
@@ -265,7 +256,8 @@ namespace Cohete {
 
         struct {
             bool gps_override_skip; // esto se configura con un comando desde la GSE --> // TODO: Cómo manejamos esto sin utilizar los temibles mutexes ?
-        } gse_configs;
+            // bool en_condiciones_para_vuelo_override_true; // Innecesario, de todas formas, las condiciones_para_vuelo en Falso no va a detener la ignición del cohete.
+        } gse;
 
         // Tracking de integradores temporales
         uint32_t timestamp_millis_entrada_estado; // se actualiza cada vez que entramos a un nuevo estado de la mde
@@ -278,6 +270,8 @@ namespace Cohete {
             uint32_t masa_g_combustible;
             float altitud_m_pad; ///< Altura de tara inicial (~3m) --> Se configura a traves de comandos GSE "TARA_INICIAL" --> guardamos el valor de ese instante de datos_sensores->altitud_filtrada_m
             float altitud_m_relativa_al_pad;
+            float gps_ultima_latitud_valida;
+            float gps_ultima_longitud_valida;
         } ctx_fisico;
 
         // PEGAMENTO FEO, NECESITO ACCESO A LA FLASH
@@ -289,14 +283,10 @@ namespace Cohete {
             bool drogue_disparado;
             bool paracaidas_principal_disparado;
             bool emergencia_fatal;
-            // bool borrar_log;
+            bool borrar_log;
             bool volcar_ram_a_flash;
         } flags;
 
-        struct{
-            float gps_latitud;
-            float gps_longitud;
-        }datos_actuales;
     } system_data_t;
 
     extern system_data_t SYSTEM; // SOLAMENTE DEBE SER MODIFICADA POR LA MDE DEL COHETE. LOS DEMÁS PROCESOS SOLO DEBERÍAN LEERLA, PERO NO DEBEN MODIFICARLA. // TODO: FORZAR SOLO LECTURA PARA OBJETOS EXTERNOS A LA MDE.

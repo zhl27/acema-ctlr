@@ -17,7 +17,7 @@ namespace Cohete {
         }
         bool gps_es_preciso(const data_all_t* datos_sensores);
         bool en_codiciones_para_volar(const data_all_t* datos_sensores);
-        bool hay_boost(const data_all_t *datos_sensores);
+        bool hay_boost_garantizado(const data_all_t *datos_sensores);
 
     }
     // Punteros a funciones de estado. Reciben el array de datos de los sensores y un clock.
