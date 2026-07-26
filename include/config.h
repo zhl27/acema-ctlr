@@ -113,6 +113,10 @@ namespace ConfigInit {
     constexpr float EMA_FREC_CORTE_PRESION_ATM     = 2.0f;
     constexpr float EMA_FREC_CORTE_DENSIDAD_AIRE   = 1.0f;
     constexpr float EMA_FREC_CORTE_ACCEL_VERTICAL  = 15.0f;
+    constexpr float EMA_FREC_CORTE_ALTITUD_BMP     = 10.0f;
+    constexpr float EMA_FREC_CORTE_ACCEL_MPU       = 2.0f;
+
+
 
     /**********************/
     /*     BUFFERS TAM    */

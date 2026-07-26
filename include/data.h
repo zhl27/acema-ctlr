@@ -126,6 +126,14 @@ typedef struct {
     uint32_t estado_vuelo;
     uint32_t error_vuelo;
 
+    //<<! Experimental
+    struct
+    {   struct {
+            float x, y,z;
+        }accel_filtrada;
+    } mpu;
+    
+
 } data_all_t; ///< Información de utilidad obtenida del ambiente a través de los sensores que YA ESTÁN SANITIZADOS Y FILTRADOS!
 
 
