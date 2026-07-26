@@ -1,4 +1,6 @@
 #include "CmdDispatcher.h"
+
+#include "config.h"
 #include "../EnlaceGSE/EnlaceGSE.h"
 
 CmdDispatcher::CmdDispatcher() : _registeredCmds(0), _cmdQueue(nullptr), _taskHandle(nullptr) {}
@@ -12,9 +14,9 @@ void CmdDispatcher::init() {
         xTaskCreate(
             _taskWrapper, 
             "CmdTask", 
-            4096,        // Stack size 
-            this,        // Pasamos la instancia como parámetro
-            2,           // Prioridad
+            4096,                               // Stack size
+            this,                               // Pasamos la instancia como parámetro
+            ConfigInit::TASK_PRIORITY_COMMON,   // Prioridad // TODO: Revisar. Originalmente habia un 2, espero que no sea determinante.
             &_taskHandle
         );
     }

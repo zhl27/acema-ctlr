@@ -104,7 +104,7 @@ data_raw_mpu_t mMPU6050::get_mpu_raw_data() {
     constexpr float g_val = 9.80665f;
     constexpr float a_boost = 2.0f * g_val;         // Empuje neto del motor (2G)
     constexpr unsigned long t_lanzamiento = 50000;  // Despegue en t = 50s
-    constexpr unsigned long duracion_boost = 5000;  // Duración del quemado
+    constexpr unsigned long duracion_boost = 10000;  // Duración del quemado
 
     unsigned long t_actual = millis();
 
@@ -112,7 +112,7 @@ data_raw_mpu_t mMPU6050::get_mpu_raw_data() {
     float acc_y = g_val;
 
     if (t_actual > t_lanzamiento && t_actual <= (t_lanzamiento + duracion_boost)) {
-        // 2. Fase Boost (50s a 53s): 1G de normal + 2G netos de motor = 3G (+29.42 m/s²)
+        // 2. Fase Boost: 1G de normal + 2G netos de motor = 3G (+29.42 m/s²)
         // Supera el umbral de aceleración >= 2G por 0.15s para activar la MdE
         acc_y = g_val + a_boost;
 
@@ -120,16 +120,15 @@ data_raw_mpu_t mMPU6050::get_mpu_raw_data() {
         // 3. Fase Coast y Caída Libre (t > 53s): Motor apagado.
         // FÍSICA REAL: Un sensor MEMS en caída libre/vuelo balístico experimenta ingravidez (0G).
         acc_y = 0.0f;
-
-        // NOTA DE DEPURACIÓN: Si tu Máquina de Estados NO usa un filtro que reste la gravedad
-        // y está programada "hardcodeada" esperando leer el número crudo -9.81 para abrir paracaídas,
-        // comenta la línea anterior y usa la siguiente:
-        // acc_z = -g_val;
     }
 
     // Según tus requerimientos, el eje vertical hacia el cielo es el Z.
     // Pasamos el valor al 3er parámetro: setMockSensorData(ax, ay, az, gx, gy, gz)
     _mpu.setMockSensorData(0.0f, acc_y, 0.0f, 0.0f, 0.0f, 0.0f);
+
+    // if (t_actual % 1000 <= 100) {
+    //     Serial.printf("AccY Raw: %f\n", acc_y);
+    // }
 #endif
 
     data_raw_mpu_t raw_mpu = {};

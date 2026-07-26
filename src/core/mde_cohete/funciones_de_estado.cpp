@@ -33,28 +33,22 @@ namespace Cohete {
         static TimerHandle_t xTimerRecalibrarMPU;
         static volatile bool flag_recalibrarMPU_disparado = false; // TODO: huelo una pequeña condicion de carrera, que en este caso zafa.
 
-        // typedef void (* TimerCallbackFunction_t)( TimerHandle_t xTimer );
         void calibrar_mpu_callback(TimerHandle_t xTimer) {
-            xTaskCreate(
-    [](void* pvParameters) {
-                    ESP_LOGI(TAG_BASE, "Temporizador xTimerRecalibrarMPU disparado!");
-                    ESP_LOGI(TAG_BASE, "Calibrando MPU6050.");
+            // typedef void (* TimerCallbackFunction_t)( TimerHandle_t xTimer );
+            auto calibracion_mpu = [](void* pvParameters) {
+                ESP_LOGI(TAG_BASE, "Temporizador xTimerRecalibrarMPU disparado!");
+                ESP_LOGI(TAG_BASE, "Calibrando MPU6050.");
 
-                    const mMPU6050::CalibrationStatus res = Sensors::getMPU6050().calibrar();
+                const mMPU6050::CalibrationStatus res = Sensors::getMPU6050().calibrar();
 
-                    if (res == mMPU6050::CalibrationStatus::Ok) {
-                        flag_recalibrarMPU_disparado = true;
-                        ESP_LOGI(TAG_BASE, "Calibración de MPU6050 exitosa.");
-                    }
+                if (res == mMPU6050::CalibrationStatus::Ok) {
+                    flag_recalibrarMPU_disparado = true;
+                    ESP_LOGI(TAG_BASE, "Calibración de MPU6050 exitosa.");
+                }
 
-                    vTaskDelete(NULL); // para auto-borrarse
-                },
-                "MPU_Calibrar_Task", // Name of the task for debugging
-                4096,                // Stack size in words (or bytes in ESP-IDF)
-                NULL,                // Parameter passed into the task (pvParameters)
-                5,                   // Task priority (adjust as needed)
-                NULL                 // Task handle (optional, pass &handle if needed)
-            );
+                vTaskDelete(NULL); // para auto-borrarse
+            };
+            xTaskCreatePinnedToCore(calibracion_mpu, "MPU_Calibrar_Task", 4096,NULL, ConfigInit::TASK_PRIORITY_COMMON, NULL,1);
         }
     }
 
@@ -99,8 +93,8 @@ namespace Cohete {
             if (datos_sensores == NULL) {
                 return false;
             }
-            if (!isfinite(datos_sensores->aceleracion_vertical_m_s2) ||
-                !isfinite(datos_sensores->altitud_filtrada_m) ||
+            if (!isfinite(datos_sensores->aceleracion_vertical_m_s2_mpu) ||
+                !isfinite(datos_sensores->altitud_asl_filtrada_m_bmp) ||
                 !isfinite(datos_sensores->velocidad_vertical_filtrada_m_s)) {
                 // Datos corruptos por ruido I2C, NaN o infinito. Abortar evaluación este ciclo.
                 return false;
@@ -110,9 +104,15 @@ namespace Cohete {
             static uint32_t timestamp_ultima_acel_valida = 0;
             static uint32_t timestamp_millis_inicio_pico_g = 0;
 
+            Serial.printf("aceleracion_vertical_m_s2_mpu=%f\n", datos_sensores->aceleracion_vertical_m_s2_mpu);
             // 1. Evaluación de Aceleración con Ventana de Tolerancia (Debounce)
-            if (datos_sensores->aceleracion_vertical_m_s2 >= ACEL_M_S2_UMBRAL_BOOST) {
+            if (datos_sensores->aceleracion_vertical_m_s2_mpu >= ACEL_M_S2_UMBRAL_BOOST-1.0f) {
                 if (timestamp_millis_inicio_pico_g == 0) {
+                    Serial.printf("Sospecha de BOOOOOOST\n");
+                    Serial.printf("Sospecha de BOOOOOOST\n");
+                    Serial.printf("Sospecha de BOOOOOOST\n");
+                    Serial.printf("Sospecha de BOOOOOOST\n");
+                    Serial.printf("Sospecha de BOOOOOOST\n");
                     timestamp_millis_inicio_pico_g = ahora_ms;
                 }
                 timestamp_ultima_acel_valida = ahora_ms;
@@ -131,6 +131,9 @@ namespace Cohete {
             if (timestamp_millis_inicio_pico_g != 0) {
                 const uint32_t duracion_pico_ms = ahora_ms - timestamp_millis_inicio_pico_g;
 
+                Serial.printf("SYSTEM.ctx_fisico.altitud_m_relativa_al_pad=%f\n", SYSTEM.ctx_fisico.altitud_m_relativa_al_pad);
+                Serial.printf("SYSTEM.ctx_fisico.altitud_m_pad=%f\n", SYSTEM.ctx_fisico.altitud_m_pad);
+                Serial.printf("datos_sensores->altitud_filtrada_m_bmp=%f\n", datos_sensores->altitud_asl_filtrada_m_bmp);
                 if ((duracion_pico_ms >= TIEMPO_MS_MIN_BOOST) && (SYSTEM.ctx_fisico.altitud_m_relativa_al_pad > ALTITUD_MIN_SALIDA_RAMPA_M)) {
                     timestamp_millis_inicio_pico_g = 0;
                     timestamp_ultima_acel_valida = 0;
@@ -157,6 +160,8 @@ namespace Cohete {
      */
     void f_st_init(data_all_t* datos_sensores, uint32_t ms_en_estado) {
         ESP_LOGI(TAG_BASE, "\nINIT\n");
+
+
 
         //TODO: LÓGICA DE LECTURA DE FLASH = X
         // Note: Delegado en main, máxima prioridad
@@ -185,16 +190,28 @@ namespace Cohete {
             }
         }
 
+        // asume que cuando el cohete es encendido, ya se encuentra sobre la rampa.
+        auto configurar_altura_rampa = [](void* pvParameters) {
+            SYSTEM.ctx_fisico.altitud_m_pad = Sensors::getBMP280().get_altitude_media_iterations(); // esta cosa es bloqueante!
+            ESP_LOGI("configurar_altura_rampa", "Altitud ASL de rampa: %f m\n", SYSTEM.ctx_fisico.altitud_m_pad);
+            SYSTEM.config_restauracion.altitud_del_pad = SYSTEM.ctx_fisico.altitud_m_pad;
+            vTaskDelete(NULL);
+        };
+        xTaskCreatePinnedToCore(configurar_altura_rampa, "calcular_altura_rampa", 2*1024, NULL, ConfigInit::TASK_PRIORITY_COMMON, NULL, 1);
+
         // Se debería llamar a la función _lora.c_connect_to_GSE() por medio de GSE o EnlaceGSE,
         //_lora.c_connect_to_GSE(); EMITE UN PING
 
         ESP_LOGI(TAG_BASE, " -> [CONEXIÓN GSE] Entrando a: ST_ESPERA_CONEXION_GSE");
+        SYSTEM.config_restauracion.mision_activa = true; // TODO: Esta bien afirmar que mision activa durante salida del ST_INIT ?
         SYSTEM.estado = ST_ESPERA_CONEXION_GSE;
         // transicionar_hacia(ST_ESPERA_CONEXION_GSE);
     }
 
     void f_st_espera_conexion_gse(data_all_t* datos_sensores, uint32_t ms_en_estado) {
-        ESP_LOGI(TAG_BASE, "Esperando conexión con la GSE...");
+
+        if (ms_en_estado == 0)
+            ESP_LOGI(TAG_BASE, "Esperando conexión con la GSE...");
 
         //  Condición de éxito: ¿Se conectó por LoRa?
         if (GSE::get_estado_conexion() == ROCKET_CONNECTED) {
@@ -213,7 +230,9 @@ namespace Cohete {
 
 
     void f_st_espera_gps_preciso(data_all_t* datos_sensores, uint32_t ms_en_estado) {
-        ESP_LOGI(TAG_BASE, "Esperando condiciones estables para el módulo GPS...");
+
+        if (ms_en_estado == 0)
+            ESP_LOGI(TAG_BASE, "Esperando condiciones estables para el módulo GPS...");
 
         // Timeout
         if (ms_en_estado >= GPS_TIMEOUT_MILLIS) {  // TODO: Deberiamos poner Timeout largo teniendo en cuenta que ya se puede overridear desde GSE
@@ -244,7 +263,8 @@ namespace Cohete {
     }
 
     void f_st_espera_ignicion(data_all_t* datos_sensores, uint32_t ms_en_estado) {
-        static uint32_t timer_millis = 0;
+        static uint32_t timer0_millis = 0;
+        // static uint32_t timer1_millis = 0;
         // Aquí el cohete está pasivo en la rampa. Ignición es externa.
         // Lógica del filtro anti-zarandeo:
         // 1. Transformar aceleración a vector inercial.
@@ -274,9 +294,10 @@ namespace Cohete {
         const bool apuntando_al_cielo = Eventos::entorno(datos_sensores->angulo_respecto_z_deg, 0.0f, 5.0f);
         if (!apuntando_al_cielo) {
             if (ms_en_estado % 1000 <= 10) {
-                ESP_LOGI(TAG_BASE, " -> [f_st_espera_ignicion] PELIGRO. COHETE NO APUNTANDO AL CIELO.");
+                ESP_LOGI(TAG_BASE, " -> [f_st_espera_ignicion] PELIGRO. COHETE NO APUNTANDO AL CIELO. AnguloDeInclinacion=%f", datos_sensores->angulo_respecto_z_deg);
                 EnlaceGSE::enviarMensaje("[f_st_espera_ignicion] PELIGRO. COHETE NO APUNTANDO AL CIELO.");
                 // PODEMOS ACTIVAR EL BUZZER PARA QUE MOLESTE MUCHO.
+                Actuators::getBuzzer().playError();
             }
         }
 
@@ -285,8 +306,8 @@ namespace Cohete {
 
         if(en_codiciones_para_volar) {
             // if led no encendido: encenderlo para señalizar que ya podemos volar.
-            if (millis() - timer_millis >= 3000) { // cada 3 segundos hacer un beep
-                timer_millis = millis();
+            if (millis() - timer0_millis >= 3000) { // cada 3 segundos hacer un beep
+                timer0_millis = millis();
                 // buzzer.beep(100);
                 ESP_LOGI(TAG_BASE, " -> [ESPERA IGNICION] Cohete en condiciones para volar!");
             }
@@ -342,7 +363,7 @@ namespace Cohete {
             
             // Si la aceleración Z (sin gravedad) cae por debajo de 0, 
             // significa que el empuje es menor que el Drag. El motor se apagó.
-            if (datos_sensores->aceleracion_vertical_m_s2 <= 0.0f) {
+            if (datos_sensores->aceleracion_vertical_m_s2_mpu <= 0.0f) {
                 
                 // Verificamos que sigamos subiendo a buena velocidad como doble chequeo
                 if (datos_sensores->velocidad_vertical_filtrada_m_s > 5.0f) {
@@ -371,17 +392,17 @@ void f_st_fase_balistica(data_all_t* datos_sensores, uint32_t ms_en_estado) {
     // 1. ACTUALIZACIÓN DE ALTURA MÁXIMA
 	// ---------------------------------------------------------
     if ((datos_sensores->velocidad_vertical_filtrada_m_s > -0.2f) &&
-        (datos_sensores->altitud_filtrada_m > SYSTEM.ctx_fisico.altura_m_max_historica)) 
+        (datos_sensores->altitud_asl_filtrada_m_bmp > SYSTEM.ctx_fisico.altura_m_max_historica))
     {
-        SYSTEM.ctx_fisico.altura_m_max_historica = datos_sensores->altitud_filtrada_m;
+        SYSTEM.ctx_fisico.altura_m_max_historica = datos_sensores->altitud_asl_filtrada_m_bmp;
     }
     
     // ---------------------------------------------------------
     // 2. GATES DE DETECCIÓN DE APOGEO
     // ---------------------------------------------------------  
   	const bool vel_apogeo = (datos_sensores->velocidad_vertical_filtrada_m_s <= -0.3f);
-    const bool caida_confirmada = (SYSTEM.ctx_fisico.altura_m_max_historica - datos_sensores->altitud_filtrada_m) >= DIFF_ALTURA_M_APOGEO_CAIDA; 
-    const bool g_gate_valido = (datos_sensores->aceleracion_vertical_m_s2 > -5.0f && datos_sensores->aceleracion_vertical_m_s2 < 2.0f);
+    const bool caida_confirmada = (SYSTEM.ctx_fisico.altura_m_max_historica - datos_sensores->altitud_asl_filtrada_m_bmp) >= DIFF_ALTURA_M_APOGEO_CAIDA;
+    const bool g_gate_valido = (datos_sensores->aceleracion_vertical_m_s2_mpu > -5.0f && datos_sensores->aceleracion_vertical_m_s2_mpu < 2.0f);
 
     if ((vel_apogeo && g_gate_valido) || caida_confirmada) {
         if (ticks_apogeo_confirmado < 255) ticks_apogeo_confirmado++;
@@ -532,7 +553,7 @@ void f_st_pcaidas_ppal_desplegado(data_all_t* datos_sensores, uint32_t ms_en_est
     const bool velocidad_nula = (datos_sensores->velocidad_vertical_filtrada_m_s > -0.4f && datos_sensores->velocidad_vertical_filtrada_m_s < 0.4f);
     
     // Condición B: Aceleración estática (sin sacudidas del paracaídas ni viento fuerte)
-    const bool aceleracion_estatica = (datos_sensores->aceleracion_vertical_m_s2 > -1.5f && datos_sensores->aceleracion_vertical_m_s2 < 1.5f);
+    const bool aceleracion_estatica = (datos_sensores->aceleracion_vertical_m_s2_mpu > -1.5f && datos_sensores->aceleracion_vertical_m_s2_mpu < 1.5f);
 
     if (velocidad_nula && aceleracion_estatica) {
         if (ticks_aterrizado < 65535) ticks_aterrizado++;

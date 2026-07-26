@@ -130,7 +130,7 @@ void mFlash::guardarConfig(const void* config, size_t lenConfig) {
     _flash.writeByteArray(ADDR_CONFIG, (uint8_t*)config, lenConfig);
 }
 
-bool mFlash::cargarConfig(void* config, size_t lenConfig) {
+bool mFlash::recuperarConfig(void* config, size_t lenConfig) {
     return _flash.readByteArray(ADDR_CONFIG, (uint8_t*)config, lenConfig);
 }
 

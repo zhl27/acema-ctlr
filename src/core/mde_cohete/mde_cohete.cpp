@@ -22,11 +22,11 @@ namespace Cohete {
             .xTaskFlashHandle = NULL,
             .xTaskLoraHandle = NULL,
             .xTaskDataFilterHandle = NULL,
-            .flujos = {
-                .Sensors_a_StateMachine_enabled = true,
-                .Sensors_a_Flash_enabled = true,
-                .Sensors_a_Lora_enabled = true
-            }
+            // .flujos = {
+            //     .Sensors_a_StateMachine_enabled = true,
+            //     .Sensors_a_Flash_enabled = true,
+            //     .Sensors_a_Lora_enabled = true
+            // }
         },
 
         .gse = {
@@ -58,6 +58,8 @@ namespace Cohete {
             .borrar_log = false,
             .volcar_ram_a_flash = false,
         },
+
+        .config_restauracion = {}
     };
 
     // correlativo a estado_vuelo_t --> el orden importa
@@ -92,7 +94,7 @@ namespace Cohete {
 
     void mde_cohete_actualizar(data_all_t* datos_sensores) {
         if (SYSTEM.estado >= ST_NULL) {
-            return;
+            return; // TODO: OJO, ESTO FALLA SILENCIOSAMENTE.
         }
 
         const uint32_t ahora_ms = millis();
@@ -106,6 +108,7 @@ namespace Cohete {
         if (SYSTEM.estado != SYSTEM.estado_anterior) {
             SYSTEM.timestamp_millis_entrada_estado = ahora_ms;
             SYSTEM.estado_anterior = SYSTEM.estado;
+            SYSTEM.config_restauracion.estado = SYSTEM.estado;
         }
 
         if (datos_sensores->gps_is_valid) {
@@ -117,8 +120,8 @@ namespace Cohete {
         const uint32_t ms_en_estado = ahora_ms - SYSTEM.timestamp_millis_entrada_estado;
 
         // Actualizar datos derivados de contexto físico
-        SYSTEM.ctx_fisico.altitud_m_relativa_al_pad = 
-            datos_sensores->altitud_filtrada_m_bmp - SYSTEM.ctx_fisico.altitud_m_pad;
+        SYSTEM.ctx_fisico.altitud_m_relativa_al_pad = datos_sensores->altitud_asl_filtrada_m_bmp - SYSTEM.ctx_fisico.altitud_m_pad;
+        SYSTEM.config_restauracion.altitud_actual_relativa_al_pad = SYSTEM.ctx_fisico.altitud_m_relativa_al_pad;
 
         // Ejecutar el estado pasando los datos y el tiempo transcurrido
         MDE_COHETE[SYSTEM.estado](datos_sensores, ms_en_estado);

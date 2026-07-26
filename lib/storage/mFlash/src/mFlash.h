@@ -24,7 +24,7 @@ public:
     // --- SECCIÓN CONFIGURACIÓN (PREVUELO) ---
     void guardarConfig(const void* config, size_t lenConfig);
 
-    bool cargarConfig(void* config, size_t lenConfig);
+    bool recuperarConfig(void* config, size_t lenConfig);
 
     // --- SECCIÓN TELEMETRÍA / FILTRADO ---
     void resetearLog();

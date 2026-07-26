@@ -98,10 +98,11 @@ typedef struct {
     float angulo_respecto_z_deg;            // Inclinación total del cohete --> Exclusivo MPU6050
 
     // --- CINEMÁTICA LINEAL (Eje Y es nuestro eje vertical) ---
-    float altitud_filtrada_m_bmp;           // Altura filtrada sobre el nivel del mar --> Exclusivo BMP280 // TODO: Necesitamos tener valor de altitud que salga solamente del bmp280.
-    float aceleracion_vertical_m_s2;        // Aceleración lineal absoluta (sin gravedad) --> Exclusivo MPU6050
-    float altitud_filtrada_m;               // Altura filtrada sobre el nivel del mar --> BMP280 + MPU6050
-    float velocidad_vertical_filtrada_m_s;  // Velocidad vertical real --> BMP280 + MPU6050
+    float altitud_asl_filtrada_m_bmp;           // Altura filtrada sobre el nivel del mar --> Exclusivo BMP280 // TODO: Necesitamos tener valor de altitud que salga solamente del bmp280.
+    float aceleracion_vertical_m_s2_mpu;        // Aceleración lineal absoluta (sin gravedad) --> Exclusivo MPU6050
+    float altitud_asl_filtrada_m;               // Altura filtrada sobre el nivel del mar --> BMP280 + MPU6050
+    float velocidad_vertical_filtrada_m_s;      // Velocidad vertical real --> BMP280 + MPU6050
+    float velocidad_vertical_filtrada_m_s_mpu;  // Velocidad vertical --> Exclusivo MPU6050
 
     float momentum_kg_m_s;                  // Cantidad de movimiento (P = m * v)
     float temperatura_amb_c;                // Tomada estrictamente del BMP280
@@ -114,7 +115,7 @@ typedef struct {
     float gps_latitud;
     float gps_longitud;
 
-    
+
     // TODO: MOVER LOS SIGUIENTES CAMPOS HACIA data_gse_t
     ///> DATOS EXTRAS PARA ENVIAR POR GSE
 
@@ -178,14 +179,14 @@ struct __attribute__((__packed__)) ConfigDatos { // TODO: Esto me inspira la ide
         float temp, presion, densidad, accelVert;
     }alfaEma;
 
-    int estado_cohete_actual; // es un enum
+    int estado; // es un enum
 
     // Coeficiente para filtrado
-    float altitud_base_agl;         // CRÍTICO: Presión o altitud nivel del suelo
-    float altitud_actual_agl;  
+    float altitud_del_pad;              // CRÍTICO: Presión o altitud nivel del suelo
+    float altitud_actual_relativa_al_pad;
     float altura_max_historica_m;
      
-    bool mision_activa;             // false = En tierra/Test, true = Vuelo armado/En curso
+    bool mision_activa;                 // false = En tierra/Test, true = Vuelo armado/En curso
 //    char estado_calibracion[10]; 
 };
 
@@ -247,11 +248,11 @@ namespace Cohete {
             TaskHandle_t xTaskFlashHandle;
             TaskHandle_t xTaskLoraHandle;
             TaskHandle_t xTaskDataFilterHandle;
-            struct {
-                bool Sensors_a_StateMachine_enabled;
-                bool Sensors_a_Flash_enabled;
-                bool Sensors_a_Lora_enabled;
-            } flujos;
+            // struct {
+            //     bool Sensors_a_StateMachine_enabled;
+            //     bool Sensors_a_Flash_enabled;
+            //     bool Sensors_a_Lora_enabled;
+            // } flujos;
         } procesos;
 
         struct {
@@ -286,6 +287,8 @@ namespace Cohete {
             bool borrar_log;
             bool volcar_ram_a_flash;
         } flags;
+
+        ConfigDatos config_restauracion;
 
     } system_data_t;
 
@@ -352,9 +355,9 @@ inline void plot_cinematica_filtrada(const data_all_t *data) {
 #ifdef DEBUG_ESP32
     if (data == nullptr) return;
     
-    Serial.print(">alt_agl_m:");    Serial.println(data->altitud_filtrada_m, 2);
+    Serial.print(">alt_agl_m:");    Serial.println(data->altitud_asl_filtrada_m, 2);
     Serial.print(">vel_z_m_s:");    Serial.println(data->velocidad_vertical_filtrada_m_s, 2);
-    Serial.print(">accel_z_m_s2:"); Serial.println(data->aceleracion_vertical_m_s2, 2);
+    Serial.print(">accel_z_m_s2:"); Serial.println(data->aceleracion_vertical_m_s2_mpu, 2);
 #endif
 }
 
@@ -431,7 +434,7 @@ inline void plot_all_processed(const data_all_t *data) {
 #ifdef DEBUG_ESP32
     if (data == nullptr) return;
     Serial.printf(">alt_agl:%f\n>vel_z:%f\n>accel_z:%f\n>pitch:%f\n>yaw:%f\n>incl_z:%f\n>vel_ang_x:%f\n>vel_ang_y:%f\n>vel_ang_z:%f\n>temp_amb:%f\n>rho:%f\n>lat:%f\n>lon:%f\n>hdop:%f\n>sats:%d\n",
-                  data->altitud_filtrada_m, data->velocidad_vertical_filtrada_m_s, data->aceleracion_vertical_m_s2,
+                  data->altitud_asl_filtrada_m, data->velocidad_vertical_filtrada_m_s, data->aceleracion_vertical_m_s2_mpu,
                   data->angulo_pitch_deg, data->angulo_yaw_deg, data->angulo_respecto_z_deg,
                   data->vel_angular_x_deg_s, data->vel_angular_y_deg_s, data->vel_angular_z_deg_s,
                   data->temperatura_amb_c, data->densidad_aire_kg_m3,
@@ -543,9 +546,9 @@ inline void print_data(const data_all_t *data) {
     Serial.printf("\n=============== DATA_ALL_T (micros=%lu) ===============\n", micros());
 
     Serial.printf("--- CINEMÁTICA LINEAL ---\n");
-    Serial.printf("Altura AGL:         %.2f m\n", data->altitud_filtrada_m);
+    Serial.printf("Altura AGL:         %.2f m\n", data->altitud_asl_filtrada_m);
     Serial.printf("Velocidad Z:        %.2f m/s\n", data->velocidad_vertical_filtrada_m_s);
-    Serial.printf("Aceleración Z:      %.2f m/s^2\n", data->aceleracion_vertical_m_s2);
+    Serial.printf("Aceleración Z:      %.2f m/s^2\n", data->aceleracion_vertical_m_s2_mpu);
     // Serial.printf("Altitud Rampa ASL:  %.2f m\n", data->altitud_rampa_asl_m);
 
     Serial.printf("--- CINEMÁTICA ANGULAR ---\n");
@@ -586,7 +589,7 @@ inline void print_plotter_data_processed(const data_all_t *data) {
     Serial.printf(
                 // "Pitch_deg:%f,"
                 // "Yaw_deg:%f,"
-                // "InclZ_deg:%f,"
+                "InclZ_deg:%f,"
                 // "PitchRate_deg_s:%f,"
                 // "RollRate_deg_s:%f,"
                 // "YawRate_deg_s:%f,"
@@ -594,11 +597,11 @@ inline void print_plotter_data_processed(const data_all_t *data) {
                 "\r\n",
         // data->angulo_pitch_deg,
         // data->angulo_yaw_deg,
-        // data->angulo_respecto_z_deg,
+        data->angulo_respecto_z_deg,
         // data->vel_angular_x_deg_s,
         // data->vel_angular_y_deg_s,
         // data->vel_angular_z_deg_s,
-        data->aceleracion_vertical_m_s2
+        data->aceleracion_vertical_m_s2_mpu
     );
 #endif
 
@@ -608,7 +611,7 @@ inline void print_plotter_data_processed(const data_all_t *data) {
                "AltFusion_m:%f"
                "\r\n",
         data->velocidad_vertical_filtrada_m_s,
-        data->altitud_filtrada_m);
+        data->altitud_asl_filtrada_m);
 #endif
 
 #if defined(PLOT_BMP_PROCESSED)
@@ -620,7 +623,7 @@ inline void print_plotter_data_processed(const data_all_t *data) {
                 // "Densidad_kg_m3:%f,"
                 // "Momentum_kg_m_s:%f"
                 "\r\n",
-        data->altitud_filtrada_m_bmp
+        data->altitud_asl_filtrada_m_bmp
           // data->temperatura_amb_c
           // data->densidad_aire_kg_m3
           // ,data->momentum_kg_m_s

@@ -43,7 +43,7 @@ static const char *TAG_TASK_LORA = "TASK LORA";
 
 mFlash cajaNegra(FLASH_CS);
 // !< Acá se guardan los datos de configuración inicial
-ConfigDatos g_configActual = {}; // <--- DEBE SER GLOBA U EN UNA STRUCT GLOBAL (SYSTEM)
+// ConfigDatos g_configActual = {}; // <--- DEBE SER GLOBA U EN UNA STRUCT GLOBAL (SYSTEM)
 
 
 int contadorMde = 0;
@@ -63,9 +63,9 @@ mBuzzer buzzer (BUZZER_PIN);
 bool init_black_box()
 {
     if(!cajaNegra.begin(sizeof(data_all_t))){
-        if(EnlaceGSE::enviarError("El Flash no se ha inicializado correctamente"))
+        if(EnlaceGSE::enviarError("Ha fallado la inicialización del Flash"))
         {
-            ESP_LOGI("INIT_BLACK_BOX", "El Flash no se ha inicializado correctamente");
+            ESP_LOGI("INIT_BLACK_BOX", "Ha fallado la inicialización del Flash");
         }
         else {
             ESP_LOGE("INIT_BLACK_BOX", "EnlaceGSE roto");
@@ -73,7 +73,8 @@ bool init_black_box()
         return false; // false? sep, porque malió sal
     }
 
-    if(!cajaNegra.cargarConfig(&g_configActual, sizeof(g_configActual))){
+    // Recuperamos valores guardados en Flash
+    if(!cajaNegra.recuperarConfig(&Cohete::SYSTEM.config_restauracion, sizeof(Cohete::SYSTEM.config_restauracion))){
         if(EnlaceGSE::enviarError("No se pudo cargar la configuracion guardada en Flash"))
         {
             ESP_LOGI("INIT_BLACK_BOX","No se pudo cargar la configuracion guardada en Flash");
@@ -116,10 +117,9 @@ bool init_hardware() {
 // mas no, que sea condición para el depegue
 // LOGICA DE MAQUINA DE ESTADOS: Esto puede ir en la FSM para prevenir los reinicios
 void run_boot_logic(const bool sensores_inicializaron_bien) {
-    ESP_LOGI("BOOT_LOGIC", "sensores_inicializaron_bien=%d", sensores_inicializaron_bien);
 
     if(!sensores_inicializaron_bien){
-        g_configActual.estado_cohete_actual = Cohete::ST_INIT; // comenzamos MdE desde cero.
+        Cohete::SYSTEM.config_restauracion.estado = Cohete::ST_INIT; // comenzamos MdE desde cero.
         return;
     }
     ESP_LOGI("BOOT_LOGIC", "Evaluando estado de vuelo post-reinicio...");
@@ -127,11 +127,11 @@ void run_boot_logic(const bool sensores_inicializaron_bien) {
     constexpr mMPU6050::GravityAxis nuestro_eje_vertical = mMPU6050::GravityAxis::PLUS_Y;
 
     // INTERLOCK 1: ¿La misión había sido armada/iniciada antes del reinicio?
-    if (g_configActual.mision_activa == true) {
+    if (Cohete::SYSTEM.config_restauracion.mision_activa == true) {
 
         // INTERLOCK 2: Validación por sensores (se asume que Sensors::get_raw_data obtiene una lectura válida)
         data_raw_t raw_data = {};
-        float altitud_actual = {};
+        float altitud_actual = {}; // TODO: 0.0f ?
         // Descarta ruido inicial
         for (size_t i = 0; i < 50; i++)
         {
@@ -140,34 +140,36 @@ void run_boot_logic(const bool sensores_inicializaron_bien) {
         }
 
         // Comparamos la altitud actual con la altitud base guardada en flash
-        if ((altitud_actual - g_configActual.altitud_base_agl) > 20.0f) {
+        if ((altitud_actual - Cohete::SYSTEM.config_restauracion.altitud_del_pad) > 20.0f) {
             // ¡ESTAMOS EN EL AIRE REALMENTE! Recuperando vuelo.
             ESP_LOGW("BOOT_LOGIC", "¡Reinicio en vuelo detectado! Saltando calibración IMU.");
-            g_configActual.estado_cohete_actual = Cohete::ST_BOOST;
+            // Cohete::SYSTEM.config_actual.estado_cohete_actual = Cohete::ST_BOOST;
+            Cohete::SYSTEM.estado = Cohete::ST_BOOST; // TODO: No seria mejor chequear el ultimo estado en el que estuvo ? Y restaurar ese de prepo ??
 
             // Aquí NO se llama a Sensors::calibrar(). El filtro dependerá de los offsets guardados
             // previamente en el flash, o usará valores por defecto seguros.
-            math::Vector3f biasAccel = g_configActual.bias.accel;
-            math::Vector3f biasGyro = g_configActual.bias.gyro;
+            math::Vector3f biasAccel = Cohete::SYSTEM.config_restauracion.bias.accel;
+            math::Vector3f biasGyro = Cohete::SYSTEM.config_restauracion.bias.gyro;
             Sensors::getMPU6050().setBias(biasAccel,biasGyro);
-            // NOTE: no importa setear el eje de gravedad pues eso se quedó guardado en la bias
+            // NOTE: no importa setear el eje de gravedad, pues eso se quedó guardado en la bias
 
         } else {
             // Falsa alarma. Se armó, pero nunca despegó (o ya aterrizó).
             ESP_LOGI("BOOT_LOGIC", "Misión activa pero en tierra. Calibrando sensores...");
-            g_configActual.estado_cohete_actual = Cohete::ST_INIT;
+            // Cohete::SYSTEM.config_actual.estado_cohete_actual = Cohete::ST_INIT;
+            Cohete::SYSTEM.estado = Cohete::ST_INIT;
             mMPU6050::CalibrationStatus result = Sensors::getMPU6050().calibrar(nuestro_eje_vertical); // <-- Calibración segura en tierra
-            g_configActual.bias.accel = Sensors::getMPU6050().get_calibration_result().accel_bias;
-            g_configActual.bias.gyro = Sensors::getMPU6050().get_calibration_result().gyro_bias;
+            Cohete::SYSTEM.config_restauracion.bias.accel = Sensors::getMPU6050().get_calibration_result().accel_bias;
+            Cohete::SYSTEM.config_restauracion.bias.gyro = Sensors::getMPU6050().get_calibration_result().gyro_bias;
         }
 
     } else {
         // No hay misión activa. Arranque normal.
         ESP_LOGI("BOOT_LOGIC", "Arranque normal de prevuelo. Calibrando sensores...");
-        g_configActual.estado_cohete_actual = Cohete::ST_INIT;
+        Cohete::SYSTEM.estado = Cohete::ST_INIT;
         mMPU6050::CalibrationStatus result =  Sensors::getMPU6050().calibrar(nuestro_eje_vertical); // <-- Calibración segura en tierra
-        g_configActual.bias.accel = Sensors::getMPU6050().get_calibration_result().accel_bias;
-        g_configActual.bias.gyro = Sensors::getMPU6050().get_calibration_result().gyro_bias;
+        Cohete::SYSTEM.config_restauracion.bias.accel = Sensors::getMPU6050().get_calibration_result().accel_bias;
+        Cohete::SYSTEM.config_restauracion.bias.gyro = Sensors::getMPU6050().get_calibration_result().gyro_bias;
     }
 }
 
@@ -379,31 +381,13 @@ void vTaskDataFilter(void *pvParameters)
             // Este filtro trabaja naturalmente en SI.
             //----------------------------------------------------------------------
             if (!kalmanAltInit) {
-                // Fase de acumulación: Promedia la altitud antes del vuelo
-                if (baro_calib_muestras < MUESTRAS_CALIBRACION_BARO) {
-                    suma_altitud_snm += raw.bmp.altitud_snm_m;
-                    baro_calib_muestras++;
-                    
-                    // Evita que el resto de la tarea envíe basura mientras calibra
-                    continue;
-                } 
-                // Fase de inicialización del filtro
-                else {
-                    altitud_rampa_m = suma_altitud_snm / (float)MUESTRAS_CALIBRACION_BARO;
-                    
-                    // El filtro arranca estrictamente en 0 metros (AGL) y 0 m/s
-                    kalmanAlt.init(0.0f, 0.0f, VARIANZA_INICIAL_ACELEROMETRO, VARIANZA_INICIAL_GIROSCOPIO);  
-                    kalmanAltInit = true;
-                    
-                    Serial.printf("[Filtro] Calibración de rampa lista. Altitud ASL: %f m\n", altitud_rampa_m);
-                }
+                // El filtro arranca estrictamente en altura inicial 0 m y velocidad inicial 0 m/s
+                kalmanAlt.init(0.0f, 0.0f, VARIANZA_INICIAL_ACELEROMETRO, VARIANZA_INICIAL_GIROSCOPIO);
+                kalmanAltInit = true;
             }
 
-            // Calculamos la altitud relativa al nivel del suelo (AGL)
-            const float altitud_agl_m = raw.bmp.altitud_snm_m - altitud_rampa_m;
-
-            // Le inyectamos la altitud AGL al filtro
-            kalmanAlt.update(dt, accelVertical_m_s2, altitud_agl_m);
+            // Le inyectamos la altitud ASL al filtro
+            kalmanAlt.update(dt, accelVertical_m_s2, raw.bmp.altitud_snm_m);
 
             //----------------------------------------------------------------------
             // EMPAQUETADO
@@ -427,9 +411,9 @@ void vTaskDataFilter(void *pvParameters)
             out.angulo_respecto_z_deg = inclinacion_rad * RAD_TO_DEG;
 
             // Cinemática vertical
-            out.altitud_filtrada_m  = kalmanAlt.getAltitude();
+            out.altitud_asl_filtrada_m  = kalmanAlt.getAltitude();
             out.velocidad_vertical_filtrada_m_s  = kalmanAlt.getVelocity();
-            out.aceleracion_vertical_m_s2  = accelVertical_m_s2;
+            out.aceleracion_vertical_m_s2_mpu  = accelVertical_m_s2;
 
             // Ambientales
             out.temperatura_amb_c   = raw.bmp.temp_deg_c;

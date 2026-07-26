@@ -28,7 +28,7 @@
 class mBMP280 {
 private:
     SensorBMP280 _bmp;
-    float _altitud_base_m; // Variable para almacenar el Offset de la rampa de lanzamiento
+    // float _altitud_base_m; // Variable para almacenar el Offset de la rampa de lanzamiento
 
 public:
     mBMP280();
@@ -47,6 +47,7 @@ public:
     
     // Calcula y devuelve la altitud relativa al punto de despegue (AGL)
     float _get_altitude(); 
+    float get_altitude_media_iterations(int nro_iteraciones = 200);
 
     data_raw_bmp_t get_bmp_raw_data();
 };

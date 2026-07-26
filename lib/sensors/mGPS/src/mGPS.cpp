@@ -1,5 +1,6 @@
 #include "mGPS.h"
 
+#include "config.h"
 #include "data.h"
 
 mGPS::mGPS(int uartNum, int rx, int tx, uint32_t baud)
@@ -44,7 +45,7 @@ bool mGPS::init() {
         }
     }
 
-    const BaseType_t res = xTaskCreate(_gpsTask, "mGPS_Task", 3072, this, 1, &_taskHandle);
+    const BaseType_t res = xTaskCreate(_gpsTask, "mGPS_Task", 3072, this, ConfigInit::TASK_PRIORITY_COMMON, &_taskHandle);
 
     _timestamp_init = millis();
 

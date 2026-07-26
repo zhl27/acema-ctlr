@@ -69,15 +69,14 @@ void setup() {
     ESP_LOGI(TAG_MAIN, "Desplegando Tareas de FreeRTOS en Cores...");
     
     // Core 1: Operaciones críticas
-    xTaskCreatePinnedToCore(vTaskStateMachine, "StateMachine", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskStateMachineHandle), 1);
-    xTaskCreatePinnedToCore(vTaskFlash, "BlackBox", 8192, &cajaNegra, 4, &(Cohete::SYSTEM.procesos.xTaskFlashHandle), 1); 
-    xTaskCreatePinnedToCore(vTaskReadSensors, "ReadSensors", 4096, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskReadSensorsHandle), 1);
-    xTaskCreatePinnedToCore(vTaskDataFilter, "DataFilter", 8192, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskDataFilterHandle), 1);
+    xTaskCreatePinnedToCore(vTaskStateMachine, "StateMachine", 4096, NULL, TASK_PRIORITY_COMMON, &(Cohete::SYSTEM.procesos.xTaskStateMachineHandle), 1);
+    xTaskCreatePinnedToCore(vTaskFlash, "BlackBox", 8192, &cajaNegra, TASK_PRIORITY_COMMON, &(Cohete::SYSTEM.procesos.xTaskFlashHandle), 1);
+    xTaskCreatePinnedToCore(vTaskReadSensors, "ReadSensors", 4096, NULL, TASK_PRIORITY_COMMON, &(Cohete::SYSTEM.procesos.xTaskReadSensorsHandle), 1);
+    xTaskCreatePinnedToCore(vTaskDataFilter, "DataFilter", 8192, NULL, TASK_PRIORITY_COMMON, &(Cohete::SYSTEM.procesos.xTaskDataFilterHandle), 1);
 
 
     // Core 0: Operaciones de comunicación
-    xTaskCreatePinnedToCore(vTaskLora, "Lora", 8192, NULL, 4, &(Cohete::SYSTEM.procesos.xTaskLoraHandle), 0);
-    // xTaskCreatePinnedToCore(vTaskFlash, "Flash", 4096, NULL, 4, &(SYSTEM.procesos.xTaskFlashHandle), 0);
+    xTaskCreatePinnedToCore(vTaskLora, "Lora", 8192, NULL, TASK_PRIORITY_COMMON, &(Cohete::SYSTEM.procesos.xTaskLoraHandle), 0);
 
     ESP_LOGI(TAG_MAIN, "🚀 BOOT SEQUENCE COMPLETADA. Entregando control a FreeRTOS.");
 

@@ -126,6 +126,12 @@ namespace ConfigInit {
     /**********************/
     constexpr float PERIOD_SAMPLING_SENSORS_MS = 100.0f; // Muestreo cada 10 ms
     constexpr float FREC_SAMPLING_SENSORS_HZ = 1.0f / (PERIOD_SAMPLING_SENSORS_MS * 1e-3f);
+
+    /**********************/
+    /*      FREERTOS      */
+    /**********************/
+    constexpr float TASK_PRIORITY_COMMON = 4;
+
 }
 
 enum comandosGlobale {

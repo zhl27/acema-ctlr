@@ -7,7 +7,8 @@
 #include "SerialPrint.h"
 #include <Arduino.h> // Necesario para la función delay() en la calibración
 
-mBMP280::mBMP280() : _altitud_base_m(0.0f) {}
+// mBMP280::mBMP280() : _altitud_base_m(0.0f) {}
+mBMP280::mBMP280() {};
 
 bool mBMP280::init(uint8_t addr, uint8_t chipid) {
     if (!_bmp.begin(addr, chipid)) {
@@ -21,6 +22,8 @@ bool mBMP280::init(uint8_t addr, uint8_t chipid) {
                      SAMPLING_X8,     // Sobremuestreo de Presión (Moderado, reduce ruido aerodinámico)
                      FILTER_OFF,      // Filtro IIR desactivado para evitar retrasos de fase en el vuelo
                      STANDBY_MS_1);   // Tiempo de espera entre lecturas al mínimo (0.5 ms)
+
+    _bmp.setMockAltitude(1000.25f);
 #else
     // Configuración para telemetría de alta velocidad (Cohete)
     _bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     // Modo Normal (medición continua)
@@ -31,26 +34,39 @@ bool mBMP280::init(uint8_t addr, uint8_t chipid) {
 #endif
 
 
-    // Calibración de la altitud en la rampa (Offset de la media)
-    float suma_altitud = 0.0f;
-    const int iteraciones = 200;
 
-    for (int i = 0; i < iteraciones; i++) {
-        suma_altitud += _bmp.readAltitude(1013.25f);
-        // Pequeño delay para permitir que el sensor complete su conversión interna
-        delay(5); 
-    }
-
-    // Guardamos la media térmica y barométrica del punto cero
-    _altitud_base_m = suma_altitud / (float)iteraciones;
 
     return true;
 }
 
 float mBMP280::_get_altitude() {
     // Calculamos la Altitud Relativa (AGL) restando la calibración base
-    return _bmp.readAltitude(1013.25f) - _altitud_base_m;
+    // return _bmp.readAltitude(1013.25f) - _altitud_base_m;
+    // Obtenemos la altura directamente.
+    return _bmp.readAltitude(1013.25f);
 }
+
+/*
+ * Bloqueante
+ *
+ * Lo utilizamos para obtener la altitud del pad.
+ *
+ */
+float mBMP280::get_altitude_media_iterations(const int nro_iteraciones) {
+    // Calibración de la altitud en la rampa (Offset de la media)
+    float suma_altitud = 0.0f;
+
+    // Fase de acumulación: Promedia la altitud antes del vuelo
+    for (int i = 0; i < nro_iteraciones; i++) {
+        suma_altitud += _bmp.readAltitude(1013.25f);
+        // Pequeño delay para permitir que el sensor complete su conversión interna
+        delay(5);
+    }
+
+    // Retornamos la media térmica y barométrica del punto cero
+    return suma_altitud / static_cast<float>(nro_iteraciones);
+}
+
 
 data_raw_bmp_t mBMP280::get_bmp_raw_data() {
 
@@ -60,9 +76,9 @@ data_raw_bmp_t mBMP280::get_bmp_raw_data() {
     constexpr float a_boost = 2.0f * g_val;         // Aceleración neta hacia arriba del motor (2G)
     constexpr float rampa_asl = 100.0f;             // Altura cruda de la rampa sobre nivel del mar
     constexpr unsigned long t_lanzamiento = 50000;  // Despegue en t = 50s (en ms)
-    constexpr unsigned long duracion_boost = 3000;  // Duración del quemado: 3s (50s a 53s)
+    constexpr unsigned long duracion_boost = 10000;  // Duración del quemado
 
-    // 2. DERIVACIÓN CINEMÁTICA ANALÍTICA AL CORTE DE MOTOR (t = 3s)
+    // 2. DERIVACIÓN CINEMÁTICA ANALÍTICA AL CORTE DE MOTOR
     // Se calculan en tiempo de compilación integrando la aceleración constante:
     // v(t) = v_0 + a*t   |   h(t) = h_0 + v_0*t + 0.5*a*t^2
     constexpr float t_boost_seg = duracion_boost / 1000.0f;
@@ -70,7 +86,7 @@ data_raw_bmp_t mBMP280::get_bmp_raw_data() {
     constexpr float delta_h_corte = 0.5f * a_boost * (t_boost_seg * t_boost_seg); // Altura ganada en quema (~88.26 m)
     constexpr float h_corte = rampa_asl + delta_h_corte;                         // Altura absoluta al corte (~188.26 m)
 
-    unsigned long t_actual = millis();
+    const unsigned long t_actual = millis();
     float alt_cruda = rampa_asl;                    // Valor por defecto en reposo
 
     if (t_actual <= t_lanzamiento) {
@@ -81,7 +97,7 @@ data_raw_bmp_t mBMP280::get_bmp_raw_data() {
         // FASE 2: Propulsión / Boost (50s a 53s)
         // Partimos del reposo (v_0 = 0, h_0 = rampa_asl). Solo actúa a_boost hacia arriba:
         // h(t) = h_rampa + 0.5 * a_boost * t^2
-        float t_rel = (t_actual - t_lanzamiento) / 1000.0f;
+        float t_rel = (t_actual - t_lanzamiento) / 1000.0f; // laburamos con segundos
         alt_cruda = rampa_asl + (0.5f * a_boost * (t_rel * t_rel));
 
     } else {
@@ -98,7 +114,7 @@ data_raw_bmp_t mBMP280::get_bmp_raw_data() {
         }
     }
 
-    // Inyectamos el dato CRUDO al sensor BMP280. La lógica de telemetría le restará el offset de tierra.
+    // Inyectamos el dato CRUDO al sensor BMP280.
     _bmp.setMockAltitude(alt_cruda);
 #endif
 
