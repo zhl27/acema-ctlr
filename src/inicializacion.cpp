@@ -80,7 +80,7 @@ bool init_black_box()
     }
 
     // Recuperamos valores guardados en Flash
-    if(!cajaNegra.recuperarConfig(&Cohete::SYSTEM.config_restauracion, sizeof(Cohete::SYSTEM.config_restauracion))){
+    if(!cajaNegra.recuperarConfig(&Cohete::CONFIG_RESTAURACION, sizeof(Cohete::CONFIG_RESTAURACION))){
         if(EnlaceGSE::enviarError("No se pudo cargar la configuracion guardada en Flash"))
         {
             ESP_LOGI("INIT_BLACK_BOX","No se pudo cargar la configuracion guardada en Flash");
@@ -125,7 +125,7 @@ bool init_hardware() {
 void run_boot_logic(const bool sensores_inicializaron_bien) {
 
     if(!sensores_inicializaron_bien){
-        Cohete::SYSTEM.config_restauracion.estado = Cohete::ST_INIT; // comenzamos MdE desde cero.
+        Cohete::CONFIG_RESTAURACION.estado = Cohete::ST_INIT; // comenzamos MdE desde cero.
         return;
     }
     ESP_LOGI("BOOT_LOGIC", "Evaluando estado de vuelo post-reinicio...");
@@ -133,7 +133,7 @@ void run_boot_logic(const bool sensores_inicializaron_bien) {
     constexpr mMPU6050::GravityAxis nuestro_eje_vertical = mMPU6050::GravityAxis::PLUS_Y;
 
     // INTERLOCK 1: ¿La misión había sido armada/iniciada antes del reinicio?
-    if (Cohete::SYSTEM.config_restauracion.mision_activa == true) {
+    if (Cohete::CONFIG_RESTAURACION.mision_activa == true) {
 
         // INTERLOCK 2: Validación por sensores (se asume que Sensors::get_raw_data obtiene una lectura válida)
         data_raw_t raw_data = {};
@@ -146,7 +146,7 @@ void run_boot_logic(const bool sensores_inicializaron_bien) {
         }
 
         // Comparamos la altitud actual con la altitud base guardada en flash
-        if ((altitud_actual - Cohete::SYSTEM.config_restauracion.altitud_del_pad) > 20.0f) {
+        if ((altitud_actual - Cohete::CONFIG_RESTAURACION.altitud_del_pad) > 20.0f) {
             // ¡ESTAMOS EN EL AIRE REALMENTE! Recuperando vuelo.
             ESP_LOGW("BOOT_LOGIC", "¡Reinicio en vuelo detectado! Saltando calibración IMU.");
             // Cohete::SYSTEM.config_actual.estado_cohete_actual = Cohete::ST_BOOST;
@@ -154,8 +154,8 @@ void run_boot_logic(const bool sensores_inicializaron_bien) {
 
             // Aquí NO se llama a Sensors::calibrar(). El filtro dependerá de los offsets guardados
             // previamente en el flash, o usará valores por defecto seguros.
-            math::Vector3f biasAccel = Cohete::SYSTEM.config_restauracion.bias.accel;
-            math::Vector3f biasGyro = Cohete::SYSTEM.config_restauracion.bias.gyro;
+            math::Vector3f biasAccel = Cohete::CONFIG_RESTAURACION.bias.accel;
+            math::Vector3f biasGyro = Cohete::CONFIG_RESTAURACION.bias.gyro;
             Sensors::getMPU6050().setBias(biasAccel,biasGyro);
             // NOTE: no importa setear el eje de gravedad, pues eso se quedó guardado en la bias
 
@@ -165,8 +165,8 @@ void run_boot_logic(const bool sensores_inicializaron_bien) {
             // Cohete::SYSTEM.config_actual.estado_cohete_actual = Cohete::ST_INIT;
             Cohete::SYSTEM.estado = Cohete::ST_INIT;
             mMPU6050::CalibrationStatus result = Sensors::getMPU6050().calibrar(nuestro_eje_vertical); // <-- Calibración segura en tierra
-            Cohete::SYSTEM.config_restauracion.bias.accel = Sensors::getMPU6050().get_calibration_result().accel_bias;
-            Cohete::SYSTEM.config_restauracion.bias.gyro = Sensors::getMPU6050().get_calibration_result().gyro_bias;
+            Cohete::CONFIG_RESTAURACION.bias.accel = Sensors::getMPU6050().get_calibration_result().accel_bias;
+            Cohete::CONFIG_RESTAURACION.bias.gyro = Sensors::getMPU6050().get_calibration_result().gyro_bias;
         }
 
     } else {
@@ -174,8 +174,8 @@ void run_boot_logic(const bool sensores_inicializaron_bien) {
         ESP_LOGI("BOOT_LOGIC", "Arranque normal de prevuelo. Calibrando sensores...");
         Cohete::SYSTEM.estado = Cohete::ST_INIT;
         mMPU6050::CalibrationStatus result =  Sensors::getMPU6050().calibrar(nuestro_eje_vertical); // <-- Calibración segura en tierra
-        Cohete::SYSTEM.config_restauracion.bias.accel = Sensors::getMPU6050().get_calibration_result().accel_bias;
-        Cohete::SYSTEM.config_restauracion.bias.gyro = Sensors::getMPU6050().get_calibration_result().gyro_bias;
+        Cohete::CONFIG_RESTAURACION.bias.accel = Sensors::getMPU6050().get_calibration_result().accel_bias;
+        Cohete::CONFIG_RESTAURACION.bias.gyro = Sensors::getMPU6050().get_calibration_result().gyro_bias;
     }
 }
 
@@ -417,7 +417,7 @@ void vTaskDataFilter(void *pvParameters)
             out.angulo_respecto_z_deg = inclinacion_rad * RAD_TO_DEG;
 
             // Altitud
-            out.altitud_filtrada_m_bmp = emaAltitudBMP.actualizar(raw.bmp.altitud_snm_m);
+            out.altitud_asl_filtrada_m_bmp = emaAltitudBMP.actualizar(raw.bmp.altitud_snm_m);
             // Cinemática vertical
             out.altitud_asl_filtrada_m  = kalmanAlt.getAltitude();
             out.velocidad_vertical_filtrada_m_s  = kalmanAlt.getVelocity();
@@ -753,7 +753,7 @@ CmdResult comandoOffPiro(float value, void* context){
 CmdResult comando_disparar_piro(float value, void* context){
     mPyro* p = static_cast<mPyro*>(context);
     
-    bool ok = p->disparar((uint32_t)value);
+    bool ok = p->disparar(static_cast<uint32_t>(value));
     
     CmdResult res;
     res.status = ok ? 1 : 0;

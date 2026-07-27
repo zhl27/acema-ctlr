@@ -11,7 +11,9 @@
 #include <cstdint>
 #include <cstdio>
 #include "freertos/FreeRTOS.h"
- 
+#include "../src/core/math/Vector3f.h"
+
+
 /**
  * @struct data_raw_mpu_t
  * @brief Estructura de datos crudos de la MPU6050.
@@ -102,7 +104,7 @@ typedef struct {
     float aceleracion_vertical_m_s2_mpu;        // Aceleración lineal absoluta (sin gravedad) --> Exclusivo MPU6050
     float altitud_asl_filtrada_m;               // Altura filtrada sobre el nivel del mar --> BMP280 + MPU6050
     float velocidad_vertical_filtrada_m_s;      // Velocidad vertical real --> BMP280 + MPU6050
-    float velocidad_vertical_filtrada_m_s_mpu;  // Velocidad vertical --> Exclusivo MPU6050
+    // float velocidad_vertical_filtrada_m_s_mpu; // Velocidad vertical --> Exclusivo MPU6050 --> no se inicializa ni se usa nunca
 
     float momentum_kg_m_s;                  // Cantidad de movimiento (P = m * v)
     float temperatura_amb_c;                // Tomada estrictamente del BMP280
@@ -168,38 +170,6 @@ typedef struct {
 } data_gse_t;
 
 
-#include "../src/core/math/Vector3f.h"
-
-/**
- * @brief Datos primordiales para cargar en caso de reinicio
- */
-struct __attribute__((__packed__)) ConfigDatos { // TODO: Esto me inspira la idea de un Process Control Block.
-
-    // Estructuras para los bias de calibración
-// Estructuras para los bias de calibración (POD puro)
-    struct bias_t{
-        math::Vector3f gyro; 
-        math::Vector3f accel;
-    } bias;
-
-    // Estructura para los alfa de los filtros EMA
-    struct {
-        float temp, presion, densidad, accelVert;
-    }alfaEma;
-
-    int estado; // es un enum
-
-    // Coeficiente para filtrado
-    float altitud_del_pad;              // CRÍTICO: Presión o altitud nivel del suelo
-    float altitud_actual_relativa_al_pad;
-    float altura_max_historica_m;
-     
-    bool mision_activa;                 // false = En tierra/Test, true = Vuelo armado/En curso
-//    char estado_calibracion[10]; 
-};
-
-
-
 namespace Cohete {
 
     static const char *TAG_BASE = "STATE MACHINE";
@@ -218,8 +188,8 @@ namespace Cohete {
         ST_FASE_BALISTICA,         // Inercia ascendente. Activa rutina de frenado aerodinámico
         ST_DROGUE_DESPLEGADO,      // Derivada de altura nula. Disparo Drogue + Corte cámara. Luego de 3 segundos post-drogue testear salud
         ST_PCAIDAS_PPAL_DESPLEGADO,
-        ST_CAIDA_CATASTROFICA,     // Falla total de retención. Pánico -> Volcado a Flash
         ST_ATERRIZADO,             // Reposo en suelo. Emisión de coordenadas GPS
+        ST_CAIDA_CATASTROFICA,     // Falla total de retención. Pánico -> Volcado a Flash
         ST_NULL
     } estado_cohete_t;
 
@@ -249,7 +219,6 @@ namespace Cohete {
         // bool entrando_estado;
         // bool es_estado_salida;
 
-
         struct {
             TaskHandle_t xTaskReadSensorsHandle;
             TaskHandle_t xTaskStateMachineHandle;
@@ -275,16 +244,15 @@ namespace Cohete {
 
         struct {
             float altura_m_max_historica;
-            uint32_t masa_g_cohete;
-            uint32_t masa_g_combustible;
-            float altitud_m_pad; ///< Altura de tara inicial (~3m) --> Se configura a traves de comandos GSE "TARA_INICIAL" --> guardamos el valor de ese instante de datos_sensores->altitud_filtrada_m
+            // uint32_t masa_g_cohete;
+            // uint32_t masa_g_combustible;
+            float altitud_m_pad;
             float altitud_m_relativa_al_pad;
             float gps_ultima_latitud_valida;
             float gps_ultima_longitud_valida;
         } ctx_fisico;
 
-        // PEGAMENTO FEO, NECESITO ACCESO A LA FLASH
-        // void* blackBox; 
+        // PEGAMENTO FEO, NECESITO ACCESO A LA FLASH  // TODO: Trasladar responsabilidades hacia la mFlash.
         struct{
             // bool gse_conectado;
             bool flash_log_borrado;
@@ -296,14 +264,45 @@ namespace Cohete {
             bool volcar_ram_a_flash;
         } flags;
 
-        ConfigDatos config_restauracion;
-
     } system_data_t;
 
+
+    /**
+     * @brief Datos primordiales para cargar en caso de reinicio
+     */
+    struct __attribute__((__packed__)) ConfigDatos { // TODO: Esto me inspira la idea de un Process Control Block.
+
+        // Estructuras para los bias de calibración
+        // Estructuras para los bias de calibración (POD puro)
+        struct bias_t{
+            math::Vector3f gyro;
+            math::Vector3f accel;
+        } bias;
+
+        // Estructura para los alfa de los filtros EMA
+        struct {
+            float temp, presion, densidad, accelVert;
+        }alfaEma;
+
+        // Cohete::system_data_t system_data;
+
+        int estado; // es un enum
+
+        float altitud_del_pad;
+        float altitud_actual_relativa_al_pad;
+        float altura_max_historica_m;
+
+        bool mision_activa;                 // false = En tierra/Test, true = Vuelo armado/En curso
+
+        uint32_t t_time_ms_mision_anterior;
+        uint64_t t_time_us_mision_anterior;
+    };
+
+
     extern system_data_t SYSTEM; // SOLAMENTE DEBE SER MODIFICADA POR LA MDE DEL COHETE. LOS DEMÁS PROCESOS SOLO DEBERÍAN LEERLA, PERO NO DEBEN MODIFICARLA. // TODO: FORZAR SOLO LECTURA PARA OBJETOS EXTERNOS A LA MDE.
+    extern ConfigDatos CONFIG_RESTAURACION;
 
 }
-
 
 
 

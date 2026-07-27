@@ -102,7 +102,7 @@ data_raw_mpu_t mMPU6050::get_mpu_raw_data() {
 
 #ifdef SENSORES_MOCK
     constexpr float g_val = 9.80665f;
-    constexpr float a_boost = 2.0f * g_val;         // Empuje neto del motor (2G)
+    constexpr float a_boost = 3.0f * g_val;         // Empuje neto del motor (3G)
     constexpr unsigned long t_lanzamiento = 50000;  // Despegue en t = 50s
     constexpr unsigned long duracion_boost = 10000;  // Duración del quemado
 

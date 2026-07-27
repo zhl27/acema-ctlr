@@ -40,8 +40,6 @@ namespace Cohete {
 
         .ctx_fisico = {
             .altura_m_max_historica = 0.0f,
-            .masa_g_cohete = 0, // TODO: masa_cohete_kg debe ser configurable a traves de comando desde GSE: "set_masa_cohete_kg" o similar
-            .masa_g_combustible = 0, // TODO: masa_combustible_kg debe ser configurable a traves de comando desde GSE: "set_masa_combustible_kg" o similar
             .altitud_m_pad = 0.0f, // TODO: altitud_m_pad toma el valor actual de la altitud_bmp --> cuando comando desde GSE: "tara_altitud" o similar
             .altitud_m_relativa_al_pad = 0.0f, // se actualiza utilizando SYSTEM.ctx_fisico.altitud_m_cero_pad
             .gps_ultima_latitud_valida = 0.0f,
@@ -58,9 +56,9 @@ namespace Cohete {
             .borrar_log = false,
             .volcar_ram_a_flash = false,
         },
-
-        .config_restauracion = {}
     };
+
+    ConfigDatos CONFIG_RESTAURACION = {}; // debe ser inicializado por la Flash
 
     // correlativo a estado_vuelo_t --> el orden importa
     const f_st_t MDE_COHETE[] = {
@@ -86,8 +84,8 @@ namespace Cohete {
         "ST_FASE_BALISTICA",
         "ST_DROGUE_DESPLEGADO",
         "ST_PCAIDAS_PPAL_DESPLEGADO",
+        "ST_ATERRIZADO",
         "ST_CAIDA_CATASTROFICA",
-        "ST_ATERRIZAJE",
         "ST_NULL"
     };
 
@@ -108,7 +106,8 @@ namespace Cohete {
         if (SYSTEM.estado != SYSTEM.estado_anterior) {
             SYSTEM.timestamp_millis_entrada_estado = ahora_ms;
             SYSTEM.estado_anterior = SYSTEM.estado;
-            SYSTEM.config_restauracion.estado = SYSTEM.estado;
+            CONFIG_RESTAURACION.estado = SYSTEM.estado;
+            ESP_LOGI(TAG_BASE, " -> Entrando al estado: %s", estado_cohete_string[SYSTEM.estado]);
         }
 
         if (datos_sensores->gps_is_valid) {
@@ -121,7 +120,7 @@ namespace Cohete {
 
         // Actualizar datos derivados de contexto físico
         SYSTEM.ctx_fisico.altitud_m_relativa_al_pad = datos_sensores->altitud_asl_filtrada_m_bmp - SYSTEM.ctx_fisico.altitud_m_pad;
-        SYSTEM.config_restauracion.altitud_actual_relativa_al_pad = SYSTEM.ctx_fisico.altitud_m_relativa_al_pad;
+        CONFIG_RESTAURACION.altitud_actual_relativa_al_pad = SYSTEM.ctx_fisico.altitud_m_relativa_al_pad;
 
         // Ejecutar el estado pasando los datos y el tiempo transcurrido
         MDE_COHETE[SYSTEM.estado](datos_sensores, ms_en_estado);

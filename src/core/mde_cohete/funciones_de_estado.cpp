@@ -28,6 +28,13 @@ constexpr int       ALTITUD_DESPLIEGUE_PCAIDAS_PPAL         = 250;
 
 
 namespace Cohete {
+    uint32_t t_time_ms() {
+        return CONFIG_RESTAURACION.t_time_ms_mision_anterior + millis();
+    }
+    uint64_t t_time_us() {
+        return CONFIG_RESTAURACION.t_time_us_mision_anterior + micros();
+    }
+
     namespace Timers
     {
         static TimerHandle_t xTimerRecalibrarMPU;
@@ -106,7 +113,7 @@ namespace Cohete {
 
             Serial.printf("aceleracion_vertical_m_s2_mpu=%f\n", datos_sensores->aceleracion_vertical_m_s2_mpu);
             // 1. Evaluación de Aceleración con Ventana de Tolerancia (Debounce)
-            if (datos_sensores->aceleracion_vertical_m_s2_mpu >= ACEL_M_S2_UMBRAL_BOOST-1.0f) {
+            if (datos_sensores->aceleracion_vertical_m_s2_mpu >= ACEL_M_S2_UMBRAL_BOOST) {
                 if (timestamp_millis_inicio_pico_g == 0) {
                     Serial.printf("Sospecha de BOOOOOOST\n");
                     Serial.printf("Sospecha de BOOOOOOST\n");
@@ -159,9 +166,6 @@ namespace Cohete {
      * @brief Timer para Esperar a que la IMU se caliente --> pasados los 5 mins recalibramos timer.
      */
     void f_st_init(data_all_t* datos_sensores, uint32_t ms_en_estado) {
-        ESP_LOGI(TAG_BASE, "\nINIT\n");
-
-
 
         //TODO: LÓGICA DE LECTURA DE FLASH = X
         // Note: Delegado en main, máxima prioridad
@@ -194,7 +198,7 @@ namespace Cohete {
         auto configurar_altura_rampa = [](void* pvParameters) {
             SYSTEM.ctx_fisico.altitud_m_pad = Sensors::getBMP280().get_altitude_media_iterations(); // esta cosa es bloqueante!
             ESP_LOGI("configurar_altura_rampa", "Altitud ASL de rampa: %f m\n", SYSTEM.ctx_fisico.altitud_m_pad);
-            SYSTEM.config_restauracion.altitud_del_pad = SYSTEM.ctx_fisico.altitud_m_pad;
+            CONFIG_RESTAURACION.altitud_del_pad = SYSTEM.ctx_fisico.altitud_m_pad;
             vTaskDelete(NULL);
         };
         xTaskCreatePinnedToCore(configurar_altura_rampa, "calcular_altura_rampa", 2*1024, NULL, ConfigInit::TASK_PRIORITY_COMMON, NULL, 1);
@@ -202,8 +206,7 @@ namespace Cohete {
         // Se debería llamar a la función _lora.c_connect_to_GSE() por medio de GSE o EnlaceGSE,
         //_lora.c_connect_to_GSE(); EMITE UN PING
 
-        ESP_LOGI(TAG_BASE, " -> [CONEXIÓN GSE] Entrando a: ST_ESPERA_CONEXION_GSE");
-        SYSTEM.config_restauracion.mision_activa = true; // TODO: Esta bien afirmar que mision activa durante salida del ST_INIT ?
+        // CONFIG_RESTAURACION.mision_activa = true; // TODO: Esta bien afirmar que mision activa durante salida del ST_INIT ?
         SYSTEM.estado = ST_ESPERA_CONEXION_GSE;
         // transicionar_hacia(ST_ESPERA_CONEXION_GSE);
     }
@@ -361,17 +364,15 @@ namespace Cohete {
         // podría tener fluctuaciones iniciales propias del motor sólido.
         if (ms_en_estado > 1000) {
             
-            // Si la aceleración Z (sin gravedad) cae por debajo de 0, 
+            // Si la aceleración Y (sin gravedad) cae por debajo de 0,
             // significa que el empuje es menor que el Drag. El motor se apagó.
             if (datos_sensores->aceleracion_vertical_m_s2_mpu <= 0.0f) {
                 
                 // Verificamos que sigamos subiendo a buena velocidad como doble chequeo
                 if (datos_sensores->velocidad_vertical_filtrada_m_s > 5.0f) {
-                    EnlaceGSE::enviarMensaje("[BOOST] MOTOR APAGADO. MODO BALISTICO.");
-                    
-                    // Actualizamos la masa antes de entrar a balística
-                    SYSTEM.ctx_fisico.masa_g_cohete -= SYSTEM.ctx_fisico.masa_g_combustible; // TODO: PREGUNTAR VALORES REALES.
-                    
+                    EnlaceGSE::enviarMensaje("[BOOST] MOTOR APAGADO. MODO BALÍSTICO.");
+                    ESP_LOGI(TAG_BASE, "[BOOST] MOTOR APAGADO. MODO BALÍSTICO.");
+
                     SYSTEM.estado = ST_FASE_BALISTICA;
                     return;
                 }
@@ -464,13 +465,13 @@ void f_st_fase_balistica(data_all_t* datos_sensores, uint32_t ms_en_estado) {
         }
     } 
     // 4. CONTROL DE AIRBRAKES DURANTE ASCENSO SIN BOOST
-    else {
-        float angulo_airbrake = 0.0f;
-        if (datos_sensores->velocidad_vertical_filtrada_m_s >= 15.0f) {
-            // angulo_airbrake = MPC_Controller::calcular_accion(...);
-        }
-        Actuators::getServo().sendAngulo(angulo_airbrake);
-    }
+    // else {
+    //     float angulo_airbrake = 0.0f;
+    //     if (datos_sensores->velocidad_vertical_filtrada_m_s >= 15.0f) {
+    //         // angulo_airbrake = MPC_Controller::calcular_accion(...);
+    //     }
+    //     Actuators::getServo().sendAngulo(angulo_airbrake);
+    // }
 }
 
 
