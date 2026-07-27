@@ -70,13 +70,13 @@ void setup() {
     
     // Core 1: Operaciones críticas
     xTaskCreatePinnedToCore(vTaskStateMachine, "StateMachine", 4096, NULL, TASK_PRIORITY_COMMON, &(Cohete::SYSTEM.procesos.xTaskStateMachineHandle), 1);
-    xTaskCreatePinnedToCore(vTaskFlash, "BlackBox", 8192, &cajaNegra, TASK_PRIORITY_COMMON, &(Cohete::SYSTEM.procesos.xTaskFlashHandle), 1);
     xTaskCreatePinnedToCore(vTaskReadSensors, "ReadSensors", 4096, NULL, TASK_PRIORITY_COMMON, &(Cohete::SYSTEM.procesos.xTaskReadSensorsHandle), 1);
     xTaskCreatePinnedToCore(vTaskDataFilter, "DataFilter", 8192, NULL, TASK_PRIORITY_COMMON, &(Cohete::SYSTEM.procesos.xTaskDataFilterHandle), 1);
 
 
-    // Core 0: Operaciones de comunicación
+    // Core 0: Operaciones de comunicación y almacenamiento
     xTaskCreatePinnedToCore(vTaskLora, "Lora", 8192, NULL, TASK_PRIORITY_COMMON, &(Cohete::SYSTEM.procesos.xTaskLoraHandle), 0);
+    xTaskCreatePinnedToCore(vTaskFlash, "BlackBox", 8192, &cajaNegra, TASK_PRIORITY_COMMON, &(Cohete::SYSTEM.procesos.xTaskFlashHandle), 0);
 
     ESP_LOGI(TAG_MAIN, "🚀 BOOT SEQUENCE COMPLETADA. Entregando control a FreeRTOS.");
 

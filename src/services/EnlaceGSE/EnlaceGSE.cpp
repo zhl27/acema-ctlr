@@ -33,8 +33,10 @@ bool EnlaceGSE::enviarMensaje(const char* mensaje) {
     // strncpy protege contra desbordamientos si el string es mayor a 128 caracteres.
     strncpy(sobre.payload.texto, mensaje, sizeof(sobre.payload.texto) - 1);
     // Garantizamos que siempre termine en caracter nulo
-    sobre.payload.texto[sizeof(sobre.payload.texto) - 1] = '\0'; 
-    
+    sobre.payload.texto[sizeof(sobre.payload.texto) - 1] = '\0';
+
+    ESP_LOGI("EnlaceGSE", "%s", mensaje);
+
     return encolarSobre(sobre);
 }
 

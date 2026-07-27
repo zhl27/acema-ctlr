@@ -284,8 +284,6 @@ namespace Cohete {
             float temp, presion, densidad, accelVert;
         }alfaEma;
 
-        // Cohete::system_data_t system_data;
-
         int estado; // es un enum
 
         float altitud_del_pad;

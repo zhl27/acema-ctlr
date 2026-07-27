@@ -63,7 +63,7 @@ namespace ConfigInit {
 
     // TODO: CAMBIAR LOS PINES POR LOS REALES
     constexpr uint8_t PIRO_PRINCIPAL_PIN                = 13;
-    constexpr uint8_t CONTINUIDAD_PIRO_PRINCIPAL_PIN    = 39;
+    constexpr uint8_t CONTINUIDAD_PIRO_PRINCIPAL_PIN    = 35;
 
     constexpr uint8_t PIRO_DROGUE_PIN                   = 12;
     constexpr uint8_t CONTINUIDAD_PIRO_DROGUE_PIN       = 39;
@@ -78,8 +78,7 @@ namespace ConfigInit {
     /***********************/
     /*         MdE         */
     /***********************/
-    // constexpr int   UMBRAL_LANZAMIENTO      = 100; // TODO: falta implementar valor real
-    // constexpr float AREA_REFERENCIA_COHETE  = 0.01; // m^2, TODO: falta implementar valor real
+    // En la MdE
 
     /***********************/
     /*         UART        */
@@ -149,7 +148,3 @@ enum comandosGlobale {
 
 
 #endif //ACEMA_CTLR_CONFIG_H
-/**
- *  Nota de cambios: 
- * - Se modigicó Sensors.cpp
- *  - Se cambió Actuators.cpp*/

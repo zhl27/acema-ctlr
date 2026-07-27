@@ -59,8 +59,6 @@ int contadorLora = 0;
 
 
 static CmdDispatcher cmdDispatcher;
-mBuzzer buzzer (BUZZER_PIN);
-
 // int muestreo_datos_crudos_ms = 500; // cada 0,5 segundos
 
 //>! Orden

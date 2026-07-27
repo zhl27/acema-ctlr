@@ -135,9 +135,9 @@ namespace Cohete {
             if (timestamp_millis_inicio_pico_g != 0) {
                 const uint32_t duracion_pico_ms = ahora_ms - timestamp_millis_inicio_pico_g;
 
-                Serial.printf("datos_sensores->altitud_filtrada_m_bmp=%f\n", datos_sensores->altitud_asl_filtrada_m_bmp);
-                Serial.printf("SYSTEM.ctx_fisico.altitud_m_pad=%f\n", SYSTEM.ctx_fisico.altitud_m_pad);
-                Serial.printf("SYSTEM.ctx_fisico.altitud_m_relativa_al_pad=%f\n", SYSTEM.ctx_fisico.altitud_m_relativa_al_pad);
+                // Serial.printf("datos_sensores->altitud_filtrada_m_bmp=%f\n", datos_sensores->altitud_asl_filtrada_m_bmp);
+                // Serial.printf("SYSTEM.ctx_fisico.altitud_m_pad=%f\n", SYSTEM.ctx_fisico.altitud_m_pad);
+                // Serial.printf("SYSTEM.ctx_fisico.altitud_m_relativa_al_pad=%f\n", SYSTEM.ctx_fisico.altitud_m_relativa_al_pad);
                 if ((duracion_pico_ms >= TIEMPO_MS_MIN_BOOST) && (SYSTEM.ctx_fisico.altitud_m_relativa_al_pad > ALTITUD_MIN_SALIDA_RAMPA_M)) {
                     EnlaceGSE::enviarMensaje("BOOST Confirmado");
                     ESP_LOGI(TAG_BASE, "BOOST Confirmado");
@@ -298,7 +298,6 @@ namespace Cohete {
         const bool apuntando_al_cielo = Eventos::entorno(datos_sensores->angulo_respecto_z_deg, 0.0f, 5.0f);
         if (!apuntando_al_cielo) {
             if (ms_en_estado % 1000 <= 10) {
-                ESP_LOGI(TAG_BASE, " -> [f_st_espera_ignicion] PELIGRO. COHETE NO APUNTANDO AL CIELO. AnguloDeInclinacion=%f", datos_sensores->angulo_respecto_z_deg);
                 EnlaceGSE::enviarMensaje("[f_st_espera_ignicion] PELIGRO. COHETE NO APUNTANDO AL CIELO.");
                 // PODEMOS ACTIVAR EL BUZZER PARA QUE MOLESTE MUCHO.
                 Actuators::getBuzzer().playError();
@@ -313,14 +312,14 @@ namespace Cohete {
             if (millis() - timer0_millis >= 3000) { // cada 3 segundos hacer un beep
                 timer0_millis = millis();
                 // buzzer.beep(100);
-                ESP_LOGI(TAG_BASE, " -> [ESPERA IGNICION] Cohete en condiciones para volar!");
+                EnlaceGSE::enviarMensaje("[ESPERA IGNICION] Cohete en condiciones para volar!");
             }
         }
 
         if (Eventos::hay_boost_garantizado(datos_sensores)) {
             if (!en_codiciones_para_volar) {
                 // transicion_error(ERR_DESPEGUE_PROHIBIDO, datos_sensores);
-                ESP_LOGE(TAG_BASE, "FALTA IMPLEMENTAR. ERR_DESPEGUE_PROHIBIDO");
+                ESP_LOGE(TAG_BASE, "ERR_DESPEGUE_PROHIBIDO");
                 // L: Qué hacemos si realmente detectamos un despegue, pero el cohete no estaba en condiciones de volar? Pienso que: ya que esta en vuelo, mucho no podemos hacer al respecto, hay que continuar con lo que se tiene. Ver qué hacemos a partir de ahí.
                 // J: TOTALMENTE. Que sea lo que Dios quiera
 
@@ -372,7 +371,6 @@ namespace Cohete {
                 // Verificamos que sigamos subiendo a buena velocidad como doble chequeo
                 if (datos_sensores->velocidad_vertical_filtrada_m_s > 5.0f) {
                     EnlaceGSE::enviarMensaje("[BOOST] MOTOR APAGADO. MODO BALÍSTICO.");
-                    ESP_LOGI(TAG_BASE, "[BOOST] MOTOR APAGADO. MODO BALÍSTICO.");
 
                     SYSTEM.estado = ST_FASE_BALISTICA;
                     return;
@@ -401,7 +399,7 @@ void f_st_fase_balistica(data_all_t* datos_sensores, uint32_t ms_en_estado) {
     
     // ---------------------------------------------------------
     // 2. GATES DE DETECCIÓN DE APOGEO
-    // ---------------------------------------------------------  
+    // ---------------------------------------------------------
   	const bool vel_apogeo = (datos_sensores->velocidad_vertical_filtrada_m_s <= -0.3f);
     const bool caida_confirmada = (SYSTEM.ctx_fisico.altura_m_max_historica - datos_sensores->altitud_asl_filtrada_m_bmp) >= DIFF_ALTURA_M_APOGEO_CAIDA;
     const bool g_gate_valido = (datos_sensores->aceleracion_vertical_m_s2_mpu > -5.0f && datos_sensores->aceleracion_vertical_m_s2_mpu < 2.0f);
@@ -656,11 +654,11 @@ void f_st_pcaidas_ppal_desplegado(data_all_t* datos_sensores, uint32_t ms_en_est
         // 2. Detener logs de alta frecuencia para salvar batería.
 
 
-        if(ms_en_estado % 500 <= 5){
+        if(ms_en_estado % 1000 <= 10){
             // Suponiendo que los sensores funcionan... MEJOR NO xd
             // SYSTEM.datos_actuales.gps_longitud  = datos_sensores->gps_longitud;  // ya lo actualiza de prepo mde_cohete_actualizar(...)
             // SYSTEM.datos_actuales.gps_latitud   = datos_sensores->gps_latitud;
-            buzzer.playSuccess();
+            Actuators::getBuzzer().playSuccess();
         }
         // 3. Cerrar archivos en la SD (flush y close).
         // 4. Emitir un "beeeeep beeeeep" continuo y transmitir coordenadas Lat/Lon por LoRa cada X segundos.

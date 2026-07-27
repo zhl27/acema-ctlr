@@ -92,7 +92,6 @@ void vTaskLora(void *pvParameters);
 // Prototipos de Inicialización
 // ---------------------------------------------------------
 extern mFlash cajaNegra;
-extern mBuzzer buzzer;
 
 
 
