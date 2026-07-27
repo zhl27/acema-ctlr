@@ -48,8 +48,7 @@ bool LoraWrapped::begin(int sw, char ew, float frec){
         _radio->startReceive(); 
         return true;
     }
-    Serial.println(state);
-    ESP_LOGE("LORA WRAPPED", "Radio lib no pudo inicializar, codigo de erro %d", &state);
+    ESP_LOGE("LORA WRAPPED", "Radio lib no pudo inicializar, codigo de error: %d", state);
     return false;
 }
 

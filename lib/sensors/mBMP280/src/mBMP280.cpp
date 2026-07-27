@@ -73,7 +73,7 @@ data_raw_bmp_t mBMP280::get_bmp_raw_data() {
 #ifdef SENSORES_MOCK
     // 1. CONSTANTES FÍSICAS Y DEL SISTEMA (Únicas fuentes de verdad)
     constexpr float g_val = 9.80665f;
-    constexpr float a_boost = 2.0f * g_val;         // Aceleración neta hacia arriba del motor (2G)
+    constexpr float a_boost = 10.0f * g_val;         // Aceleración neta hacia arriba del motor (2G)
     constexpr float rampa_asl = 100.0f;             // Altura cruda de la rampa sobre nivel del mar
     constexpr unsigned long t_lanzamiento = 50000;  // Despegue en t = 50s (en ms)
     constexpr unsigned long duracion_boost = 10000;  // Duración del quemado
