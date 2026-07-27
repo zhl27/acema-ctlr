@@ -47,7 +47,7 @@ bool init_hardware(); // Corregí el typo de "initHarware" a "initHardware"
  /**
  * @brief Aplica la lógica de boot y decide el estado de inicio
  */
-void run_boot_logic(bool);
+// void run_boot_logic(bool);
 
  /**
  * @brief Inicializa el lora y canal de comunicaciones 

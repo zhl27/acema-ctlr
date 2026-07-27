@@ -58,7 +58,7 @@ namespace Cohete {
         },
     };
 
-    ConfigDatos CONFIG_RESTAURACION = {}; // debe ser inicializado por la Flash
+    // ConfigDatos CONFIG_RESTAURACION = {}; // debe ser inicializado por la Flash
 
     // correlativo a estado_vuelo_t --> el orden importa
     const f_st_t MDE_COHETE[] = {
@@ -106,7 +106,7 @@ namespace Cohete {
         if (SYSTEM.estado != SYSTEM.estado_anterior) {
             SYSTEM.timestamp_millis_entrada_estado = ahora_ms;
             SYSTEM.estado_anterior = SYSTEM.estado;
-            CONFIG_RESTAURACION.estado = SYSTEM.estado;
+            // CONFIG_RESTAURACION.estado = SYSTEM.estado;
             ESP_LOGI(TAG_BASE, " -> Entrando al estado: %s", estado_cohete_string[SYSTEM.estado]);
         }
 
@@ -120,7 +120,12 @@ namespace Cohete {
 
         // Actualizar datos derivados de contexto físico
         SYSTEM.ctx_fisico.altitud_m_relativa_al_pad = datos_sensores->altitud_asl_filtrada_m_bmp - SYSTEM.ctx_fisico.altitud_m_pad;
-        CONFIG_RESTAURACION.altitud_actual_relativa_al_pad = SYSTEM.ctx_fisico.altitud_m_relativa_al_pad;
+
+
+        // CONFIG_RESTAURACION.altitud_actual_relativa_al_pad = SYSTEM.ctx_fisico.altitud_m_relativa_al_pad;
+        //
+        // CONFIG_RESTAURACION.t_time_ms_mision_anterior =
+        // CONFIG_RESTAURACION.t_time_us_mision_anterior
 
         // Ejecutar el estado pasando los datos y el tiempo transcurrido
         MDE_COHETE[SYSTEM.estado](datos_sensores, ms_en_estado);

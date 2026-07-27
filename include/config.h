@@ -61,7 +61,6 @@ namespace ConfigInit {
     constexpr int SERVO_PIN  =  27;  
     
 
-    // TODO: CAMBIAR LOS PINES POR LOS REALES
     constexpr uint8_t PIRO_PRINCIPAL_PIN                = 13;
     constexpr uint8_t CONTINUIDAD_PIRO_PRINCIPAL_PIN    = 35;
 

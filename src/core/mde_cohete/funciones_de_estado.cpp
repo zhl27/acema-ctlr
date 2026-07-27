@@ -17,23 +17,23 @@
 constexpr float     A_GRAV                                  = 9.81;
 constexpr float     ACEL_M_S2_UMBRAL_BOOST                  = 2 * A_GRAV;   // 2G (acorde a requerimientos)
 constexpr int       TIEMPO_MS_MIN_BOOST                     = 200;          // 0.2 segundos en milisegundos (acorde a requerimientos)
-constexpr uint32_t  CONEXION_GSE_TIMEOUT_MILLIS             = 1000;         // Solo debemos esperar un minuto
+constexpr uint32_t  CONEXION_GSE_TIMEOUT_MILLIS             = 1000*60;         // Solo debemos esperar un minuto
 constexpr uint8_t   CANT_REINTENTOS_TMOUT                   = 2;            // Cantidad de reintentos que hacemos para conectarnos a la gse
-constexpr float     ALTURA_M_MAX                            = 1000;         // TODO: chequear ALTURA_M_MAX. Igual nos importa realmente este dato?
-constexpr float     ALTURA_M_MIN                            = 500;
-constexpr uint32_t  GPS_TIMEOUT_MILLIS                      = 1000*5;
-constexpr uint32_t  TIEMPO_MILLIS_ESPERA_WARMUP_MPU         = 1000*20;
+// constexpr float     ALTURA_M_MAX                            = 1000;         // TODO: chequear ALTURA_M_MAX.
+// constexpr float     ALTURA_M_MIN                            = 500;
+constexpr uint32_t  GPS_TIMEOUT_MILLIS                      = 1000*60*5;
+constexpr uint32_t  TIEMPO_MILLIS_ESPERA_WARMUP_MPU         = 1000*60*5;
 constexpr int       DIFF_ALTURA_M_APOGEO_CAIDA              = 10;
 constexpr int       ALTITUD_DESPLIEGUE_PCAIDAS_PPAL         = 250;
 
 
 namespace Cohete {
-    uint32_t t_time_ms() {
-        return CONFIG_RESTAURACION.t_time_ms_mision_anterior + millis();
-    }
-    uint64_t t_time_us() {
-        return CONFIG_RESTAURACION.t_time_us_mision_anterior + micros();
-    }
+    // uint32_t t_time_ms() {
+    //     return CONFIG_RESTAURACION.t_time_ms_mision_anterior + millis();
+    // }
+    // uint64_t t_time_us() {
+    //     return CONFIG_RESTAURACION.t_time_us_mision_anterior + micros();
+    // }
 
     namespace Timers
     {
@@ -46,9 +46,10 @@ namespace Cohete {
                 ESP_LOGI(TAG_BASE, "Temporizador xTimerRecalibrarMPU disparado!");
                 ESP_LOGI(TAG_BASE, "Calibrando MPU6050.");
 
-                const mMPU6050::CalibrationStatus res = Sensors::getMPU6050().calibrar();
+                constexpr mMPU6050::GravityAxis nuestro_eje_vertical = mMPU6050::GravityAxis::PLUS_Y;
+                mMPU6050::CalibrationStatus result =  Sensors::getMPU6050().calibrar(nuestro_eje_vertical); // <-- Calibración segura en tierra
 
-                if (res == mMPU6050::CalibrationStatus::Ok) {
+                if (result == mMPU6050::CalibrationStatus::Ok) {
                     flag_recalibrarMPU_disparado = true;
                     ESP_LOGI(TAG_BASE, "Calibración de MPU6050 exitosa.");
                 }
@@ -185,7 +186,6 @@ namespace Cohete {
 
         if(Timers::xTimerRecalibrarMPU != NULL ) {
             /* Iniciamos el temporizador con un tiempo de bloqueo (block time) de 0 */
-            ESP_LOGI(TAG_BASE, " -> [INIT] Temporizador xTimerRecalibrarMPU creado. Se disparará en 5 minutos"); // TODO: mejorar sistema de logging
             xTimerStart(Timers::xTimerRecalibrarMPU, 0 );
             if(EnlaceGSE::enviarMensaje("[INIT] Temporizador xTimerRecalibrarMPU creado. Se disparará en 5 minutos")){
                 ESP_LOGI(TAG_BASE, "Mensaje enviado a enlaceGSE");
@@ -199,7 +199,7 @@ namespace Cohete {
         auto configurar_altura_rampa = [](void* pvParameters) {
             SYSTEM.ctx_fisico.altitud_m_pad = Sensors::getBMP280().get_altitude_media_iterations(); // esta cosa es bloqueante!
             ESP_LOGI("configurar_altura_rampa", "Altitud ASL de rampa: %f m\n", SYSTEM.ctx_fisico.altitud_m_pad);
-            CONFIG_RESTAURACION.altitud_del_pad = SYSTEM.ctx_fisico.altitud_m_pad;
+            // CONFIG_RESTAURACION.altitud_del_pad = SYSTEM.ctx_fisico.altitud_m_pad;
             vTaskDelete(NULL);
         };
         xTaskCreatePinnedToCore(configurar_altura_rampa, "calcular_altura_rampa", 2*1024, NULL, ConfigInit::TASK_PRIORITY_COMMON, NULL, 1);

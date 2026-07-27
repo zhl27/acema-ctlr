@@ -77,17 +77,17 @@ bool init_black_box()
         return false; // false? sep, porque malió sal
     }
 
-    // Recuperamos valores guardados en Flash
-    if(!cajaNegra.recuperarConfig(&Cohete::CONFIG_RESTAURACION, sizeof(Cohete::CONFIG_RESTAURACION))){
-        if(EnlaceGSE::enviarError("No se pudo cargar la configuracion guardada en Flash"))
-        {
-            ESP_LOGI("INIT_BLACK_BOX","No se pudo cargar la configuracion guardada en Flash");
-        }
-        else {
-            ESP_LOGE("INIT_BLACK_BOX", "EnlaceGSE roto");
-        }
-        return false; // false? sep, porque malió sal
-    }
+    // // Recuperamos valores guardados en Flash
+    // if(!cajaNegra.recuperarConfig(&Cohete::CONFIG_RESTAURACION, sizeof(Cohete::CONFIG_RESTAURACION))){
+    //     if(EnlaceGSE::enviarError("No se pudo cargar la configuracion guardada en Flash"))
+    //     {
+    //         ESP_LOGI("INIT_BLACK_BOX","No se pudo cargar la configuracion guardada en Flash");
+    //     }
+    //     else {
+    //         ESP_LOGE("INIT_BLACK_BOX", "EnlaceGSE roto");
+    //     }
+    //     return false; // false? sep, porque malió sal
+    // }
     return true;
 }
 
@@ -120,62 +120,62 @@ bool init_hardware() {
 // Se esperaría en algun momento, limpiar el logger antes de despegar,
 // mas no, que sea condición para el depegue
 // LOGICA DE MAQUINA DE ESTADOS: Esto puede ir en la FSM para prevenir los reinicios
-void run_boot_logic(const bool sensores_inicializaron_bien) {
-
-    if(!sensores_inicializaron_bien){
-        Cohete::CONFIG_RESTAURACION.estado = Cohete::ST_INIT; // comenzamos MdE desde cero.
-        return;
-    }
-    ESP_LOGI("BOOT_LOGIC", "Evaluando estado de vuelo post-reinicio...");
-
-    constexpr mMPU6050::GravityAxis nuestro_eje_vertical = mMPU6050::GravityAxis::PLUS_Y;
-
-    // INTERLOCK 1: ¿La misión había sido armada/iniciada antes del reinicio?
-    if (Cohete::CONFIG_RESTAURACION.mision_activa == true) {
-
-        // INTERLOCK 2: Validación por sensores (se asume que Sensors::get_raw_data obtiene una lectura válida)
-        data_raw_t raw_data = {};
-        float altitud_actual = {}; // TODO: 0.0f ?
-        // Descarta ruido inicial
-        for (size_t i = 0; i < 50; i++)
-        {
-            raw_data = Sensors::get_raw_data();
-            altitud_actual = raw_data.bmp.altitud_snm_m;
-        }
-
-        // Comparamos la altitud actual con la altitud base guardada en flash
-        if ((altitud_actual - Cohete::CONFIG_RESTAURACION.altitud_del_pad) > 20.0f) {
-            // ¡ESTAMOS EN EL AIRE REALMENTE! Recuperando vuelo.
-            ESP_LOGW("BOOT_LOGIC", "¡Reinicio en vuelo detectado! Saltando calibración IMU.");
-            // Cohete::SYSTEM.config_actual.estado_cohete_actual = Cohete::ST_BOOST;
-            Cohete::SYSTEM.estado = Cohete::ST_BOOST; // TODO: No seria mejor chequear el ultimo estado en el que estuvo ? Y restaurar ese de prepo ??
-
-            // Aquí NO se llama a Sensors::calibrar(). El filtro dependerá de los offsets guardados
-            // previamente en el flash, o usará valores por defecto seguros.
-            math::Vector3f biasAccel = Cohete::CONFIG_RESTAURACION.bias.accel;
-            math::Vector3f biasGyro = Cohete::CONFIG_RESTAURACION.bias.gyro;
-            Sensors::getMPU6050().setBias(biasAccel,biasGyro);
-            // NOTE: no importa setear el eje de gravedad, pues eso se quedó guardado en la bias
-
-        } else {
-            // Falsa alarma. Se armó, pero nunca despegó (o ya aterrizó).
-            ESP_LOGI("BOOT_LOGIC", "Misión activa pero en tierra. Calibrando sensores...");
-            // Cohete::SYSTEM.config_actual.estado_cohete_actual = Cohete::ST_INIT;
-            Cohete::SYSTEM.estado = Cohete::ST_INIT;
-            mMPU6050::CalibrationStatus result = Sensors::getMPU6050().calibrar(nuestro_eje_vertical); // <-- Calibración segura en tierra
-            Cohete::CONFIG_RESTAURACION.bias.accel = Sensors::getMPU6050().get_calibration_result().accel_bias;
-            Cohete::CONFIG_RESTAURACION.bias.gyro = Sensors::getMPU6050().get_calibration_result().gyro_bias;
-        }
-
-    } else {
-        // No hay misión activa. Arranque normal.
-        ESP_LOGI("BOOT_LOGIC", "Arranque normal de prevuelo. Calibrando sensores...");
-        Cohete::SYSTEM.estado = Cohete::ST_INIT;
-        mMPU6050::CalibrationStatus result =  Sensors::getMPU6050().calibrar(nuestro_eje_vertical); // <-- Calibración segura en tierra
-        Cohete::CONFIG_RESTAURACION.bias.accel = Sensors::getMPU6050().get_calibration_result().accel_bias;
-        Cohete::CONFIG_RESTAURACION.bias.gyro = Sensors::getMPU6050().get_calibration_result().gyro_bias;
-    }
-}
+// void run_boot_logic(const bool sensores_inicializaron_bien) {
+//
+//     if(!sensores_inicializaron_bien){
+//         Cohete::CONFIG_RESTAURACION.estado = Cohete::ST_INIT; // comenzamos MdE desde cero.
+//         return;
+//     }
+//     ESP_LOGI("BOOT_LOGIC", "Evaluando estado de vuelo post-reinicio...");
+//
+//     constexpr mMPU6050::GravityAxis nuestro_eje_vertical = mMPU6050::GravityAxis::PLUS_Y;
+//
+//     // INTERLOCK 1: ¿La misión había sido armada/iniciada antes del reinicio?
+//     if (Cohete::CONFIG_RESTAURACION.mision_activa == true) {
+//
+//         // INTERLOCK 2: Validación por sensores (se asume que Sensors::get_raw_data obtiene una lectura válida)
+//         data_raw_t raw_data = {};
+//         float altitud_actual = {}; // TODO: 0.0f ?
+//         // Descarta ruido inicial
+//         for (size_t i = 0; i < 50; i++)
+//         {
+//             raw_data = Sensors::get_raw_data();
+//             altitud_actual = raw_data.bmp.altitud_snm_m;
+//         }
+//
+//         // Comparamos la altitud actual con la altitud base guardada en flash
+//         if ((altitud_actual - Cohete::CONFIG_RESTAURACION.altitud_del_pad) > 20.0f) {
+//             // ¡ESTAMOS EN EL AIRE REALMENTE! Recuperando vuelo.
+//             ESP_LOGW("BOOT_LOGIC", "¡Reinicio en vuelo detectado! Saltando calibración IMU.");
+//             // Cohete::SYSTEM.config_actual.estado_cohete_actual = Cohete::ST_BOOST;
+//             Cohete::SYSTEM.estado = Cohete::ST_BOOST; // TODO: No seria mejor chequear el ultimo estado en el que estuvo ? Y restaurar ese de prepo ??
+//
+//             // Aquí NO se llama a Sensors::calibrar(). El filtro dependerá de los offsets guardados
+//             // previamente en el flash, o usará valores por defecto seguros.
+//             math::Vector3f biasAccel = Cohete::CONFIG_RESTAURACION.bias.accel;
+//             math::Vector3f biasGyro = Cohete::CONFIG_RESTAURACION.bias.gyro;
+//             Sensors::getMPU6050().setBias(biasAccel,biasGyro);
+//             // NOTE: no importa setear el eje de gravedad, pues eso se quedó guardado en la bias
+//
+//         } else {
+//             // Falsa alarma. Se armó, pero nunca despegó (o ya aterrizó).
+//             ESP_LOGI("BOOT_LOGIC", "Misión activa pero en tierra. Calibrando sensores...");
+//             // Cohete::SYSTEM.config_actual.estado_cohete_actual = Cohete::ST_INIT;
+//             Cohete::SYSTEM.estado = Cohete::ST_INIT;
+//             mMPU6050::CalibrationStatus result = Sensors::getMPU6050().calibrar(nuestro_eje_vertical); // <-- Calibración segura en tierra
+//             Cohete::CONFIG_RESTAURACION.bias.accel = Sensors::getMPU6050().get_calibration_result().accel_bias;
+//             Cohete::CONFIG_RESTAURACION.bias.gyro = Sensors::getMPU6050().get_calibration_result().gyro_bias;
+//         }
+//
+//     } else {
+//         // No hay misión activa. Arranque normal.
+//         ESP_LOGI("BOOT_LOGIC", "Arranque normal de prevuelo. Calibrando sensores...");
+//         Cohete::SYSTEM.estado = Cohete::ST_INIT;
+//         mMPU6050::CalibrationStatus result =  Sensors::getMPU6050().calibrar(nuestro_eje_vertical); // <-- Calibración segura en tierra
+//         Cohete::CONFIG_RESTAURACION.bias.accel = Sensors::getMPU6050().get_calibration_result().accel_bias;
+//         Cohete::CONFIG_RESTAURACION.bias.gyro = Sensors::getMPU6050().get_calibration_result().gyro_bias;
+//     }
+// }
 
 
 void init_lora(){
@@ -739,30 +739,31 @@ CmdResult cmd_set_angulo_servo(float value, void* context) {
     // Devolvemos status 1 (Éxito) y el ángulo final aplicado
     return CmdResult{.status = 1, .data = angulo_seguro};
 }
+//
+// CmdResult comandoOnPiro(float value, void* context){
+//     Actuators::getPyroDrogue()
+//     return {1, 0.0f}; // Status OK temporal
+// }
+//
+// CmdResult comandoOffPiro(float value, void* context){
+//     return {1, 0.0f}; // Status OK temporal
+// }
 
-CmdResult comandoOnPiro(float value, void* context){
-    return {1, 0.0f}; // Status OK temporal
-}
+// CmdResult comando_disparar_piro(float value, void* context){
+//     mPyro* p = static_cast<mPyro*>(context);
+//
+//     bool ok = p->disparar(static_cast<uint32_t>(value));
+//
+//     CmdResult res;
+//     res.status = ok ? 1 : 0;
+//     res.data = 0.0f; // No hay dato que devolver en un disparo
+//
+//     return res;
+// }
 
-CmdResult comandoOffPiro(float value, void* context){
-    return {1, 0.0f}; // Status OK temporal
-}
-
-CmdResult comando_disparar_piro(float value, void* context){
-    mPyro* p = static_cast<mPyro*>(context);
-    
-    bool ok = p->disparar(static_cast<uint32_t>(value));
-    
-    CmdResult res;
-    res.status = ok ? 1 : 0;
-    res.data = 0.0f; // No hay dato que devolver en un disparo
-    
-    return res;
-}
-
-CmdResult comandoDesplegarDrogue(float value, void* context){
-    return {1, 0.0f}; // Status OK temporal
-}
+// CmdResult comandoDesplegarDrogue(float value, void* context){
+//     return {1, 0.0f}; // Status OK temporal
+// }
 
 CmdResult cmd_borrar_log(float value, void* context) {
     ESP_LOGI("CMD", "Solicitud de borrado de memoria recibida por LoRa.");

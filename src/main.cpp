@@ -36,7 +36,7 @@ void setup() {
     }
 
     // Lógica de Boot y Diagnóstico de Vuelo (Decide estado y si calibra o no)
-    run_boot_logic(hw_iniciado_con_exito);
+    // run_boot_logic(hw_iniciado_con_exito);
 
     // Inicialización de Comunicaciones RF y Comandos
     init_lora();
