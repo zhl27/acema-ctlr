@@ -96,7 +96,6 @@ namespace Cohete {
 #define ALTITUD_FALLBACK_M             12.0f  // Altura de redundancia
 #define VELOCIDAD_VERT_MIN_FALLBACK    5.0f   // ~5 m/s para validar que realmente subimos (evita viento en rampa)
         bool hay_boost_garantizado(const data_all_t *datos_sensores) {
-            // 1. Regla NASA: Validación defensiva de punteros
             if (datos_sensores == NULL) {
                 return false;
             }
@@ -111,15 +110,11 @@ namespace Cohete {
             static uint32_t timestamp_ultima_acel_valida = 0;
             static uint32_t timestamp_millis_inicio_pico_g = 0;
 
-            Serial.printf("aceleracion_vertical_m_s2_mpu=%f\n", datos_sensores->aceleracion_vertical_m_s2_mpu);
+            // Serial.printf("aceleracion_vertical_m_s2_mpu=%f\n", datos_sensores->aceleracion_vertical_m_s2_mpu);
             // 1. Evaluación de Aceleración con Ventana de Tolerancia (Debounce)
             if (datos_sensores->aceleracion_vertical_m_s2_mpu >= ACEL_M_S2_UMBRAL_BOOST) {
                 if (timestamp_millis_inicio_pico_g == 0) {
-                    Serial.printf("Sospecha de BOOOOOOST\n");
-                    Serial.printf("Sospecha de BOOOOOOST\n");
-                    Serial.printf("Sospecha de BOOOOOOST\n");
-                    Serial.printf("Sospecha de BOOOOOOST\n");
-                    Serial.printf("Sospecha de BOOOOOOST\n");
+                    EnlaceGSE::enviarMensaje("Sospecha de BOOST");
                     timestamp_millis_inicio_pico_g = ahora_ms;
                 }
                 timestamp_ultima_acel_valida = ahora_ms;
@@ -132,16 +127,20 @@ namespace Cohete {
                     timestamp_millis_inicio_pico_g = 0;
                     timestamp_ultima_acel_valida = 0;
                 }
+                EnlaceGSE::enviarMensaje("Falsa detección de BOOST");
+                ESP_LOGI(TAG_BASE, "Falsa detección de BOOST");
             }
 
             // 2. Condición Principal: Empuje sostenido en tiempo + Salida física de rampa
             if (timestamp_millis_inicio_pico_g != 0) {
                 const uint32_t duracion_pico_ms = ahora_ms - timestamp_millis_inicio_pico_g;
 
-                Serial.printf("SYSTEM.ctx_fisico.altitud_m_relativa_al_pad=%f\n", SYSTEM.ctx_fisico.altitud_m_relativa_al_pad);
-                Serial.printf("SYSTEM.ctx_fisico.altitud_m_pad=%f\n", SYSTEM.ctx_fisico.altitud_m_pad);
                 Serial.printf("datos_sensores->altitud_filtrada_m_bmp=%f\n", datos_sensores->altitud_asl_filtrada_m_bmp);
+                Serial.printf("SYSTEM.ctx_fisico.altitud_m_pad=%f\n", SYSTEM.ctx_fisico.altitud_m_pad);
+                Serial.printf("SYSTEM.ctx_fisico.altitud_m_relativa_al_pad=%f\n", SYSTEM.ctx_fisico.altitud_m_relativa_al_pad);
                 if ((duracion_pico_ms >= TIEMPO_MS_MIN_BOOST) && (SYSTEM.ctx_fisico.altitud_m_relativa_al_pad > ALTITUD_MIN_SALIDA_RAMPA_M)) {
+                    EnlaceGSE::enviarMensaje("BOOST Confirmado");
+                    ESP_LOGI(TAG_BASE, "BOOST Confirmado");
                     timestamp_millis_inicio_pico_g = 0;
                     timestamp_ultima_acel_valida = 0;
                     return true; // Despegue nominal confirmado (IMU + Barómetro)
@@ -150,6 +149,8 @@ namespace Cohete {
 
             // 3. Condición de Redundancia / Fallback Robusta (Fallo de acelerómetro)
             if (SYSTEM.ctx_fisico.altitud_m_relativa_al_pad > ALTITUD_FALLBACK_M) {
+                EnlaceGSE::enviarMensaje("BOOST Confirmado por fallback (diferencia de altitud");
+                ESP_LOGI(TAG_BASE, "BOOST Confirmado por fallback (diferencia de altitud");
                 timestamp_millis_inicio_pico_g = 0;
                 timestamp_ultima_acel_valida = 0;
                 return true; // Despegue confirmado por cinemática pura
@@ -430,7 +431,7 @@ void f_st_fase_balistica(data_all_t* datos_sensores, uint32_t ms_en_estado) {
                 
                 SYSTEM.flags.drogue_disparado = true;
                 SYSTEM.timestamp_micros_apertura_drogue = micros(); 
-            } 
+            }
             // FALLBACK: Drogue sin continuidad -> Disparar Principal directo
             else if (Actuators::getPyroPpal().tieneContinuidad()) {
                 ESP_LOGW(TAG_BASE, "[APOGEO] Drogue SIN continuidad. Disparando Principal (FALLBACK)...");
